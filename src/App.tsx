@@ -1303,9 +1303,18 @@ function App() {
               <div className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 shadow-sm shadow-slate-100">
                 <History className="h-4 w-4 text-slate-500" />
                 <div>
-                  <div className="text-xs text-slate-500">总点数（含场供）</div>
+                  <div className="text-xs text-slate-500">玩家持有点数</div>
                   <div className="font-semibold tabular-nums tracking-tight">
-                    {formatPoints(totalWithKyotaku)} / 100,000
+                    <span
+                      className={`${
+                        totalPoints === 100000
+                          ? "text-emerald-600"
+                          : "text-rose-600"
+                      }`}
+                    >
+                      {formatPoints(totalPoints)}
+                    </span>{" "}
+                    / 100,000
                   </div>
                 </div>
               </div>
@@ -1914,11 +1923,11 @@ function App() {
                           <div>
                             <div className="max-h-[80vh] overflow-y-auto pr-2 text-xs">
                               <div className="flex flex-wrap gap-2">
-                                {
-                                  state.history.length < 1 && (
-                                    <div className="text-slate-400">暂无历史记录</div>
-                                  )
-                                }
+                                {state.history.length < 1 && (
+                                  <div className="text-slate-400">
+                                    暂无历史记录
+                                  </div>
+                                )}
                                 {state.history.map((h) => (
                                   <div
                                     key={h.id}
