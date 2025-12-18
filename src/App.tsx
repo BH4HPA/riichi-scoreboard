@@ -97,12 +97,6 @@ interface CoreSnapshot {
   names: string[];
 }
 
-interface LastSettlementMeta {
-  type: SettlementType;
-  summary: string;
-  timestamp: string;
-}
-
 interface GameState {
   past: CoreSnapshot[];
   present: CoreSnapshot;
@@ -190,7 +184,7 @@ function calcBasePoints(han: number, fu: number): number {
   if (han >= 5) return 2000;
 
   // 满贯以下按公式 + 切上满贯
-  let raw = fu * Math.pow(2, han + 2);
+  const raw = fu * Math.pow(2, han + 2);
 
   // 切上满贯：30符4翻、60符3翻视为满贯
   if ((han === 4 && fu === 30) || (han === 3 && fu === 60)) {
@@ -525,9 +519,9 @@ function App() {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
-      const parsed = JSON.parse(raw) as any;
+      const parsed = JSON.parse(raw) as GameState;
       if (parsed && parsed.present) {
-        setState(parsed as GameState);
+        setState(parsed);
       }
     } catch (e) {
       console.error("Failed to load scoreboard state", e);
@@ -546,6 +540,7 @@ function App() {
       setSettleOpen(true);
       setShouldSettle(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shouldSettle]);
 
   const roundInfo = getRoundInfo(state.present.kyokuIndex, state.present.honba);
@@ -1094,7 +1089,7 @@ function App() {
       const dealerTenpai = drawTenpai[prev.present.dealerIndex];
 
       let nextDealer = prev.present.dealerIndex;
-      let nextHonba = prev.present.honba + 1;
+      const nextHonba = prev.present.honba + 1;
       let nextKyoku = prev.present.kyokuIndex;
 
       if (!dealerTenpai) {
