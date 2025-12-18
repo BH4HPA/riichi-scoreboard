@@ -1433,7 +1433,7 @@ function App() {
         </section>
 
         {/* Bottom: history & controls */}
-        <section className="grid gap-5 lg:grid-cols-[3fr,2fr]">
+        <section className="grid gap-5 lg:grid-cols-[3fr,1fr]">
           <Card className="border-none bg-white/80 shadow-md shadow-slate-200/70">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <CardTitle className="text-sm font-semibold text-slate-700">
