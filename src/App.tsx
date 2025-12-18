@@ -90,7 +90,7 @@ interface CoreSnapshot {
   points: number[];
   kyotaku: number; // 场供立直棒数量
   honba: number;
-  kyokuIndex: number; // 0-3: 东1-4, 4-7: 南1-4
+  kyokuIndex: number; // 0-3: 东1-4, 4-7: 南1-4, 8: 结束
   dealerIndex: SeatIndex;
   history: HistoryEntry[];
   // 当前四家的昵称（按东南西北顺序）
@@ -104,20 +104,9 @@ interface LastSettlementMeta {
 }
 
 interface GameState {
-  points: number[];
-  kyotaku: number; // 场供立直棒数量
-  honba: number;
-  kyokuIndex: number; // 0-3: 东1-4, 4-7: 南1-4
-  dealerIndex: SeatIndex;
-  history: HistoryEntry[];
-  // 当前四家的昵称（按东南西北顺序）
-  names: string[];
-  // 最近一次结算前后的快照，用于撤销 / 重做
-  lastSettlementBefore: CoreSnapshot | null;
-  lastSettlementAfter: CoreSnapshot | null;
-  lastSettlementMeta: LastSettlementMeta | null;
-  // 当前是否处于“撤销后”的状态，控制重做按钮可用性
-  isInUndo: boolean;
+  past: CoreSnapshot[];
+  present: CoreSnapshot;
+  future: CoreSnapshot[];
 }
 
 function createDefaultNames(): string[] {
@@ -135,37 +124,17 @@ function sanitizeNames(input: unknown): string[] {
 
 function createInitialGameState(): GameState {
   return {
-    points: [25000, 25000, 25000, 25000],
-    kyotaku: 0,
-    honba: 0,
-    kyokuIndex: 0,
-    dealerIndex: 0,
-    history: [],
-    names: createDefaultNames(),
-    lastSettlementBefore: null,
-    lastSettlementAfter: null,
-    lastSettlementMeta: null,
-    isInUndo: false,
-  };
-}
-
-function createCoreSnapshotFromState(source: {
-  points: number[];
-  kyotaku: number;
-  honba: number;
-  kyokuIndex: number;
-  dealerIndex: SeatIndex;
-  history: HistoryEntry[];
-  names: string[];
-}): CoreSnapshot {
-  return {
-    points: [...source.points],
-    kyotaku: source.kyotaku,
-    honba: source.honba,
-    kyokuIndex: source.kyokuIndex,
-    dealerIndex: source.dealerIndex,
-    history: [...source.history],
-    names: [...source.names],
+    past: [],
+    present: {
+      points: [25000, 25000, 25000, 25000],
+      kyotaku: 0,
+      honba: 0,
+      kyokuIndex: 0,
+      dealerIndex: 0,
+      history: [],
+      names: createDefaultNames(),
+    },
+    future: [],
   };
 }
 
@@ -286,7 +255,7 @@ interface SettlementPreview {
  * 预览自摸结算对四家点数与场供的影响
  */
 function computeTsumoPreview(
-  state: GameState,
+  state: CoreSnapshot,
   winner: SeatIndex | null,
   hanInput: string,
   fuInput: string,
@@ -363,7 +332,7 @@ function computeTsumoPreview(
  * 预览荣和结算对四家点数与场供的影响
  */
 function computeRonPreview(
-  state: GameState,
+  state: CoreSnapshot,
   winner: SeatIndex | null,
   loser: SeatIndex | null,
   hanInput: string,
@@ -417,7 +386,7 @@ function computeRonPreview(
  * 预览流局结算对四家点数与场供的影响
  */
 function computeDrawPreview(
-  state: GameState,
+  state: CoreSnapshot,
   tenpaiFlags: boolean[],
   riichiFlags: boolean[]
 ): SettlementPreview {
@@ -557,28 +526,8 @@ function App() {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const parsed = JSON.parse(raw) as any;
-      if (
-        parsed &&
-        Array.isArray(parsed.points) &&
-        parsed.points.length === 4 &&
-        typeof parsed.honba === "number" &&
-        typeof parsed.kyokuIndex === "number" &&
-        typeof parsed.dealerIndex === "number"
-      ) {
-        const baseState: GameState = {
-          points: parsed.points,
-          kyotaku: typeof parsed.kyotaku === "number" ? parsed.kyotaku : 0,
-          honba: parsed.honba,
-          kyokuIndex: parsed.kyokuIndex,
-          dealerIndex: ensureSeatIndex(parsed.dealerIndex),
-          history: Array.isArray(parsed.history) ? parsed.history : [],
-          names: sanitizeNames(parsed.names),
-          lastSettlementBefore: parsed.lastSettlementBefore ?? null,
-          lastSettlementAfter: parsed.lastSettlementAfter ?? null,
-          lastSettlementMeta: parsed.lastSettlementMeta ?? null,
-          isInUndo: parsed.isInUndo ?? false,
-        };
-        setState(baseState);
+      if (parsed && parsed.present) {
+        setState(parsed as GameState);
       }
     } catch (e) {
       console.error("Failed to load scoreboard state", e);
@@ -599,9 +548,8 @@ function App() {
     }
   }, [shouldSettle]);
 
-  const roundInfo = getRoundInfo(state.kyokuIndex, state.honba);
-  const totalPoints = state.points.reduce((sum, v) => sum + v, 0);
-  const totalWithKyotaku = totalPoints + state.kyotaku * 1000;
+  const roundInfo = getRoundInfo(state.present.kyokuIndex, state.present.honba);
+  const totalPoints = state.present.points.reduce((sum, v) => sum + v, 0);
 
   const beijingTime = useMemo(() => {
     try {
@@ -629,20 +577,20 @@ function App() {
 
   const diffMatrix = useMemo(
     () =>
-      state.points.map((score, i) =>
-        state.points.map((other, j) => (i === j ? 0 : score - other))
+      state.present.points.map((score, i) =>
+        state.present.points.map((other, j) => (i === j ? 0 : score - other))
       ),
-    [state.points]
+    [state.present.points]
   );
 
   const playerRanks = useMemo(
-    () => computePlayerRanks(state.points),
-    [state.points]
+    () => computePlayerRanks(state.present.points),
+    [state.present.points]
   );
 
   const uma = useMemo(
-    () => computeUma(state.points, playerRanks),
-    [state.points, playerRanks]
+    () => computeUma(state.present.points, playerRanks),
+    [state.present.points, playerRanks]
   );
 
   const bestRank = useMemo(
@@ -657,56 +605,52 @@ function App() {
 
   const rankingList = useMemo(
     () =>
-      state.points
+      state.present.points
         .map((score, index) => ({
           index,
           score,
           rank: playerRanks[index] ?? 0,
-          name: state.names[index],
+          name: state.present.names[index],
         }))
         .sort((a, b) => {
           if (a.rank !== b.rank) return a.rank - b.rank;
           return a.index - b.index;
         }),
-    [state.points, state.names, playerRanks]
+    [state.present.points, state.present.names, playerRanks]
   );
 
   const tsumoPreview = useMemo(
     () =>
-      computeTsumoPreview(state, tsumoWinner, tsumoHan, tsumoFu, tsumoRiichi),
-    [state, tsumoWinner, tsumoHan, tsumoFu, tsumoRiichi]
+      computeTsumoPreview(state.present, tsumoWinner, tsumoHan, tsumoFu, tsumoRiichi),
+    [state.present, tsumoWinner, tsumoHan, tsumoFu, tsumoRiichi]
   );
 
   const ronPreview = useMemo(
     () =>
-      computeRonPreview(state, ronWinner, ronLoser, ronHan, ronFu, ronRiichi),
-    [state, ronWinner, ronLoser, ronHan, ronFu, ronRiichi]
+      computeRonPreview(state.present, ronWinner, ronLoser, ronHan, ronFu, ronRiichi),
+    [state.present, ronWinner, ronLoser, ronHan, ronFu, ronRiichi]
   );
 
   const drawPreview = useMemo(
-    () => computeDrawPreview(state, drawTenpai, drawRiichi),
-    [state, drawTenpai, drawRiichi]
+    () => computeDrawPreview(state.present, drawTenpai, drawRiichi),
+    [state.present, drawTenpai, drawRiichi]
   );
 
-  const hasLastSettlement = Boolean(
-    state.lastSettlementBefore &&
-      state.lastSettlementAfter &&
-      state.lastSettlementMeta
-  );
-  const canUndo = hasLastSettlement && !state.isInUndo;
-  const canRedo = hasLastSettlement && state.isInUndo;
+  const canUndo = state.past.length > 0;
+  const canRedo = state.future.length > 0;
 
   const isGameFinished = useMemo(() => {
-    const lastHistory = state.history[0];
-    return lastHistory?.description.startsWith("终局场供分配");
-  }, [state.history]);
+    return state.present.kyokuIndex >= 8;
+  }, [state.present.kyokuIndex]);
 
   function resetGame(resetNames: boolean) {
-    setState((prev) => ({
-      ...createInitialGameState(),
-      // 默认保留昵称，除非显式要求重置
-      names: resetNames ? createDefaultNames() : prev.names,
-    }));
+    setState(() => {
+      const initial = createInitialGameState();
+      if (!resetNames) {
+        initial.present.names = state.present.names;
+      }
+      return initial;
+    });
     setSessionStart(Date.now());
   }
 
@@ -717,11 +661,11 @@ function App() {
     riichiPlayers: string[],
     deltas: number[]
   ): HistoryEntry {
-    const { label } = getRoundInfo(state.kyokuIndex, state.honba);
+    const { label } = getRoundInfo(state.present.kyokuIndex, state.present.honba);
     const dealerLabel =
-      state.names[state.dealerIndex] ?? PLAYER_LABELS[state.dealerIndex];
+      state.present.names[state.present.dealerIndex] ?? PLAYER_LABELS[state.present.dealerIndex];
     return {
-      id: `${Date.now()}-${state.history.length}`,
+      id: `${Date.now()}-${state.present.history.length}`,
       type,
       roundLabel: label,
       dealerLabel,
@@ -730,7 +674,7 @@ function App() {
       timestamp: new Date().toLocaleString("zh-CN", {
         hour12: false,
       }),
-      playerNames: [...state.names],
+      playerNames: [...state.present.names],
       riichiPlayers: [...riichiPlayers],
       deltas: [...deltas],
     };
@@ -744,65 +688,35 @@ function App() {
     const kyokuIndex = editWind === "东" ? editNumber - 1 : 3 + editNumber;
     setState((prev) => ({
       ...prev,
-      honba: Math.max(0, editHonba),
-      kyokuIndex: kyokuIndex,
-      dealerIndex: editDealer,
+      present: {
+        ...prev.present,
+        honba: Math.max(0, editHonba),
+        kyokuIndex: kyokuIndex,
+        dealerIndex: editDealer,
+      },
     }));
     setEditRoundOpen(false);
   }
 
   function handleUndoLastSettlement() {
     setState((prev) => {
-      if (
-        !prev.lastSettlementBefore ||
-        !prev.lastSettlementAfter ||
-        !prev.lastSettlementMeta
-      ) {
-        return prev;
-      }
-
-      const snapshot = prev.lastSettlementBefore;
-
-      return {
-        ...prev,
-        points: [...snapshot.points],
-        kyotaku: snapshot.kyotaku,
-        honba: snapshot.honba,
-        kyokuIndex: snapshot.kyokuIndex,
-        dealerIndex: snapshot.dealerIndex,
-        history: [...snapshot.history],
-        names: [...snapshot.names],
-        isInUndo: true,
-      };
+      const { past, present, future } = prev;
+      if (past.length === 0) return prev;
+      const newPast = past.slice(0, past.length - 1);
+      const newPresent = past[past.length - 1];
+      const newFuture = [present, ...future];
+      return { past: newPast, present: newPresent, future: newFuture };
     });
   }
 
   function handleRedoLastSettlement() {
     setState((prev) => {
-      if (
-        !prev.lastSettlementBefore ||
-        !prev.lastSettlementAfter ||
-        !prev.lastSettlementMeta
-      ) {
-        return prev;
-      }
-      if (!prev.isInUndo) {
-        return prev;
-      }
-
-      const snapshot = prev.lastSettlementAfter;
-
-      return {
-        ...prev,
-        points: [...snapshot.points],
-        kyotaku: snapshot.kyotaku,
-        honba: snapshot.honba,
-        kyokuIndex: snapshot.kyokuIndex,
-        dealerIndex: snapshot.dealerIndex,
-        history: [...snapshot.history],
-        names: [...snapshot.names],
-        isInUndo: false,
-      };
+      const { past, present, future } = prev;
+      if (future.length === 0) return prev;
+      const newPast = [...past, present];
+      const newPresent = future[0];
+      const newFuture = future.slice(1);
+      return { past: newPast, present: newPresent, future: newFuture };
     });
   }
 
@@ -817,10 +731,9 @@ function App() {
 
     setState((prev) => {
       const winner = tsumoWinner as SeatIndex;
-      const beforeSnapshot = createCoreSnapshotFromState(prev);
-      const winnerName = prev.names[winner] ?? PLAYER_LABELS[winner];
+      const winnerName = prev.present.names[winner] ?? PLAYER_LABELS[winner];
       const dealerName =
-        prev.names[prev.dealerIndex] ?? PLAYER_LABELS[prev.dealerIndex];
+        prev.present.names[prev.present.dealerIndex] ?? PLAYER_LABELS[prev.present.dealerIndex];
       const basePoints = calcBasePoints(han, fu);
       const deltas = [0, 0, 0, 0];
       const riichiIndices: SeatIndex[] = [];
@@ -835,22 +748,22 @@ function App() {
 
       const riichiCount = riichiIndices.length;
       const riichiIncome = riichiCount * 1000;
-      const kyotakuPoints = prev.kyotaku * 1000;
+      const kyotakuPoints = prev.present.kyotaku * 1000;
       const riichiPlayers = riichiIndices.map(
-        (i) => prev.names[i] ?? PLAYER_LABELS[i]
+        (i) => prev.present.names[i] ?? PLAYER_LABELS[i]
       );
 
-      const winnerIsDealer = winner === prev.dealerIndex;
+      const winnerIsDealer = winner === prev.present.dealerIndex;
       let totalBaseFromOthers = 0;
       let totalHonbaFromOthers = 0;
 
       if (winnerIsDealer) {
         // 庄家自摸：其余三家各支付2倍基本点 + 本场
-        prev.points.forEach((_, idx) => {
+        prev.present.points.forEach((_, idx) => {
           if (idx === winner) return;
           const rawBase = 2 * basePoints;
           const basePay = roundUpToHundred(rawBase);
-          const honbaPay = prev.honba * 100;
+          const honbaPay = prev.present.honba * 100;
           const payment = basePay + honbaPay;
           deltas[idx] -= payment;
           totalBaseFromOthers += basePay;
@@ -858,12 +771,12 @@ function App() {
         });
       } else {
         // 闲家自摸：庄家支付2倍基本点，另两闲家各支付1倍基本点
-        prev.points.forEach((_, idx) => {
+        prev.present.points.forEach((_, idx) => {
           if (idx === winner) return;
-          const isDealer = idx === prev.dealerIndex;
+          const isDealer = idx === prev.present.dealerIndex;
           const rawBase = basePoints * (isDealer ? 2 : 1);
           const basePay = roundUpToHundred(rawBase);
-          const honbaPay = prev.honba * 100;
+          const honbaPay = prev.present.honba * 100;
           const payment = basePay + honbaPay;
           deltas[idx] -= payment;
           totalBaseFromOthers += basePay;
@@ -874,7 +787,7 @@ function App() {
       deltas[winner] += totalBaseFromOthers + totalHonbaFromOthers;
       deltas[winner] += kyotakuPoints + riichiIncome;
 
-      const newPoints = applyDeltas(prev.points, deltas);
+      const newPoints = applyDeltas(prev.present.points, deltas);
 
       const winnerGain = deltas[winner];
 
@@ -882,7 +795,7 @@ function App() {
       if (winnerIsDealer) {
         const perBaseRaw = 2 * basePoints;
         const perBasePay = roundUpToHundred(perBaseRaw);
-        const perHonba = prev.honba * 100;
+        const perHonba = prev.present.honba * 100;
         description = `庄家自摸${han}番${fu}符，闲家各支付${formatPoints(
           perBasePay + perHonba
         )}点（其中${formatPoints(perHonba)}点为本场），场供${formatPoints(
@@ -893,10 +806,10 @@ function App() {
       } else {
         const dealerBaseRaw = 2 * basePoints;
         const dealerBasePay = roundUpToHundred(dealerBaseRaw);
-        const dealerHonba = prev.honba * 100;
+        const dealerHonba = prev.present.honba * 100;
         const othersBaseRaw = basePoints;
         const othersBasePay = roundUpToHundred(othersBaseRaw);
-        const othersHonba = prev.honba * 100;
+        const othersHonba = prev.present.honba * 100;
         description = `${winnerName}自摸${han}番${fu}符，庄家${dealerName}支付${formatPoints(
           dealerBasePay + dealerHonba
         )}点（其中${formatPoints(
@@ -919,47 +832,38 @@ function App() {
       );
 
       // 连庄/轮庄 + 本场
-      const winnerIsDealerNow = winner === prev.dealerIndex;
-      let nextDealer = prev.dealerIndex;
-      let nextHonba = prev.honba;
-      let nextKyoku = prev.kyokuIndex;
+      const winnerIsDealerNow = winner === prev.present.dealerIndex;
+      let nextDealer = prev.present.dealerIndex;
+      let nextHonba = prev.present.honba;
+      let nextKyoku = prev.present.kyokuIndex;
 
       if (winnerIsDealerNow) {
-        nextHonba = prev.honba + 1;
+        nextHonba = prev.present.honba + 1;
       } else {
-        nextDealer = ensureSeatIndex(prev.dealerIndex + 1);
+        nextDealer = ensureSeatIndex(prev.present.dealerIndex + 1);
         nextHonba = 0;
-        if (prev.kyokuIndex === 7) {
+        if (prev.present.kyokuIndex === 7) {
           nextKyoku = 8;
           setShouldSettle(true);
         } else {
-          nextKyoku = prev.kyokuIndex + 1;
+          nextKyoku = prev.present.kyokuIndex + 1;
         }
       }
 
-      const afterSnapshot: CoreSnapshot = {
+      const newPresent: CoreSnapshot = {
         points: newPoints,
         kyotaku: 0,
         honba: nextHonba,
         kyokuIndex: nextKyoku,
         dealerIndex: nextDealer,
-        history: [entry, ...prev.history],
-        names: prev.names,
-      };
-
-      const meta: LastSettlementMeta = {
-        type: "tsumo",
-        summary: `${winnerName}自摸（${entry.roundLabel}）`,
-        timestamp: entry.timestamp,
+        history: [entry, ...prev.present.history],
+        names: prev.present.names,
       };
 
       return {
-        ...prev,
-        ...afterSnapshot,
-        lastSettlementBefore: beforeSnapshot,
-        lastSettlementAfter: afterSnapshot,
-        lastSettlementMeta: meta,
-        isInUndo: false,
+        past: [...prev.past, prev.present],
+        present: newPresent,
+        future: [],
       };
     });
 
@@ -968,45 +872,35 @@ function App() {
 
   function handleDistributeKyotaku() {
     setState((prev) => {
-      if (prev.kyotaku === 0) return prev;
+      if (prev.present.kyotaku === 0) return prev;
 
-      const beforeSnapshot = createCoreSnapshotFromState(prev);
-      const kyotakuPoints = prev.kyotaku * 1000;
-      const ranks = computePlayerRanks(prev.points);
+      const kyotakuPoints = prev.present.kyotaku * 1000;
+      const ranks = computePlayerRanks(prev.present.points);
       const winnerIndex = ranks.findIndex((r) => r === 1);
       if (winnerIndex === -1) return prev;
 
       const deltas = [0, 0, 0, 0];
       deltas[winnerIndex] = kyotakuPoints;
 
-      const newPoints = applyDeltas(prev.points, deltas);
-      const winnerName = prev.names[winnerIndex] ?? PLAYER_LABELS[winnerIndex];
+      const newPoints = applyDeltas(prev.present.points, deltas);
+      const winnerName = prev.present.names[winnerIndex] ?? PLAYER_LABELS[winnerIndex];
 
       const description = `终局场供分配：${winnerName} 收入 ${formatPoints(
         kyotakuPoints
       )} 点。`;
       const entry = buildHistoryEntry("draw", description, 0, [], deltas);
 
-      const afterSnapshot: CoreSnapshot = {
-        ...beforeSnapshot,
+      const newPresent: CoreSnapshot = {
+        ...prev.present,
         points: newPoints,
         kyotaku: 0,
-        history: [entry, ...prev.history],
-      };
-
-      const meta: LastSettlementMeta = {
-        type: "draw",
-        summary: `场供分配（${entry.roundLabel}）`,
-        timestamp: entry.timestamp,
+        history: [entry, ...prev.present.history],
       };
 
       return {
-        ...prev,
-        ...afterSnapshot,
-        lastSettlementBefore: beforeSnapshot,
-        lastSettlementAfter: afterSnapshot,
-        lastSettlementMeta: meta,
-        isInUndo: false,
+        past: [...prev.past, prev.present],
+        present: newPresent,
+        future: [],
       };
     });
   }
@@ -1027,7 +921,6 @@ function App() {
     setState((prev) => {
       const winner = ronWinner as SeatIndex;
       const loser = ronLoser as SeatIndex;
-      const beforeSnapshot = createCoreSnapshotFromState(prev);
       const basePoints = calcBasePoints(han, fu);
       const deltas = [0, 0, 0, 0];
       const riichiIndices: SeatIndex[] = [];
@@ -1042,26 +935,26 @@ function App() {
 
       const riichiCount = riichiIndices.length;
       const riichiIncome = riichiCount * 1000;
-      const kyotakuPoints = prev.kyotaku * 1000;
+      const kyotakuPoints = prev.present.kyotaku * 1000;
       const riichiPlayers = riichiIndices.map(
-        (i) => prev.names[i] ?? PLAYER_LABELS[i]
+        (i) => prev.present.names[i] ?? PLAYER_LABELS[i]
       );
 
-      const winnerIsDealer = winner === prev.dealerIndex;
+      const winnerIsDealer = winner === prev.present.dealerIndex;
       const multiplier = winnerIsDealer ? 6 : 4;
       const rawBase = multiplier * basePoints;
       const basePay = roundUpToHundred(rawBase);
-      const honbaPay = prev.honba * 300;
+      const honbaPay = prev.present.honba * 300;
       const payment = basePay + honbaPay;
 
       deltas[loser] -= payment;
       deltas[winner] += payment + kyotakuPoints + riichiIncome;
 
-      const newPoints = applyDeltas(prev.points, deltas);
+      const newPoints = applyDeltas(prev.present.points, deltas);
       const winnerGain = deltas[winner];
 
-      const winnerName = prev.names[winner] ?? PLAYER_LABELS[winner];
-      const loserName = prev.names[loser] ?? PLAYER_LABELS[loser];
+      const winnerName = prev.present.names[winner] ?? PLAYER_LABELS[winner];
+      const loserName = prev.present.names[loser] ?? PLAYER_LABELS[loser];
       let description = "";
       if (winnerIsDealer) {
         description = `庄家${winnerName}荣和${loserName}${han}番${fu}符，共${formatPoints(
@@ -1089,47 +982,38 @@ function App() {
         deltas
       );
 
-      const winnerIsDealerNow = winner === prev.dealerIndex;
-      let nextDealer = prev.dealerIndex;
-      let nextHonba = prev.honba;
-      let nextKyoku = prev.kyokuIndex;
+      const winnerIsDealerNow = winner === prev.present.dealerIndex;
+      let nextDealer = prev.present.dealerIndex;
+      let nextHonba = prev.present.honba;
+      let nextKyoku = prev.present.kyokuIndex;
 
       if (winnerIsDealerNow) {
-        nextHonba = prev.honba + 1;
+        nextHonba = prev.present.honba + 1;
       } else {
-        nextDealer = ensureSeatIndex(prev.dealerIndex + 1);
+        nextDealer = ensureSeatIndex(prev.present.dealerIndex + 1);
         nextHonba = 0;
-        if (prev.kyokuIndex === 7) {
+        if (prev.present.kyokuIndex === 7) {
           nextKyoku = 8;
           setShouldSettle(true);
         } else {
-          nextKyoku = prev.kyokuIndex + 1;
+          nextKyoku = prev.present.kyokuIndex + 1;
         }
       }
 
-      const afterSnapshot: CoreSnapshot = {
+      const newPresent: CoreSnapshot = {
         points: newPoints,
         kyotaku: 0,
         honba: nextHonba,
         kyokuIndex: nextKyoku,
         dealerIndex: nextDealer,
-        history: [entry, ...prev.history],
-        names: prev.names,
-      };
-
-      const meta: LastSettlementMeta = {
-        type: "ron",
-        summary: `${winnerName}荣和${loserName}（${entry.roundLabel}）`,
-        timestamp: entry.timestamp,
+        history: [entry, ...prev.present.history],
+        names: prev.present.names,
       };
 
       return {
-        ...prev,
-        ...afterSnapshot,
-        lastSettlementBefore: beforeSnapshot,
-        lastSettlementAfter: afterSnapshot,
-        lastSettlementMeta: meta,
-        isInUndo: false,
+        past: [...prev.past, prev.present],
+        present: newPresent,
+        future: [],
       };
     });
 
@@ -1141,7 +1025,6 @@ function App() {
     const tenpaiCount = drawTenpai.filter(Boolean).length;
 
     setState((prev) => {
-      const beforeSnapshot = createCoreSnapshotFromState(prev);
       const deltas = [0, 0, 0, 0];
       const riichiIndices: SeatIndex[] = [];
 
@@ -1156,12 +1039,12 @@ function App() {
       const riichiCount = riichiIndices.length;
       const riichiIncome = riichiCount * 1000;
       const riichiPlayers = riichiIndices.map(
-        (i) => prev.names[i] ?? PLAYER_LABELS[i]
+        (i) => prev.present.names[i] ?? PLAYER_LABELS[i]
       );
 
       if (tenpaiCount === 1) {
         const tenpaiIndex = drawTenpai.findIndex(Boolean) as SeatIndex;
-        prev.points.forEach((_, idx) => {
+        prev.present.points.forEach((_, idx) => {
           if (idx === tenpaiIndex) return;
           deltas[idx] -= 1000;
           deltas[tenpaiIndex] += 1000;
@@ -1181,20 +1064,20 @@ function App() {
         });
       } else if (tenpaiCount === 3) {
         const notIndex = drawTenpai.findIndex((v) => !v) as SeatIndex;
-        prev.points.forEach((_, idx) => {
+        prev.present.points.forEach((_, idx) => {
           if (idx === notIndex) return;
           deltas[notIndex] -= 1000;
           deltas[idx] += 1000;
         });
       }
 
-      const newPoints = applyDeltas(prev.points, deltas);
-      const newKyotaku = prev.kyotaku + riichiCount;
+      const newPoints = applyDeltas(prev.present.points, deltas);
+      const newKyotaku = prev.present.kyotaku + riichiCount;
 
       const tenpaiNames =
-        prev.names.filter((_, idx) => drawTenpai[idx]).join("、") || "无";
+        prev.present.names.filter((_, idx) => drawTenpai[idx]).join("、") || "无";
       const notenNames =
-        prev.names.filter((_, idx) => !drawTenpai[idx]).join("、") || "无";
+        prev.present.names.filter((_, idx) => !drawTenpai[idx]).join("、") || "无";
 
       const description = `流局，本局立直棒计入场供${formatPoints(
         riichiIncome
@@ -1208,45 +1091,36 @@ function App() {
         deltas
       );
 
-      const dealerTenpai = drawTenpai[prev.dealerIndex];
+      const dealerTenpai = drawTenpai[prev.present.dealerIndex];
 
-      let nextDealer = prev.dealerIndex;
-      let nextHonba = prev.honba + 1;
-      let nextKyoku = prev.kyokuIndex;
+      let nextDealer = prev.present.dealerIndex;
+      let nextHonba = prev.present.honba + 1;
+      let nextKyoku = prev.present.kyokuIndex;
 
       if (!dealerTenpai) {
-        nextDealer = ensureSeatIndex(prev.dealerIndex + 1);
-        if (prev.kyokuIndex === 7) {
+        nextDealer = ensureSeatIndex(prev.present.dealerIndex + 1);
+        if (prev.present.kyokuIndex === 7) {
           nextKyoku = 8;
           setShouldSettle(true);
         } else {
-          nextKyoku = prev.kyokuIndex + 1;
+          nextKyoku = prev.present.kyokuIndex + 1;
         }
       }
 
-      const afterSnapshot: CoreSnapshot = {
+      const newPresent: CoreSnapshot = {
         points: newPoints,
         kyotaku: newKyotaku,
         honba: nextHonba,
         kyokuIndex: nextKyoku,
         dealerIndex: nextDealer,
-        history: [entry, ...prev.history],
-        names: prev.names,
-      };
-
-      const meta: LastSettlementMeta = {
-        type: "draw",
-        summary: `流局（${entry.roundLabel}）`,
-        timestamp: entry.timestamp,
+        history: [entry, ...prev.present.history],
+        names: prev.present.names,
       };
 
       return {
-        ...prev,
-        ...afterSnapshot,
-        lastSettlementBefore: beforeSnapshot,
-        lastSettlementAfter: afterSnapshot,
-        lastSettlementMeta: meta,
-        isInUndo: false,
+        past: [...prev.past, prev.present],
+        present: newPresent,
+        future: [],
       };
     });
 
@@ -1260,18 +1134,18 @@ function App() {
   // 打开编辑场况时同步当前状态
   useEffect(() => {
     if (!editRoundOpen) return;
-    const info = getRoundInfo(state.kyokuIndex, state.honba);
+    const info = getRoundInfo(state.present.kyokuIndex, state.present.honba);
     setEditWind(info.wind);
     setEditNumber(info.number);
-    setEditHonba(state.honba);
-    setEditDealer(state.dealerIndex);
-  }, [editRoundOpen, state.kyokuIndex, state.honba, state.dealerIndex]);
+    setEditHonba(state.present.honba);
+    setEditDealer(state.present.dealerIndex);
+  }, [editRoundOpen, state.present.kyokuIndex, state.present.honba, state.present.dealerIndex]);
 
   // 打开编辑昵称时同步当前名称
   useEffect(() => {
     if (!editNamesOpen) return;
-    setEditNames(state.names);
-  }, [editNamesOpen, state.names]);
+    setEditNames(state.present.names);
+  }, [editNamesOpen, state.present.names]);
 
   return (
     <TooltipProvider>
@@ -1297,17 +1171,17 @@ function App() {
                     variant="outline"
                     className="ml-2 border-amber-200 bg-amber-50 text-[11px] text-amber-800"
                   >
-                    庄家：{state.names[state.dealerIndex]}
+                    庄家：{state.present.names[state.present.dealerIndex]}
                   </Badge>
                 </div>
                 <div className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 shadow-sm shadow-slate-100">
                   <span className="text-xs text-slate-500">场供</span>
                   <span className="font-semibold tabular-nums">
-                    {formatPoints(state.kyotaku * 1000)}
+                    {formatPoints(state.present.kyotaku * 1000)}
                   </span>
                   <span className="text-xs text-slate-500">点</span>
                   <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[11px] text-slate-500">
-                    {state.kyotaku} 棒
+                    {state.present.kyotaku} 棒
                   </span>
                 </div>
               </div>
@@ -1430,8 +1304,8 @@ function App() {
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  {state.points.map((score, idx) => {
-                    const isDealer = idx === state.dealerIndex;
+                  {state.present.points.map((score, idx) => {
+                    const isDealer = idx === state.present.dealerIndex;
                     const rank = playerRanks[idx] ?? 0;
                     const isBest = rank === bestRank;
                     const isWorst = rank === worstRank;
@@ -1459,7 +1333,7 @@ function App() {
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <div className="text-xs text-slate-500">
-                              {state.names[idx]}
+                              {state.present.names[idx]}
                             </div>
                             <div className="mt-1 text-xl font-semibold tabular-nums tracking-tight">
                               {formatPoints(score)}
@@ -1516,7 +1390,7 @@ function App() {
                       <TableHead className="w-20 text-xs text-slate-500">
                         对比
                       </TableHead>
-                      {state.names.map((name, idx) => (
+                      {state.present.names.map((name, idx) => (
                         <TableHead
                           key={idx}
                           className="text-center text-xs text-slate-500"
@@ -1530,7 +1404,7 @@ function App() {
                     {diffMatrix.map((row, i) => (
                       <TableRow key={i}>
                         <TableCell className="text-xs font-medium text-slate-600">
-                          {state.names[i]}
+                          {state.present.names[i]}
                         </TableCell>
                         {row.map((diff, j) => (
                           <TableCell
@@ -1568,7 +1442,7 @@ function App() {
                 </span>
               </CardHeader>
               <CardContent className="pt-0">
-                {state.history.length === 0 ? (
+                {state.present.history.length === 0 ? (
                   <div className="flex h-32 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 text-xs text-slate-500">
                     暂无记录，请通过下方操作栏录入对局结算。
                   </div>
@@ -1595,12 +1469,12 @@ function App() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {state.history.map((h) => {
+                        {state.present.history.map((h) => {
                           const namesSnapshot =
                             Array.isArray(h.playerNames) &&
                             h.playerNames.length === 4
                               ? h.playerNames
-                              : state.names;
+                              : state.present.names;
                           const riichiPlayers = Array.isArray(h.riichiPlayers)
                             ? h.riichiPlayers
                             : undefined;
@@ -1781,7 +1655,7 @@ function App() {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {state.names.map((name, idx) => (
+                                  {state.present.names.map((name, idx) => (
                                     <SelectItem key={idx} value={String(idx)}>
                                       {name}
                                     </SelectItem>
@@ -1896,8 +1770,8 @@ function App() {
                                   <TableRow>
                                     <TableHead>排名</TableHead>
                                     <TableHead>玩家</TableHead>
-                                    <TableHead>分数</TableHead>
-                                    <TableHead>马点</TableHead>
+                                    <TableHead className="text-right">分数</TableHead>
+                                    <TableHead className="text-right">马点</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -1914,8 +1788,8 @@ function App() {
                                     >
                                       <TableCell>{player.rank}</TableCell>
                                       <TableCell>{player.name}</TableCell>
-                                      <TableCell>{player.score}</TableCell>
-                                      <TableCell>{uma[player.index]}</TableCell>
+                                      <TableCell className="text-right">{player.score}</TableCell>
+                                      <TableCell className="text-right">{(uma[player.index]).toFixed(1)}</TableCell>
                                     </TableRow>
                                   ))}
                                 </TableBody>
@@ -1934,7 +1808,7 @@ function App() {
                                 size="sm"
                                 className="h-8 px-3 text-xs"
                                 onClick={handleDistributeKyotaku}
-                                disabled={state.kyotaku === 0}
+                                disabled={state.present.kyotaku === 0 || isGameFinished}
                               >
                                 分配剩余场供
                               </Button>
@@ -1955,12 +1829,12 @@ function App() {
                           <div>
                             <div className="max-h-[80vh] overflow-y-auto pr-2 text-xs">
                               <div className="flex flex-wrap gap-2">
-                                {state.history.length < 1 && (
+                                {state.present.history.length < 1 && (
                                   <div className="text-slate-400">
                                     暂无历史记录
                                   </div>
                                 )}
-                                {state.history.map((h) => (
+                                {state.present.history.map((h) => (
                                   <div
                                     key={h.id}
                                     className="flex flex-grow basis-80 gap-3 rounded-lg border border-slate-200 bg-white/70 p-3"
@@ -1979,7 +1853,7 @@ function App() {
                                           className="rounded-md bg-slate-50/80 px-2 py-1"
                                         >
                                           <div className="truncate text-[11px] text-slate-600">
-                                            {state.names[i]}
+                                            {state.present.names[i]}
                                           </div>
                                           <div
                                             className={`text-[11px] font-semibold tabular-nums ${
@@ -2039,7 +1913,7 @@ function App() {
                               听牌情况
                             </div>
                             <div className="grid grid-cols-2 gap-2">
-                              {state.names.map((name, idx) => (
+                              {state.present.names.map((name, idx) => (
                                 <label
                                   key={idx}
                                   className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/60 px-2 py-1.5 text-xs text-slate-700"
@@ -2062,7 +1936,7 @@ function App() {
                               当局立直情况
                             </div>
                             <div className="grid grid-cols-2 gap-2">
-                              {state.names.map((name, idx) => (
+                              {state.present.names.map((name, idx) => (
                                 <label
                                   key={idx}
                                   className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/60 px-2 py-1.5 text-xs text-slate-700"
@@ -2086,7 +1960,7 @@ function App() {
                             结算预览
                           </div>
                           <div className="grid grid-cols-2 gap-2">
-                            {state.names.map((name, idx) => {
+                            {state.present.names.map((name, idx) => {
                               const delta = drawPreview.deltas[idx] ?? 0;
                               const cls =
                                 delta > 0
@@ -2189,7 +2063,7 @@ function App() {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {state.names.map((name, idx) => (
+                                  {state.present.names.map((name, idx) => (
                                     <SelectItem key={idx} value={String(idx)}>
                                       {name}
                                     </SelectItem>
@@ -2226,7 +2100,7 @@ function App() {
                               当局立直情况
                             </div>
                             <div className="grid grid-cols-2 gap-2">
-                              {state.names.map((name, idx) => (
+                              {state.present.names.map((name, idx) => (
                                 <label
                                   key={idx}
                                   className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/60 px-2 py-1.5 text-xs text-slate-700"
@@ -2252,7 +2126,7 @@ function App() {
                           {tsumoPreview ? (
                             <div className="space-y-3">
                               <div className="grid grid-cols-2 gap-2">
-                                {state.names.map((name, idx) => {
+                                {state.present.names.map((name, idx) => {
                                   const delta = tsumoPreview.deltas[idx] ?? 0;
                                   const cls =
                                     delta > 0
@@ -2281,7 +2155,7 @@ function App() {
                                 <div className="mt-2 text-[11px] text-slate-600">
                                   <span>和牌者 </span>
                                   <span className="font-medium">
-                                    {state.names[tsumoPreview.winnerIndex]}
+                                    {state.present.names[tsumoPreview.winnerIndex]}
                                   </span>
                                   <span> 最终收入：</span>
                                   <span
@@ -2387,7 +2261,7 @@ function App() {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {state.names.map((name, idx) => (
+                                  {state.present.names.map((name, idx) => (
                                     <SelectItem key={idx} value={String(idx)}>
                                       {name}
                                     </SelectItem>
@@ -2409,7 +2283,7 @@ function App() {
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {state.names.map((name, idx) => (
+                                  {state.present.names.map((name, idx) => (
                                     <SelectItem key={idx} value={String(idx)}>
                                       {name}
                                     </SelectItem>
@@ -2446,7 +2320,7 @@ function App() {
                               当局立直情况
                             </div>
                             <div className="grid grid-cols-2 gap-2">
-                              {state.names.map((name, idx) => (
+                              {state.present.names.map((name, idx) => (
                                 <label
                                   key={idx}
                                   className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/60 px-2 py-1.5 text-xs text-slate-700"
@@ -2472,7 +2346,7 @@ function App() {
                           {ronPreview ? (
                             <div className="space-y-3">
                               <div className="grid grid-cols-2 gap-2">
-                                {state.names.map((name, idx) => {
+                                {state.present.names.map((name, idx) => {
                                   const delta = ronPreview.deltas[idx] ?? 0;
                                   const cls =
                                     delta > 0
@@ -2501,7 +2375,7 @@ function App() {
                                 <div className="mt-2 text-[11px] text-slate-600">
                                   <span>和牌者 </span>
                                   <span className="font-medium">
-                                    {state.names[ronPreview.winnerIndex]}
+                                    {state.present.names[ronPreview.winnerIndex]}
                                   </span>
                                   <span> 最终收入：</span>
                                   <span
@@ -2586,21 +2460,8 @@ function App() {
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
-                        {state.lastSettlementMeta ? (
-                          <div className="space-y-1">
-                            <div>
-                              撤销
-                              {formatSettlementType(
-                                state.lastSettlementMeta.type
-                              )}
-                            </div>
-                            <div className="line-clamp-2 max-w-[220px] text-[11px] text-zinc-300">
-                              {state.lastSettlementMeta.summary}
-                            </div>
-                            <div className="text-[11px] text-zinc-300">
-                              {state.lastSettlementMeta.timestamp}
-                            </div>
-                          </div>
+                        {canUndo ? (
+                          <span>撤销上一次操作</span>
                         ) : (
                           <span>暂无可撤销的结算</span>
                         )}
@@ -2621,25 +2482,8 @@ function App() {
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>
-                        {state.lastSettlementMeta ? (
-                          hasLastSettlement && state.isInUndo ? (
-                            <div className="space-y-1">
-                              <div>
-                                重做
-                                {formatSettlementType(
-                                  state.lastSettlementMeta.type
-                                )}
-                              </div>
-                              <div className="line-clamp-2 max-w-[220px] text-[11px] text-zinc-300">
-                                {state.lastSettlementMeta.summary}
-                              </div>
-                              <div className="text-[11px] text-zinc-300">
-                                {state.lastSettlementMeta.timestamp}
-                              </div>
-                            </div>
-                          ) : (
-                            <span>请先执行一次撤销操作</span>
-                          )
+                        {canRedo ? (
+                          <span>重做上一次操作</span>
                         ) : (
                           <span>暂无可重做的结算</span>
                         )}
