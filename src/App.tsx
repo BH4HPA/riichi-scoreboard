@@ -190,6 +190,9 @@ function getRoundInfo(
   number: number;
   label: string;
 } {
+  if (kyokuIndex >= 8) {
+    return { wind: "南", number: 4, label: "半庄结束" };
+  }
   const wind: RoundWind = kyokuIndex < 4 ? "东" : "南";
   const number = kyokuIndex < 4 ? kyokuIndex + 1 : kyokuIndex - 3;
   const label = `${wind}${number}局${honba}本场`;
@@ -496,6 +499,7 @@ function App() {
   );
   const [resetAlsoNames, setResetAlsoNames] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [shouldSettle, setShouldSettle] = useState(false);
 
   // 编辑场况
   const [editWind, setEditWind] = useState<RoundWind>("东");
@@ -586,6 +590,14 @@ function App() {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [state]);
+
+  useEffect(() => {
+    if (shouldSettle) {
+      handleDistributeKyotaku();
+      setSettleOpen(true);
+      setShouldSettle(false);
+    }
+  }, [shouldSettle]);
 
   const roundInfo = getRoundInfo(state.kyokuIndex, state.honba);
   const totalPoints = state.points.reduce((sum, v) => sum + v, 0);
@@ -683,6 +695,11 @@ function App() {
   );
   const canUndo = hasLastSettlement && !state.isInUndo;
   const canRedo = hasLastSettlement && state.isInUndo;
+
+  const isGameFinished = useMemo(() => {
+    const lastHistory = state.history[0];
+    return lastHistory?.description.startsWith("终局场供分配");
+  }, [state.history]);
 
   function resetGame(resetNames: boolean) {
     setState((prev) => ({
@@ -912,7 +929,12 @@ function App() {
       } else {
         nextDealer = ensureSeatIndex(prev.dealerIndex + 1);
         nextHonba = 0;
-        nextKyoku = (prev.kyokuIndex + 1) % 8;
+        if (prev.kyokuIndex === 7) {
+          nextKyoku = 8;
+          setShouldSettle(true);
+        } else {
+          nextKyoku = prev.kyokuIndex + 1;
+        }
       }
 
       const afterSnapshot: CoreSnapshot = {
@@ -1077,7 +1099,12 @@ function App() {
       } else {
         nextDealer = ensureSeatIndex(prev.dealerIndex + 1);
         nextHonba = 0;
-        nextKyoku = (prev.kyokuIndex + 1) % 8;
+        if (prev.kyokuIndex === 7) {
+          nextKyoku = 8;
+          setShouldSettle(true);
+        } else {
+          nextKyoku = prev.kyokuIndex + 1;
+        }
       }
 
       const afterSnapshot: CoreSnapshot = {
@@ -1189,7 +1216,12 @@ function App() {
 
       if (!dealerTenpai) {
         nextDealer = ensureSeatIndex(prev.dealerIndex + 1);
-        nextKyoku = (prev.kyokuIndex + 1) % 8;
+        if (prev.kyokuIndex === 7) {
+          nextKyoku = 8;
+          setShouldSettle(true);
+        } else {
+          nextKyoku = prev.kyokuIndex + 1;
+        }
       }
 
       const afterSnapshot: CoreSnapshot = {
@@ -1988,6 +2020,7 @@ function App() {
                           variant="outline"
                           size="sm"
                           className="h-8 px-3 text-xs"
+                          disabled={isGameFinished}
                         >
                           流局
                         </Button>
@@ -2120,15 +2153,16 @@ function App() {
                     </Dialog>
 
                     {/* 自摸 */}
-                    <Dialog open={tsumoOpen} onOpenChange={setTsumoOpen}>
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-3 text-xs"
-                        >
-                          自摸
-                        </Button>
+                  <Dialog open={tsumoOpen} onOpenChange={setTsumoOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-3 text-xs"
+                        disabled={isGameFinished}
+                      >
+                        自摸
+                      </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-md">
                         <DialogHeader>
@@ -2319,15 +2353,16 @@ function App() {
                     </Dialog>
 
                     {/* 荣和 */}
-                    <Dialog open={ronOpen} onOpenChange={setRonOpen}>
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-3 text-xs"
-                        >
-                          荣和
-                        </Button>
+                  <Dialog open={ronOpen} onOpenChange={setRonOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-3 text-xs"
+                        disabled={isGameFinished}
+                      >
+                        荣和
+                      </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-md">
                         <DialogHeader>
