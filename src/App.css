@@ -1,0 +1,25 @@
+#root {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.app-bg {
+  background: linear-gradient(135deg, #fdf2e9, #e0f2fe, #ecfdf3);
+  background-size: 200% 200%;
+  animation: gradientShift 28s ease-in-out infinite;
+}
+
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
