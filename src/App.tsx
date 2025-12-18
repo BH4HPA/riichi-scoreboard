@@ -166,7 +166,7 @@ function formatSettlementType(type: SettlementType): string {
     case "tsumo":
       return "自摸"
     case "ron":
-      return "点和"
+      return "荣和"
     case "draw":
       return "流局"
     default:
@@ -332,7 +332,7 @@ function computeTsumoPreview(
 }
 
 /**
- * 预览点和结算对四家点数与场供的影响
+ * 预览荣和结算对四家点数与场供的影响
  */
 function computeRonPreview(
   state: GameState,
@@ -485,7 +485,7 @@ function App() {
     false,
   ])
 
-  // 点和
+  // 荣和
   const [ronWinner, setRonWinner] = useState<SeatIndex | null>(0)
   const [ronLoser, setRonLoser] = useState<SeatIndex | null>(1)
   const [ronHan, setRonHan] = useState<string>("3")
@@ -965,7 +965,7 @@ function App() {
       const loserName = prev.names[loser] ?? PLAYER_LABELS[loser]
       let description = ""
       if (winnerIsDealer) {
-        description = `庄家${winnerName}点和${loserName}${han}番${fu}符，共${formatPoints(
+        description = `庄家${winnerName}荣和${loserName}${han}番${fu}符，共${formatPoints(
           payment,
         )}点（其中${formatPoints(
           honbaPay,
@@ -975,7 +975,7 @@ function App() {
           riichiIncome,
         )}点，共收入${formatPoints(winnerGain)}点。`
       } else {
-        description = `${winnerName}点和${loserName}${han}番${fu}符，共${formatPoints(
+        description = `${winnerName}荣和${loserName}${han}番${fu}符，共${formatPoints(
           payment,
         )}点（其中${formatPoints(
           honbaPay,
@@ -1013,7 +1013,7 @@ function App() {
 
       const meta: LastSettlementMeta = {
         type: "ron",
-        summary: `${winnerName}点和${loserName}（${entry.roundLabel}）`,
+        summary: `${winnerName}荣和${loserName}（${entry.roundLabel}）`,
         timestamp: entry.timestamp,
       }
 
@@ -1301,7 +1301,7 @@ function App() {
                 </Dialog>
               </div>
               <span className="text-xs text-slate-400">
-                单位：点（千分位显示）
+                单位：点
               </span>
             </CardHeader>
             <CardContent className="pt-0">
@@ -1360,7 +1360,7 @@ function App() {
                   )
                 })}
               </div>
-              <div className="mt-3 rounded-xl bg-slate-50/80 px-3 py-2 text-[11px] text-slate-600">
+              {/* <div className="mt-3 rounded-xl bg-slate-50/80 px-3 py-2 text-[11px] text-slate-600">
                 <span className="font-medium">当前排名：</span>
                 {rankingList.map((item, index) => (
                   <span key={item.index}>
@@ -1372,7 +1372,7 @@ function App() {
                     </span>
                   </span>
                 ))}
-              </div>
+              </div> */}
             </CardContent>
           </Card>
 
@@ -1382,7 +1382,7 @@ function App() {
                 分差矩阵
               </CardTitle>
               <span className="text-xs text-slate-400">
-                行减列，正为领先（绿色），负为落后（红色）
+                正为领先，负为落后
               </span>
             </CardHeader>
             <CardContent className="pt-0">
@@ -1552,14 +1552,14 @@ function App() {
                 <span>操作栏</span>
                 <span className="flex items-center gap-1 text-[11px] text-slate-400">
                   <Wand2 className="h-3 w-3" />
-                  支持游戏进程与结算录入
+                  调整比赛进程或录入结算
                 </span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 pt-0 text-xs">
               <div className="space-y-2">
                 <div className="text-[11px] font-semibold tracking-wide text-slate-500">
-                  游戏进程
+                  比赛进程
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Dialog open={editRoundOpen} onOpenChange={setEditRoundOpen}>
@@ -1742,78 +1742,6 @@ function App() {
                   结算信息
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-3 text-xs"
-                          disabled={!canUndo}
-                          onClick={handleUndoLastSettlement}
-                        >
-                          撤销上一次结算
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {state.lastSettlementMeta ? (
-                        <div className="space-y-1">
-                          <div>
-                            类型：
-                            {formatSettlementType(state.lastSettlementMeta.type)}
-                          </div>
-                          <div className="text-[11px] text-zinc-300">
-                            时间：{state.lastSettlementMeta.timestamp}
-                          </div>
-                          <div className="line-clamp-2 max-w-[220px] text-[11px] text-zinc-300">
-                            {state.lastSettlementMeta.summary}
-                          </div>
-                        </div>
-                      ) : (
-                        <span>暂无可撤销的结算</span>
-                      )}
-                    </TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-3 text-xs"
-                          disabled={!canRedo}
-                          onClick={handleRedoLastSettlement}
-                        >
-                          重做上一次结算
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {state.lastSettlementMeta ? (
-                        hasLastSettlement && state.isInUndo ? (
-                          <div className="space-y-1">
-                            <div>
-                              重做：
-                              {formatSettlementType(state.lastSettlementMeta.type)}
-                            </div>
-                            <div className="text-[11px] text-zinc-300">
-                              时间：{state.lastSettlementMeta.timestamp}
-                            </div>
-                            <div className="line-clamp-2 max-w-[220px] text-[11px] text-zinc-300">
-                              {state.lastSettlementMeta.summary}
-                            </div>
-                          </div>
-                        ) : (
-                          <span>请先执行一次撤销操作</span>
-                        )
-                      ) : (
-                        <span>暂无可重做的结算</span>
-                      )}
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <div className="flex flex-wrap gap-2">
                   {/* 流局 */}
                   <Dialog open={drawOpen} onOpenChange={setDrawOpen}>
                     <DialogTrigger asChild>
@@ -1858,7 +1786,7 @@ function App() {
                         </div>
                         <div>
                           <div className="mb-1 text-[11px] font-medium text-slate-600">
-                            当局立直（立直棒，计入场供）
+                            当局立直情况
                           </div>
                           <div className="grid grid-cols-2 gap-2">
                             {state.names.map((name, idx) => (
@@ -2018,7 +1946,7 @@ function App() {
                         </div>
                         <div>
                           <div className="mb-1 text-[11px] font-medium text-slate-600">
-                            当局立直（立直棒，获胜方收入）
+                            当局立直情况
                           </div>
                           <div className="grid grid-cols-2 gap-2">
                             {state.names.map((name, idx) => (
@@ -2142,7 +2070,7 @@ function App() {
                     </DialogContent>
                   </Dialog>
 
-                  {/* 点和 */}
+                  {/* 荣和 */}
                   <Dialog open={ronOpen} onOpenChange={setRonOpen}>
                     <DialogTrigger asChild>
                       <Button
@@ -2150,12 +2078,12 @@ function App() {
                         size="sm"
                         className="h-8 px-3 text-xs"
                       >
-                        点和
+                        荣和
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="max-w-md">
                       <DialogHeader>
-                        <DialogTitle>点和结算</DialogTitle>
+                        <DialogTitle>荣和结算</DialogTitle>
                         <DialogDescription>
                           选择和牌家与点炮家，输入番数与符数，并标记当局立直情况，系统自动计算直击支付与本场点数。
                         </DialogDescription>
@@ -2234,7 +2162,7 @@ function App() {
                         </div>
                         <div>
                           <div className="mb-1 text-[11px] font-medium text-slate-600">
-                            当局立直（立直棒，获胜方收入）
+                            当局立直情况
                           </div>
                           <div className="grid grid-cols-2 gap-2">
                             {state.names.map((name, idx) => (
@@ -2352,11 +2280,83 @@ function App() {
                             }
                           }}
                         >
-                          确认点和
+                          确认荣和
                         </Button>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-3 text-xs"
+                          disabled={!canUndo}
+                          onClick={handleUndoLastSettlement}
+                        >
+                          撤销结算
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {state.lastSettlementMeta ? (
+                        <div className="space-y-1">
+                          <div>
+                            撤销
+                            {formatSettlementType(state.lastSettlementMeta.type)}
+                          </div>
+                          <div className="line-clamp-2 max-w-[220px] text-[11px] text-zinc-300">
+                            {state.lastSettlementMeta.summary}
+                          </div>
+                          <div className="text-[11px] text-zinc-300">
+                            {state.lastSettlementMeta.timestamp}
+                          </div>
+                        </div>
+                      ) : (
+                        <span>暂无可撤销的结算</span>
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-3 text-xs"
+                          disabled={!canRedo}
+                          onClick={handleRedoLastSettlement}
+                        >
+                          重做结算
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {state.lastSettlementMeta ? (
+                        hasLastSettlement && state.isInUndo ? (
+                          <div className="space-y-1">
+                            <div>
+                              重做
+                              {formatSettlementType(state.lastSettlementMeta.type)}
+                            </div>
+                            <div className="line-clamp-2 max-w-[220px] text-[11px] text-zinc-300">
+                              {state.lastSettlementMeta.summary}
+                            </div>
+                            <div className="text-[11px] text-zinc-300">
+                              {state.lastSettlementMeta.timestamp}
+                            </div>
+                          </div>
+                        ) : (
+                          <span>请先执行一次撤销操作</span>
+                        )
+                      ) : (
+                        <span>暂无可重做的结算</span>
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
             </CardContent>
