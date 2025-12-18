@@ -264,7 +264,7 @@ function computeUma(points: number[], ranks: number[]): number[] {
 
   const results = new Array(4).fill(0);
   sortedPlayers.forEach((player, i) => {
-    results[player.i] = player.p / 1000 + uma[i];
+    results[player.i] = (player.p - 25000) / 1000 + uma[i];
   });
 
   return results;
@@ -494,7 +494,7 @@ function App() {
   const [editNames, setEditNames] = useState<string[]>(() =>
     createDefaultNames()
   );
-  const [resetAlsoNames, setResetAlsoNames] = useState(false)
+  const [resetAlsoNames, setResetAlsoNames] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
   // 编辑场况
@@ -946,35 +946,37 @@ function App() {
 
   function handleDistributeKyotaku() {
     setState((prev) => {
-      if (prev.kyotaku === 0) return prev
+      if (prev.kyotaku === 0) return prev;
 
-      const beforeSnapshot = createCoreSnapshotFromState(prev)
-      const kyotakuPoints = prev.kyotaku * 1000
-      const ranks = computePlayerRanks(prev.points)
-      const winnerIndex = ranks.findIndex((r) => r === 1)
-      if (winnerIndex === -1) return prev
+      const beforeSnapshot = createCoreSnapshotFromState(prev);
+      const kyotakuPoints = prev.kyotaku * 1000;
+      const ranks = computePlayerRanks(prev.points);
+      const winnerIndex = ranks.findIndex((r) => r === 1);
+      if (winnerIndex === -1) return prev;
 
-      const deltas = [0, 0, 0, 0]
-      deltas[winnerIndex] = kyotakuPoints
+      const deltas = [0, 0, 0, 0];
+      deltas[winnerIndex] = kyotakuPoints;
 
-      const newPoints = applyDeltas(prev.points, deltas)
-      const winnerName = prev.names[winnerIndex] ?? PLAYER_LABELS[winnerIndex]
+      const newPoints = applyDeltas(prev.points, deltas);
+      const winnerName = prev.names[winnerIndex] ?? PLAYER_LABELS[winnerIndex];
 
-      const description = `终局场供分配：${winnerName} 收入 ${formatPoints(kyotakuPoints)} 点。`
-      const entry = buildHistoryEntry("draw", description, 0, [], deltas)
+      const description = `终局场供分配：${winnerName} 收入 ${formatPoints(
+        kyotakuPoints
+      )} 点。`;
+      const entry = buildHistoryEntry("draw", description, 0, [], deltas);
 
       const afterSnapshot: CoreSnapshot = {
         ...beforeSnapshot,
         points: newPoints,
         kyotaku: 0,
         history: [entry, ...prev.history],
-      }
+      };
 
       const meta: LastSettlementMeta = {
         type: "draw",
         summary: `场供分配（${entry.roundLabel}）`,
         timestamp: entry.timestamp,
-      }
+      };
 
       return {
         ...prev,
@@ -983,8 +985,8 @@ function App() {
         lastSettlementAfter: afterSnapshot,
         lastSettlementMeta: meta,
         isInUndo: false,
-      }
-    })
+      };
+    });
   }
 
   function handleRonConfirm(): boolean {
@@ -1770,17 +1772,20 @@ function App() {
                       </DialogContent>
                     </Dialog>
 
-                    <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 px-3 text-xs text-rose-600 hover:bg-rose-50"
-                      >
-                        <RefreshCcw className="mr-1 h-3 w-3" />
-                        重置游戏
-                      </Button>
-                    </AlertDialogTrigger>
+                    <AlertDialog
+                      open={resetDialogOpen}
+                      onOpenChange={setResetDialogOpen}
+                    >
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-3 text-xs text-rose-600 hover:bg-rose-50"
+                        >
+                          <RefreshCcw className="mr-1 h-3 w-3" />
+                          重置游戏
+                        </Button>
+                      </AlertDialogTrigger>
                       <AlertDialogContent className="max-w-sm">
                         <AlertDialogHeader>
                           <AlertDialogTitle>确认重置游戏？</AlertDialogTitle>
@@ -1835,7 +1840,7 @@ function App() {
                           终局结算
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-[60vw] w-fit">
+                      <DialogContent className="max-w-[60vw]">
                         <div className="flex gap-10 shrink-0">
                           <div>
                             <DialogHeader>
@@ -1909,6 +1914,11 @@ function App() {
                           <div>
                             <div className="max-h-[80vh] overflow-y-auto pr-2 text-xs">
                               <div className="flex flex-wrap gap-2">
+                                {
+                                  state.history.length < 1 && (
+                                    <div className="text-slate-400">暂无历史记录</div>
+                                  )
+                                }
                                 {state.history.map((h) => (
                                   <div
                                     key={h.id}
