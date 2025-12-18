@@ -494,7 +494,8 @@ function App() {
   const [editNames, setEditNames] = useState<string[]>(() =>
     createDefaultNames()
   );
-  const [resetAlsoNames, setResetAlsoNames] = useState(false);
+  const [resetAlsoNames, setResetAlsoNames] = useState(false)
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
 
   // 编辑场况
   const [editWind, setEditWind] = useState<RoundWind>("东");
@@ -941,6 +942,49 @@ function App() {
     });
 
     return true;
+  }
+
+  function handleDistributeKyotaku() {
+    setState((prev) => {
+      if (prev.kyotaku === 0) return prev
+
+      const beforeSnapshot = createCoreSnapshotFromState(prev)
+      const kyotakuPoints = prev.kyotaku * 1000
+      const ranks = computePlayerRanks(prev.points)
+      const winnerIndex = ranks.findIndex((r) => r === 1)
+      if (winnerIndex === -1) return prev
+
+      const deltas = [0, 0, 0, 0]
+      deltas[winnerIndex] = kyotakuPoints
+
+      const newPoints = applyDeltas(prev.points, deltas)
+      const winnerName = prev.names[winnerIndex] ?? PLAYER_LABELS[winnerIndex]
+
+      const description = `终局场供分配：${winnerName} 收入 ${formatPoints(kyotakuPoints)} 点。`
+      const entry = buildHistoryEntry("draw", description, 0, [], deltas)
+
+      const afterSnapshot: CoreSnapshot = {
+        ...beforeSnapshot,
+        points: newPoints,
+        kyotaku: 0,
+        history: [entry, ...prev.history],
+      }
+
+      const meta: LastSettlementMeta = {
+        type: "draw",
+        summary: `场供分配（${entry.roundLabel}）`,
+        timestamp: entry.timestamp,
+      }
+
+      return {
+        ...prev,
+        ...afterSnapshot,
+        lastSettlementBefore: beforeSnapshot,
+        lastSettlementAfter: afterSnapshot,
+        lastSettlementMeta: meta,
+        isInUndo: false,
+      }
+    })
   }
 
   function handleRonConfirm(): boolean {
@@ -1726,17 +1770,17 @@ function App() {
                       </DialogContent>
                     </Dialog>
 
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-3 text-xs text-rose-600 hover:bg-rose-50"
-                        >
-                          <RefreshCcw className="mr-1 h-3 w-3" />
-                          重置游戏
-                        </Button>
-                      </AlertDialogTrigger>
+                    <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-3 text-xs text-rose-600 hover:bg-rose-50"
+                      >
+                        <RefreshCcw className="mr-1 h-3 w-3" />
+                        重置游戏
+                      </Button>
+                    </AlertDialogTrigger>
                       <AlertDialogContent className="max-w-sm">
                         <AlertDialogHeader>
                           <AlertDialogTitle>确认重置游戏？</AlertDialogTitle>
@@ -1791,7 +1835,7 @@ function App() {
                           终局结算
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-[60vw]">
+                      <DialogContent className="max-w-[60vw] w-fit">
                         <div className="flex gap-10 shrink-0">
                           <div>
                             <DialogHeader>
@@ -1839,7 +1883,28 @@ function App() {
                                 结束时间：{beijingTime}
                               </p>
                             </div>
-                            <div></div>
+                            <div className="mt-4 flex gap-2">
+                              <Button
+                                size="sm"
+                                className="h-8 px-3 text-xs"
+                                onClick={handleDistributeKyotaku}
+                                disabled={state.kyotaku === 0}
+                              >
+                                分配剩余场供
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-3 text-xs text-rose-600 hover:bg-rose-50"
+                                onClick={() => {
+                                  setSettleOpen(false);
+                                  setResetDialogOpen(true);
+                                }}
+                              >
+                                <RefreshCcw className="mr-1 h-3 w-3" />
+                                重置游戏
+                              </Button>
+                            </div>
                           </div>
                           <div>
                             <div className="max-h-[80vh] overflow-y-auto pr-2 text-xs">
@@ -1851,6 +1916,7 @@ function App() {
                                   >
                                     <div className="w-24 flex-shrink-0">
                                       <div>{h.roundLabel}</div>
+                                      <div>{formatSettlementType(h.type)}</div>
                                       <div className="mt-0.5 text-[11px] text-slate-400">
                                         {h.timestamp}
                                       </div>
