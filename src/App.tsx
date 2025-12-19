@@ -1182,7 +1182,7 @@ function App() {
               </div> */}
               <div className="flex flex-wrap items-center gap-3 text-sm text-slate-700">
                 <div className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 shadow-sm shadow-slate-100">
-                  <span className="text-xs text-slate-500">场次</span>
+                  {/* <span className="text-xs text-slate-500">场次</span> */}
                   <span className="font-semibold tracking-tight">
                     {roundInfo.label}
                   </span>
@@ -1541,8 +1541,8 @@ function App() {
                         <DialogHeader>
                           <DialogTitle>流局结算</DialogTitle>
                           <DialogDescription>
-                            选择听牌家与当局立直情况，系统会自动按照 3,000
-                            点规则结算并累加场供。
+                            {roundInfo.label}， 庄家：
+                            {state.present.names[state.present.dealerIndex]}
                           </DialogDescription>
                         </DialogHeader>
                         <div className="mt-2 space-y-4 text-xs">
@@ -1571,7 +1571,7 @@ function App() {
                           </div>
                           <div>
                             <div className="mb-1 text-[11px] font-medium text-slate-600">
-                              当局立直情况
+                              立直情况
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               {state.present.names.map((name, idx) => (
@@ -1680,13 +1680,14 @@ function App() {
                         <DialogHeader>
                           <DialogTitle>自摸结算</DialogTitle>
                           <DialogDescription>
-                            选择自摸家、番数与符数，并标记当局立直情况，系统自动计算自摸支付与本场加成。
+                            {roundInfo.label}， 庄家：
+                            {state.present.names[state.present.dealerIndex]}
                           </DialogDescription>
                         </DialogHeader>
                         <div className="mt-2 space-y-4 text-xs">
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <Label className="text-xs">自摸家</Label>
+                              <Label className="text-xs">自摸者</Label>
                               <Select
                                 value={
                                   tsumoWinner !== null
@@ -1735,7 +1736,7 @@ function App() {
                           </div>
                           <div>
                             <div className="mb-1 text-[11px] font-medium text-slate-600">
-                              当局立直情况
+                              立直情况
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               {state.present.names.map((name, idx) => (
@@ -1791,7 +1792,6 @@ function App() {
                               </div>
                               {tsumoPreview.winnerIndex !== null && (
                                 <div className="mt-2 text-[11px] text-slate-600">
-                                  <span>和牌者 </span>
                                   <span className="font-medium">
                                     {
                                       state.present.names[
@@ -1799,7 +1799,7 @@ function App() {
                                       ]
                                     }
                                   </span>
-                                  <span> 最终收入：</span>
+                                  <span> 自摸的最终收入：</span>
                                   <span
                                     className={`font-semibold ${
                                       (tsumoPreview.deltas[
@@ -1884,13 +1884,14 @@ function App() {
                         <DialogHeader>
                           <DialogTitle>荣和结算</DialogTitle>
                           <DialogDescription>
-                            选择和牌家与点炮家，输入番数与符数，并标记当局立直情况，系统自动计算直击支付与本场点数。
+                            {roundInfo.label}， 庄家：
+                            {state.present.names[state.present.dealerIndex]}
                           </DialogDescription>
                         </DialogHeader>
                         <div className="mt-2 space-y-4 text-xs">
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <Label className="text-xs">和牌家</Label>
+                              <Label className="text-xs">荣和者</Label>
                               <Select
                                 value={
                                   ronWinner !== null ? String(ronWinner) : ""
@@ -1912,7 +1913,7 @@ function App() {
                               </Select>
                             </div>
                             <div>
-                              <Label className="text-xs">点炮家</Label>
+                              <Label className="text-xs">放铳者</Label>
                               <Select
                                 value={
                                   ronLoser !== null ? String(ronLoser) : ""
@@ -1959,7 +1960,7 @@ function App() {
                           </div>
                           <div>
                             <div className="mb-1 text-[11px] font-medium text-slate-600">
-                              当局立直情况
+                              立直情况
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                               {state.present.names.map((name, idx) => (
@@ -2015,7 +2016,6 @@ function App() {
                               </div>
                               {ronPreview.winnerIndex !== null && (
                                 <div className="mt-2 text-[11px] text-slate-600">
-                                  <span>和牌者 </span>
                                   <span className="font-medium">
                                     {
                                       state.present.names[
@@ -2023,7 +2023,7 @@ function App() {
                                       ]
                                     }
                                   </span>
-                                  <span> 最终收入：</span>
+                                  <span> 荣和的最终收入：</span>
                                   <span
                                     className={`font-semibold ${
                                       (ronPreview.deltas[
