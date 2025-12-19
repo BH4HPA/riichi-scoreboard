@@ -833,9 +833,9 @@ function App() {
         const perHonba = prev.present.honba * 100;
         description = `庄家自摸${han}番${fu}符，闲家各支付${formatPoints(
           perBasePay + perHonba
-        )}点（其中${formatPoints(perHonba)}点为本场），场供${formatPoints(
+        )}点（其中${formatPoints(perHonba)}点为本场棒），历史立直供托收入${formatPoints(
           kyotakuPoints
-        )}点，立直棒收入${formatPoints(riichiIncome)}点，共收入${formatPoints(
+        )}点，本局立直供托收入${formatPoints(riichiIncome)}点，共收入${formatPoints(
           winnerGain
         )}点。`;
       } else {
@@ -849,11 +849,11 @@ function App() {
           dealerBasePay + dealerHonba
         )}点（其中${formatPoints(
           dealerHonba
-        )}点为本场），其余闲家支付${formatPoints(
+        )}点为本场棒），其余闲家支付${formatPoints(
           othersBasePay + othersHonba
-        )}点（其中${formatPoints(othersHonba)}点为本场），场供${formatPoints(
+        )}点（其中${formatPoints(othersHonba)}点为本场棒），历史立直供托收入${formatPoints(
           kyotakuPoints
-        )}点，立直棒收入${formatPoints(riichiIncome)}点，共收入${formatPoints(
+        )}点，本局立直供托收入${formatPoints(riichiIncome)}点，共收入${formatPoints(
           winnerGain
         )}点。`;
       }
@@ -921,7 +921,7 @@ function App() {
       const winnerName =
         prev.present.names[winnerIndex] ?? PLAYER_LABELS[winnerIndex];
 
-      const description = `终局场供分配：${winnerName} 收入 ${formatPoints(
+      const description = `终局立直供托分配：${winnerName} 收入 ${formatPoints(
         kyotakuPoints
       )} 点。`;
       const entry = buildHistoryEntry("draw", description, 0, [], deltas);
@@ -995,17 +995,17 @@ function App() {
       if (winnerIsDealer) {
         description = `庄家${winnerName}荣和${loserName}${han}番${fu}符，共${formatPoints(
           payment
-        )}点（其中${formatPoints(honbaPay)}点为本场），场供${formatPoints(
+        )}点（其中${formatPoints(honbaPay)}点为本场棒），历史立直供托收入${formatPoints(
           kyotakuPoints
-        )}点，立直棒收入${formatPoints(riichiIncome)}点，共收入${formatPoints(
+        )}点，本局立直供托收入${formatPoints(riichiIncome)}点，共收入${formatPoints(
           winnerGain
         )}点。`;
       } else {
         description = `${winnerName}荣和${loserName}${han}番${fu}符，共${formatPoints(
           payment
-        )}点（其中${formatPoints(honbaPay)}点为本场），场供${formatPoints(
+        )}点（其中${formatPoints(honbaPay)}点为本场棒），历史立直供托收入${formatPoints(
           kyotakuPoints
-        )}点，立直棒收入${formatPoints(riichiIncome)}点，共收入${formatPoints(
+        )}点，本局立直供托收入${formatPoints(riichiIncome)}点，共收入${formatPoints(
           winnerGain
         )}点。`;
       }
@@ -1117,7 +1117,7 @@ function App() {
         prev.present.names.filter((_, idx) => !drawTenpai[idx]).join("、") ||
         "无";
 
-      const description = `流局，本局立直棒计入场供${formatPoints(
+      const description = `流局，本局立直供托计入场供${formatPoints(
         riichiIncome
       )}点，听牌：${tenpaiNames}，未听牌：${notenNames}。`;
 
@@ -1220,11 +1220,13 @@ function App() {
                 <div className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 shadow-sm shadow-slate-100">
                   <span className="text-xs text-slate-500">场供</span>
                   <span className="font-semibold tabular-nums">
-                    {formatPoints(state.present.kyotaku * 1000)}
+                    {formatPoints(state.present.kyotaku * 1000 + state.present.honba * 300)}
                   </span>
                   <span className="text-xs text-slate-500">点</span>
                   <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[11px] text-slate-500">
                     {state.present.kyotaku} 棒
+                  </span><span className="rounded-full bg-slate-50 px-2 py-0.5 text-[11px] text-slate-500">
+                    {state.present.honba} 本场
                   </span>
                 </div>
               </div>
@@ -1673,14 +1675,14 @@ function App() {
                             })}
                           </div>
                           <div className="mt-2 text-[11px] text-slate-500">
-                            场供：
+                            立直供托：
                             {formatPoints(
                               drawPreview.kyotakuBefore * 1000
                             )} → {formatPoints(drawPreview.kyotakuAfter * 1000)}{" "}
                             点
                             {drawPreview.riichiIncome > 0 && (
                               <span className="ml-1">
-                                （本局立直棒计入场供{" "}
+                                （本局立直供托计入{" "}
                                 {formatPoints(drawPreview.riichiIncome)} 点）
                               </span>
                             )}
@@ -1866,18 +1868,18 @@ function App() {
                                     点
                                   </span>
                                   <div className="mt-1 text-[11px] text-slate-500">
-                                    （含本场加成、场供{" "}
+                                    （含本场棒 {state.present.honba*300} 点、历史立直供托{" "}
                                     {formatPoints(tsumoPreview.kyotakuIncome)}{" "}
-                                    点、 立直棒收入{" "}
+                                    点、本局立直供托{" "}
                                     {formatPoints(tsumoPreview.riichiIncome)}{" "}
                                     点）
                                   </div>
                                 </div>
                               )}
                               <div className="mt-2 text-[11px] text-slate-500">
-                                场供：
+                                立直供托：
                                 {formatPoints(
-                                  tsumoPreview.kyotakuBefore * 1000
+                                  tsumoPreview.kyotakuBefore * 1000 + tsumoPreview.riichiIncome
                                 )}{" "}
                                 →{" "}
                                 {formatPoints(tsumoPreview.kyotakuAfter * 1000)}{" "}
@@ -2096,17 +2098,17 @@ function App() {
                                     点
                                   </span>
                                   <div className="mt-1 text-[11px] text-slate-500">
-                                    （含本场加成、场供{" "}
+                                    （含本场棒 {state.present.honba*300} 点、历史立直供托{" "}
                                     {formatPoints(ronPreview.kyotakuIncome)}{" "}
-                                    点、 立直棒收入{" "}
+                                    点、本局立直供托{" "}
                                     {formatPoints(ronPreview.riichiIncome)} 点）
                                   </div>
                                 </div>
                               )}
                               <div className="mt-2 text-[11px] text-slate-500">
-                                场供：
+                                立直供托：
                                 {formatPoints(
-                                  ronPreview.kyotakuBefore * 1000
+                                  ronPreview.kyotakuBefore * 1000 + ronPreview.riichiIncome
                                 )}{" "}
                                 → {formatPoints(ronPreview.kyotakuAfter * 1000)}{" "}
                                 点
@@ -2465,7 +2467,7 @@ function App() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>确认重置游戏？</AlertDialogTitle>
                           <AlertDialogDescription>
-                            此操作会将点数、场次、本场数、场供与历史记录全部重置为初始状态。
+                            此操作会将点数、场次、本场数、立直供托与历史记录全部重置为初始状态。
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <div className="mt-3 rounded-lg bg-slate-50/80 px-3 py-2 text-xs text-slate-700">
@@ -2577,7 +2579,7 @@ function App() {
                                   state.present.kyotaku === 0 || isGameFinished
                                 }
                               >
-                                分配剩余场供
+                                分配剩余立直供托
                               </Button>
                               <Button
                                 variant="outline"
