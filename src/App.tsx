@@ -1145,7 +1145,7 @@ function App() {
   return (
     <TooltipProvider>
       <div className="app-bg min-h-screen w-full px-4 py-6 md:px-6 md:py-8">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 rounded-3xl border border-white/70 bg-white/70 p-5 shadow-xl shadow-amber-100/60 backdrop-blur-md md:p-8">
+        <div className="mx-auto flex w-full flex-col gap-6 rounded-3xl border border-white/70 bg-white/70 p-5 shadow-xl shadow-amber-100/60 backdrop-blur-md md:p-8">
           {/* Header */}
           <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="space-y-3">
