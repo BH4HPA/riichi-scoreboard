@@ -1398,7 +1398,7 @@ function App() {
               </CardHeader> */}
               <CardContent className="p-4 pt-0 w-full h-full flex justify-center items-start">
                 {state.present.history.length === 0 ? (
-                  <div className="w-full h-full flex h-32 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 text-xs text-slate-500">
+                  <div className="mt-4 w-full h-[calc(100%-1rem)] flex items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 text-xs text-slate-500">
                     暂无记录，请通过操作栏录入对局结算。
                   </div>
                 ) : (
