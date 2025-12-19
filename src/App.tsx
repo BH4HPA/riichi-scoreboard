@@ -1367,7 +1367,7 @@ function App() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-20 text-xs text-slate-500">
-                        对比
+                        点差
                       </TableHead>
                       {rankingList.map((player) => (
                         <TableHead
@@ -1380,34 +1380,54 @@ function App() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rankingList.map((player) => (
-                      <TableRow key={player.index}>
-                        <TableCell className="text-xs font-medium text-slate-600 truncate max-w-20">
-                          {player.name}
-                        </TableCell>
-                        {rankingList.map((otherPlayer) => {
-                          const diff = diffMatrix[player.index][otherPlayer.index];
-                          return (
-                            <TableCell
-                              key={otherPlayer.index}
-                              className={`text-center text-xs tabular-nums ${
-                                player.index === otherPlayer.index
-                                  ? "text-slate-400"
-                                  : diff > 0
-                                  ? "text-emerald-600"
-                                  : diff < 0
-                                  ? "text-rose-600"
-                                  : "text-slate-400"
-                              }`}
+                    {rankingList.map((player, index) => {
+                      const rank = index + 1;
+                      const isBest = rank === bestRank;
+                      const isWorst = rank === worstRank;
+                      const rankBadgeClass =
+                        rank === 0
+                          ? "border-slate-200 bg-slate-50 text-slate-500"
+                          : isBest
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : isWorst
+                          ? "border-rose-200 bg-rose-50 text-rose-700"
+                          : "border-slate-200 bg-slate-50 text-slate-600";
+                      return (
+                        <TableRow key={player.index}>
+                          <TableCell className="text-xs font-medium text-slate-600 truncate max-w-40">
+                            <Badge
+                              variant="outline"
+                              className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${rankBadgeClass}`}
                             >
-                              {player.index === otherPlayer.index
-                                ? "—"
-                                : formatDiff(diff)}
-                            </TableCell>
-                          );
-                        })}
-                      </TableRow>
-                    ))}
+                              {rank ? `${rank}` : "..."}
+                            </Badge>{" "}
+                            {player.name}
+                          </TableCell>
+                          {rankingList.map((otherPlayer) => {
+                            const diff =
+                              diffMatrix[player.index][otherPlayer.index];
+                            return (
+                              <TableCell
+                                key={otherPlayer.index}
+                                className={`text-center text-xs tabular-nums ${
+                                  player.index === otherPlayer.index
+                                    ? "text-slate-400"
+                                    : diff > 0
+                                    ? "text-emerald-600"
+                                    : diff < 0
+                                    ? "text-rose-600"
+                                    : "text-slate-400"
+                                }`}
+                              >
+                                {player.index === otherPlayer.index
+                                  ? "—"
+                                  : formatDiff(diff)}
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -1956,7 +1976,11 @@ function App() {
                                 </SelectTrigger>
                                 <SelectContent>
                                   {state.present.names.map((name, idx) => (
-                                    <SelectItem className="span-ellipsis" key={idx} value={String(idx)}>
+                                    <SelectItem
+                                      className="span-ellipsis"
+                                      key={idx}
+                                      value={String(idx)}
+                                    >
                                       {name}
                                     </SelectItem>
                                   ))}
