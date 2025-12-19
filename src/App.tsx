@@ -2216,14 +2216,20 @@ function App() {
                                 min={1}
                                 max={4}
                                 value={editNumber}
-                                onChange={(e) =>
+                                onChange={(e) => {
                                   setEditNumber(
                                     Math.min(
                                       4,
                                       Math.max(1, Number(e.target.value) || 1)
                                     )
-                                  )
-                                }
+                                  );
+                                  setEditDealer(
+                                    (Math.min(
+                                      4,
+                                      Math.max(1, Number(e.target.value) || 1)
+                                    ) - 1) as SeatIndex
+                                  );
+                                }}
                               />
                             </div>
                           </div>
@@ -2246,9 +2252,10 @@ function App() {
                               <Label className="text-xs">庄家</Label>
                               <Select
                                 value={String(editDealer)}
-                                onValueChange={(v) =>
-                                  setEditDealer(Number(v) as SeatIndex)
-                                }
+                                onValueChange={(v) => {
+                                  setEditDealer(Number(v) as SeatIndex);
+                                  setEditNumber(Number(v) + 1);
+                                }}
                               >
                                 <SelectTrigger className="mt-1 h-8 text-xs">
                                   <SelectValue />
@@ -2300,9 +2307,9 @@ function App() {
                       </DialogTrigger>
                       <DialogContent className="max-w-md">
                         <DialogHeader>
-                          <DialogTitle>编辑四家昵称</DialogTitle>
+                          <DialogTitle>编辑昵称</DialogTitle>
                           <DialogDescription>
-                            为东南西北四家设置便于识别的昵称，保存后将应用于当前局面与后续历史记录。
+                            为选手们设置便于识别的昵称。
                           </DialogDescription>
                         </DialogHeader>
                         <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
@@ -2377,9 +2384,6 @@ function App() {
                             </div>
                           ))}
                         </div>
-                        <p className="mt-3 text-[11px] text-slate-500">
-                          昵称会保存在本地浏览器。重置游戏时默认保留昵称，便于连续面麻。
-                        </p>
                         <DialogFooter className="mt-4 flex flex-row justify-end gap-2">
                           <Button
                             type="button"
@@ -2430,7 +2434,7 @@ function App() {
                         <AlertDialogHeader>
                           <AlertDialogTitle>确认重置游戏？</AlertDialogTitle>
                           <AlertDialogDescription>
-                            此操作会将四家点数、场次、本场数、场供与历史记录全部重置为初始状态。默认保留当前昵称。
+                            此操作会将点数、场次、本场数、场供与历史记录全部重置为初始状态。
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <div className="mt-3 rounded-lg bg-slate-50/80 px-3 py-2 text-xs text-slate-700">
@@ -2441,13 +2445,10 @@ function App() {
                                 setResetAlsoNames(Boolean(v))
                               }
                             />
-                            <span>
-                              同时将四家昵称重置为默认（东风家 / 南风家 / 西风家
-                              / 北风家）
-                            </span>
+                            <span>同时重置玩家昵称</span>
                           </label>
                           <p className="mt-2 text-[11px] text-slate-500">
-                            若不勾选，仅重置点数与对局记录，保留当前昵称，方便继续面麻。
+                            勾选后昵称将被重置为默认值，且清空历史记录。
                           </p>
                         </div>
                         <AlertDialogFooter className="mt-4">
