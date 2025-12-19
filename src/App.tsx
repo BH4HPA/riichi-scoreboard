@@ -526,8 +526,6 @@ function App() {
     return () => clearInterval(timer);
   }, []);
 
-
-
   // persist
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -616,13 +614,26 @@ function App() {
 
   const tsumoPreview = useMemo(
     () =>
-      computeTsumoPreview(state.present, tsumoWinner, tsumoHan, tsumoFu, tsumoRiichi),
+      computeTsumoPreview(
+        state.present,
+        tsumoWinner,
+        tsumoHan,
+        tsumoFu,
+        tsumoRiichi
+      ),
     [state.present, tsumoWinner, tsumoHan, tsumoFu, tsumoRiichi]
   );
 
   const ronPreview = useMemo(
     () =>
-      computeRonPreview(state.present, ronWinner, ronLoser, ronHan, ronFu, ronRiichi),
+      computeRonPreview(
+        state.present,
+        ronWinner,
+        ronLoser,
+        ronHan,
+        ronFu,
+        ronRiichi
+      ),
     [state.present, ronWinner, ronLoser, ronHan, ronFu, ronRiichi]
   );
 
@@ -656,9 +667,13 @@ function App() {
     riichiPlayers: string[],
     deltas: number[]
   ): HistoryEntry {
-    const { label } = getRoundInfo(state.present.kyokuIndex, state.present.honba);
+    const { label } = getRoundInfo(
+      state.present.kyokuIndex,
+      state.present.honba
+    );
     const dealerLabel =
-      state.present.names[state.present.dealerIndex] ?? PLAYER_LABELS[state.present.dealerIndex];
+      state.present.names[state.present.dealerIndex] ??
+      PLAYER_LABELS[state.present.dealerIndex];
     return {
       id: `${Date.now()}-${state.present.history.length}`,
       type,
@@ -728,7 +743,8 @@ function App() {
       const winner = tsumoWinner as SeatIndex;
       const winnerName = prev.present.names[winner] ?? PLAYER_LABELS[winner];
       const dealerName =
-        prev.present.names[prev.present.dealerIndex] ?? PLAYER_LABELS[prev.present.dealerIndex];
+        prev.present.names[prev.present.dealerIndex] ??
+        PLAYER_LABELS[prev.present.dealerIndex];
       const basePoints = calcBasePoints(han, fu);
       const deltas = [0, 0, 0, 0];
       const riichiIndices: SeatIndex[] = [];
@@ -878,7 +894,8 @@ function App() {
       deltas[winnerIndex] = kyotakuPoints;
 
       const newPoints = applyDeltas(prev.present.points, deltas);
-      const winnerName = prev.present.names[winnerIndex] ?? PLAYER_LABELS[winnerIndex];
+      const winnerName =
+        prev.present.names[winnerIndex] ?? PLAYER_LABELS[winnerIndex];
 
       const description = `终局场供分配：${winnerName} 收入 ${formatPoints(
         kyotakuPoints
@@ -1070,9 +1087,11 @@ function App() {
       const newKyotaku = prev.present.kyotaku + riichiCount;
 
       const tenpaiNames =
-        prev.present.names.filter((_, idx) => drawTenpai[idx]).join("、") || "无";
+        prev.present.names.filter((_, idx) => drawTenpai[idx]).join("、") ||
+        "无";
       const notenNames =
-        prev.present.names.filter((_, idx) => !drawTenpai[idx]).join("、") || "无";
+        prev.present.names.filter((_, idx) => !drawTenpai[idx]).join("、") ||
+        "无";
 
       const description = `流局，本局立直棒计入场供${formatPoints(
         riichiIncome
@@ -1134,7 +1153,12 @@ function App() {
     setEditNumber(info.number);
     setEditHonba(state.present.honba);
     setEditDealer(state.present.dealerIndex);
-  }, [editRoundOpen, state.present.kyokuIndex, state.present.honba, state.present.dealerIndex]);
+  }, [
+    editRoundOpen,
+    state.present.kyokuIndex,
+    state.present.honba,
+    state.present.dealerIndex,
+  ]);
 
   // 打开编辑昵称时同步当前名称
   useEffect(() => {
@@ -1144,18 +1168,18 @@ function App() {
 
   return (
     <TooltipProvider>
-      <div className="app-bg min-h-screen w-full px-4 py-6 md:px-6 md:py-8">
-        <div className="mx-auto flex w-full flex-col gap-6 rounded-3xl border border-white/70 bg-white/70 p-5 shadow-xl shadow-amber-100/60 backdrop-blur-md md:p-8">
+      <div className="app-bg h-[100vh] sm:min-h-screen w-full px-4 py-6 md:px-6 md:py-8">
+        <div className="mx-auto h-full flex w-full flex-col gap-6 rounded-3xl border border-white/70 bg-white/70 p-5 shadow-xl shadow-amber-100/60 backdrop-blur-md md:p-8">
           {/* Header */}
           <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
+              {/* <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800">
                 <Crown className="h-4 w-4" />
                 <span>立直麻将计分板</span>
                 <span className="hidden text-[11px] text-amber-700/80 sm:inline">
                   半庄 · 东南战 · 面麻专用
                 </span>
-              </div>
+              </div> */}
               <div className="flex flex-wrap items-center gap-3 text-sm text-slate-700">
                 <div className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 shadow-sm shadow-slate-100">
                   <span className="text-xs text-slate-500">场次</span>
@@ -1186,7 +1210,7 @@ function App() {
               <div className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 shadow-sm shadow-slate-100">
                 <Clock3 className="h-4 w-4 text-sky-500" />
                 <div>
-                  <div className="text-xs text-slate-500">北京时间</div>
+                  {/* <div className="text-xs text-slate-500">北京时间</div> */}
                   <div className="font-semibold tabular-nums tracking-tight">
                     {beijingTime}
                   </div>
@@ -1195,7 +1219,7 @@ function App() {
               <div className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 shadow-sm shadow-slate-100">
                 <Timer className="h-4 w-4 text-emerald-500" />
                 <div>
-                  <div className="text-xs text-slate-500">持续时间</div>
+                  {/* <div className="text-xs text-slate-500">持续时间</div> */}
                   <div className="font-semibold tabular-nums tracking-tight">
                     {elapsedMinutes} 分钟
                   </div>
@@ -1204,7 +1228,7 @@ function App() {
               <div className="flex items-center gap-2 rounded-xl bg-white/80 px-3 py-2 shadow-sm shadow-slate-100">
                 <History className="h-4 w-4 text-slate-500" />
                 <div>
-                  <div className="text-xs text-slate-500">玩家持有点数</div>
+                  {/* <div className="text-xs text-slate-500">玩家持有点数</div> */}
                   <div className="font-semibold tabular-nums tracking-tight">
                     <span
                       className={`${
@@ -1225,84 +1249,16 @@ function App() {
           {/* Middle: points & diff */}
           <section className="grid gap-5 lg:grid-cols-[2fr,3fr]">
             <Card className="border-none bg-white/80 shadow-md shadow-slate-200/70">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              {/* <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                 <div className="flex items-center gap-2">
                   <CardTitle className="text-sm font-semibold text-slate-700">
                     四家点数
                   </CardTitle>
-                  <Dialog open={editNamesOpen} onOpenChange={setEditNamesOpen}>
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 px-2 text-[11px]"
-                      >
-                        编辑昵称
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>编辑四家昵称</DialogTitle>
-                        <DialogDescription>
-                          为东南西北四家设置便于识别的昵称，保存后将应用于当前局面与后续历史记录。
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
-                        {PLAYER_LABELS.map((label, idx) => (
-                          <div key={idx}>
-                            <Label className="text-xs">{label}</Label>
-                            <Input
-                              className="mt-1 h-8 text-xs"
-                              value={editNames[idx] ?? ""}
-                              onChange={(e) => {
-                                const next = [...editNames];
-                                next[idx] = e.target.value;
-                                setEditNames(next);
-                              }}
-                              placeholder={label}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                      <p className="mt-3 text-[11px] text-slate-500">
-                        昵称会保存在本地浏览器。重置游戏时默认保留昵称，便于连续面麻。
-                      </p>
-                      <DialogFooter className="mt-4 flex flex-row justify-end gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-3 text-xs"
-                          onClick={() => setEditNamesOpen(false)}
-                        >
-                          取消
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="h-8 px-3 text-xs"
-                          onClick={() => {
-                            setState((prev) => ({
-                              past: [...prev.past, prev.present],
-                              present: {
-                                ...prev.present,
-                                names: sanitizeNames(editNames),
-                              },
-                              future: [],
-                            }));
-                            setEditNamesOpen(false);
-                          }}
-                        >
-                          保存昵称
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
                 </div>
                 <span className="text-xs text-slate-400">单位：点</span>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              </CardHeader> */}
+              <CardContent className="p-4 w-full h-full flex justify-center items-center">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 flex-1">
                   {state.present.points.map((score, idx) => {
                     const isDealer = idx === state.present.dealerIndex;
                     const rank = playerRanks[idx] ?? 0;
@@ -1374,15 +1330,15 @@ function App() {
             </Card>
 
             <Card className="border-none bg-white/80 shadow-md shadow-slate-200/70">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              {/* <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                 <CardTitle className="text-sm font-semibold text-slate-700">
                   分差矩阵
                 </CardTitle>
                 <span className="text-xs text-slate-400">
                   正为领先，负为落后
                 </span>
-              </CardHeader>
-              <CardContent className="pt-0">
+              </CardHeader> */}
+              <CardContent className="p-4 w-full h-full flex justify-center items-center">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1430,39 +1386,39 @@ function App() {
           </section>
 
           {/* Bottom: history & controls */}
-          <section className="grid gap-5 lg:grid-cols-[3fr,1fr]">
-            <Card className="border-none bg-white/80 shadow-md shadow-slate-200/70">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <section className="grid gap-5 lg:grid-cols-[3fr,1fr] h-full min-h-0">
+            <Card className="border-none bg-white/80 shadow-md shadow-slate-200/70 h-full overflow-y-auto relative">
+              {/* <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                 <CardTitle className="text-sm font-semibold text-slate-700">
                   历史记录
                 </CardTitle>
                 <span className="text-xs text-slate-400">
                   记录每一局的场次、庄家、立直玩家、点差变动与结算详情
                 </span>
-              </CardHeader>
-              <CardContent className="pt-0">
+              </CardHeader> */}
+              <CardContent className="p-4 pt-0 w-full h-full flex justify-center items-start">
                 {state.present.history.length === 0 ? (
-                  <div className="flex h-32 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 text-xs text-slate-500">
-                    暂无记录，请通过下方操作栏录入对局结算。
+                  <div className="w-full h-full flex h-32 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 text-xs text-slate-500">
+                    暂无记录，请通过操作栏录入对局结算。
                   </div>
                 ) : (
-                  <div className="max-h-80 space-y-2 overflow-y-auto pr-2 text-xs">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-28 text-xs text-slate-500">
+                  <div className="w-full space-y-2 pr-2 text-xs">
+                    <Table disableOverflow>
+                      <TableHeader className="bg-white" disableBorderBottom>
+                        <TableRow disableBorderBottom>
+                          <TableHead className="history-table-head w-28 text-xs text-slate-500">
                             场次
                           </TableHead>
-                          <TableHead className="w-16 text-xs text-slate-500">
+                          <TableHead className="history-table-head w-16 text-xs text-slate-500">
                             庄家
                           </TableHead>
-                          <TableHead className="w-28 text-xs text-slate-500">
+                          <TableHead className="history-table-head w-28 text-xs text-slate-500">
                             立直玩家
                           </TableHead>
-                          <TableHead className="w-40 text-xs text-slate-500">
+                          <TableHead className="history-table-head w-40 text-xs text-slate-500">
                             点差变动
                           </TableHead>
-                          <TableHead className="text-xs text-slate-500">
+                          <TableHead className="history-table-head text-xs text-slate-500">
                             结算信息
                           </TableHead>
                         </TableRow>
@@ -1553,8 +1509,8 @@ function App() {
               </CardContent>
             </Card>
 
-            <Card className="border-none bg-white/80 shadow-md shadow-slate-200/70">
-              <CardHeader className="space-y-2 pb-4">
+            <Card className="border-none bg-white/80 shadow-md shadow-slate-200/70 h-full overflow-y-auto">
+              <CardHeader className="space-y-2 pb-4 sticky top-0 bg-white">
                 <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700">
                   <span>操作栏</span>
                   <span className="flex items-center gap-1 text-[11px] text-slate-400">
@@ -1685,6 +1641,77 @@ function App() {
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>
+                    <Dialog
+                      open={editNamesOpen}
+                      onOpenChange={setEditNamesOpen}
+                    >
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-3 text-xs"
+                        >
+                          编辑昵称
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>编辑四家昵称</DialogTitle>
+                          <DialogDescription>
+                            为东南西北四家设置便于识别的昵称，保存后将应用于当前局面与后续历史记录。
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+                          {PLAYER_LABELS.map((label, idx) => (
+                            <div key={idx}>
+                              <Label className="text-xs">{label}</Label>
+                              <Input
+                                className="mt-1 h-8 text-xs"
+                                value={editNames[idx] ?? ""}
+                                onChange={(e) => {
+                                  const next = [...editNames];
+                                  next[idx] = e.target.value;
+                                  setEditNames(next);
+                                }}
+                                placeholder={label}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        <p className="mt-3 text-[11px] text-slate-500">
+                          昵称会保存在本地浏览器。重置游戏时默认保留昵称，便于连续面麻。
+                        </p>
+                        <DialogFooter className="mt-4 flex flex-row justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-3 text-xs"
+                            onClick={() => setEditNamesOpen(false)}
+                          >
+                            取消
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-8 px-3 text-xs"
+                            onClick={() => {
+                              setState((prev) => ({
+                                past: [...prev.past, prev.present],
+                                present: {
+                                  ...prev.present,
+                                  names: sanitizeNames(editNames),
+                                },
+                                future: [],
+                              }));
+                              setEditNamesOpen(false);
+                            }}
+                          >
+                            保存昵称
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
 
                     <AlertDialog
                       open={resetDialogOpen}
@@ -1769,8 +1796,12 @@ function App() {
                                   <TableRow>
                                     <TableHead>排名</TableHead>
                                     <TableHead>玩家</TableHead>
-                                    <TableHead className="text-right">分数</TableHead>
-                                    <TableHead className="text-right">马点</TableHead>
+                                    <TableHead className="text-right">
+                                      分数
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                      马点
+                                    </TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -1787,8 +1818,12 @@ function App() {
                                     >
                                       <TableCell>{player.rank}</TableCell>
                                       <TableCell>{player.name}</TableCell>
-                                      <TableCell className="text-right">{player.score}</TableCell>
-                                      <TableCell className="text-right">{(uma[player.index]).toFixed(1)}</TableCell>
+                                      <TableCell className="text-right">
+                                        {player.score}
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        {uma[player.index].toFixed(1)}
+                                      </TableCell>
                                     </TableRow>
                                   ))}
                                 </TableBody>
@@ -1807,7 +1842,9 @@ function App() {
                                 size="sm"
                                 className="h-8 px-3 text-xs"
                                 onClick={handleDistributeKyotaku}
-                                disabled={state.present.kyotaku === 0 || isGameFinished}
+                                disabled={
+                                  state.present.kyotaku === 0 || isGameFinished
+                                }
                               >
                                 分配剩余场供
                               </Button>
@@ -2026,16 +2063,16 @@ function App() {
                     </Dialog>
 
                     {/* 自摸 */}
-                  <Dialog open={tsumoOpen} onOpenChange={setTsumoOpen}>
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 px-3 text-xs"
-                        disabled={isGameFinished}
-                      >
-                        自摸
-                      </Button>
+                    <Dialog open={tsumoOpen} onOpenChange={setTsumoOpen}>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-3 text-xs"
+                          disabled={isGameFinished}
+                        >
+                          自摸
+                        </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-md">
                         <DialogHeader>
@@ -2154,7 +2191,11 @@ function App() {
                                 <div className="mt-2 text-[11px] text-slate-600">
                                   <span>和牌者 </span>
                                   <span className="font-medium">
-                                    {state.present.names[tsumoPreview.winnerIndex]}
+                                    {
+                                      state.present.names[
+                                        tsumoPreview.winnerIndex
+                                      ]
+                                    }
                                   </span>
                                   <span> 最终收入：</span>
                                   <span
@@ -2226,16 +2267,16 @@ function App() {
                     </Dialog>
 
                     {/* 荣和 */}
-                  <Dialog open={ronOpen} onOpenChange={setRonOpen}>
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 px-3 text-xs"
-                        disabled={isGameFinished}
-                      >
-                        荣和
-                      </Button>
+                    <Dialog open={ronOpen} onOpenChange={setRonOpen}>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-3 text-xs"
+                          disabled={isGameFinished}
+                        >
+                          荣和
+                        </Button>
                       </DialogTrigger>
                       <DialogContent className="max-w-md">
                         <DialogHeader>
@@ -2374,7 +2415,11 @@ function App() {
                                 <div className="mt-2 text-[11px] text-slate-600">
                                   <span>和牌者 </span>
                                   <span className="font-medium">
-                                    {state.present.names[ronPreview.winnerIndex]}
+                                    {
+                                      state.present.names[
+                                        ronPreview.winnerIndex
+                                      ]
+                                    }
                                   </span>
                                   <span> 最终收入：</span>
                                   <span
