@@ -1212,7 +1212,7 @@ function App() {
                   </span>
                   <Badge
                     variant="outline"
-                    className="ml-2 border-amber-200 bg-amber-50 text-[11px] text-amber-800"
+                    className="ml-2 border-amber-200 bg-amber-50 text-[11px] text-amber-800 truncate max-w-32 block"
                   >
                     庄家：{state.present.names[state.present.dealerIndex]}
                   </Badge>
@@ -1310,15 +1310,15 @@ function App() {
                           <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500" />
                         )}
                         <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <div className="text-xs text-slate-500">
+                          <div className="min-w-0">
+                            <div className="text-xs text-slate-500 truncate">
                               {state.present.names[idx]}
                             </div>
                             <div className="mt-1 text-xl font-semibold tabular-nums tracking-tight">
                               {formatPoints(score)}
                             </div>
                           </div>
-                          <div className="flex flex-col items-end gap-1">
+                          <div className="flex flex-col items-end gap-1 whitespace-nowrap">
                             {isDealer && (
                               <Badge className="flex items-center gap-1 rounded-full bg-amber-500 text-[11px] font-semibold text-white shadow-sm">
                                 <Crown className="h-3 w-3" />
@@ -1372,7 +1372,7 @@ function App() {
                       {state.present.names.map((name, idx) => (
                         <TableHead
                           key={idx}
-                          className="text-center text-xs text-slate-500"
+                          className="text-center text-xs text-slate-500 truncate max-w-4"
                         >
                           {name}
                         </TableHead>
@@ -1382,7 +1382,7 @@ function App() {
                   <TableBody>
                     {diffMatrix.map((row, i) => (
                       <TableRow key={i}>
-                        <TableCell className="text-xs font-medium text-slate-600">
+                        <TableCell className="text-xs font-medium text-slate-600 truncate max-w-4">
                           {state.present.names[i]}
                         </TableCell>
                         {row.map((diff, j) => (
@@ -1564,7 +1564,7 @@ function App() {
                       <DialogContent className="max-w-md">
                         <DialogHeader>
                           <DialogTitle>流局结算</DialogTitle>
-                          <DialogDescription>
+                          <DialogDescription className="truncate max-w-60">
                             {roundInfo.label}， 庄家：
                             {state.present.names[state.present.dealerIndex]}
                           </DialogDescription>
@@ -1588,7 +1588,7 @@ function App() {
                                       setDrawTenpai(next);
                                     }}
                                   />
-                                  <span>{name}</span>
+                                  <span className="truncate">{name}</span>
                                 </label>
                               ))}
                             </div>
@@ -1611,7 +1611,7 @@ function App() {
                                       setDrawRiichi(next);
                                     }}
                                   />
-                                  <span>{name}</span>
+                                  <span className="truncate">{name}</span>
                                 </label>
                               ))}
                             </div>
@@ -1635,7 +1635,7 @@ function App() {
                                   key={idx}
                                   className="flex items-center justify-between rounded-md bg-white/70 px-2 py-1"
                                 >
-                                  <span className="text-[11px] text-slate-600">
+                                  <span className="truncate text-[11px] text-slate-600">
                                     {name}
                                   </span>
                                   <span
@@ -1703,7 +1703,7 @@ function App() {
                       <DialogContent className="max-w-md">
                         <DialogHeader>
                           <DialogTitle>自摸结算</DialogTitle>
-                          <DialogDescription>
+                          <DialogDescription className="truncate max-w-60">
                             {roundInfo.label}， 庄家：
                             {state.present.names[state.present.dealerIndex]}
                           </DialogDescription>
@@ -1722,7 +1722,7 @@ function App() {
                                   setTsumoWinner(Number(v) as SeatIndex)
                                 }
                               >
-                                <SelectTrigger className="mt-1 h-8 text-xs">
+                                <SelectTrigger className="mt-1 h-8 text-xs span-ellipsis">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -1776,7 +1776,7 @@ function App() {
                                       setTsumoRiichi(next);
                                     }}
                                   />
-                                  <span>{name}</span>
+                                  <span className="truncate">{name}</span>
                                 </label>
                               ))}
                             </div>
@@ -1802,7 +1802,7 @@ function App() {
                                       key={idx}
                                       className="flex items-center justify-between rounded-md bg-white/70 px-2 py-1"
                                     >
-                                      <span className="text-[11px] text-slate-600">
+                                      <span className="truncate text-[11px] text-slate-600">
                                         {name}
                                       </span>
                                       <span
@@ -1907,7 +1907,7 @@ function App() {
                       <DialogContent className="max-w-md">
                         <DialogHeader>
                           <DialogTitle>荣和结算</DialogTitle>
-                          <DialogDescription>
+                          <DialogDescription className="truncate max-w-60">
                             {roundInfo.label}， 庄家：
                             {state.present.names[state.present.dealerIndex]}
                           </DialogDescription>
@@ -1924,7 +1924,7 @@ function App() {
                                   setRonWinner(Number(v) as SeatIndex)
                                 }
                               >
-                                <SelectTrigger className="mt-1 h-8 text-xs">
+                                <SelectTrigger className="mt-1 h-8 text-xs span-ellipsis">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -1946,12 +1946,12 @@ function App() {
                                   setRonLoser(Number(v) as SeatIndex)
                                 }
                               >
-                                <SelectTrigger className="mt-1 h-8 text-xs">
+                                <SelectTrigger className="mt-1 h-8 text-xs span-ellipsis">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {state.present.names.map((name, idx) => (
-                                    <SelectItem key={idx} value={String(idx)}>
+                                    <SelectItem className="span-ellipsis" key={idx} value={String(idx)}>
                                       {name}
                                     </SelectItem>
                                   ))}
@@ -2000,7 +2000,9 @@ function App() {
                                       setRonRiichi(next);
                                     }}
                                   />
-                                  <span>{name}</span>
+                                  <span className="truncate max-w-60 font-medium">
+                                    {name}
+                                  </span>
                                 </label>
                               ))}
                             </div>
@@ -2026,7 +2028,7 @@ function App() {
                                       key={idx}
                                       className="flex items-center justify-between rounded-md bg-white/70 px-2 py-1"
                                     >
-                                      <span className="text-[11px] text-slate-600">
+                                      <span className="truncate text-[11px] text-slate-600">
                                         {name}
                                       </span>
                                       <span
@@ -2257,7 +2259,7 @@ function App() {
                                   setEditNumber(Number(v) + 1);
                                 }}
                               >
-                                <SelectTrigger className="mt-1 h-8 text-xs">
+                                <SelectTrigger className="mt-1 h-8 text-xs span-ellipsis">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
