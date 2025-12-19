@@ -1510,7 +1510,7 @@ function App() {
             </Card>
 
             <Card className="border-none bg-white/80 shadow-md shadow-slate-200/70 h-full overflow-y-auto">
-              <CardHeader className="space-y-2 pb-4 sticky top-0 bg-white">
+              <CardHeader className="space-y-2 pb-4 sticky top-0 bg-white z-10">
                 <CardTitle className="flex items-center justify-between text-sm font-semibold text-slate-700">
                   <span>操作栏</span>
                   <span className="flex items-center gap-1 text-[11px] text-slate-400">
@@ -1520,404 +1520,6 @@ function App() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 pt-0 text-xs">
-                <div className="space-y-2">
-                  <div className="text-[11px] font-semibold tracking-wide text-slate-500">
-                    比赛进程
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Dialog
-                      open={editRoundOpen}
-                      onOpenChange={setEditRoundOpen}
-                    >
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-3 text-xs"
-                        >
-                          调整场况
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>调整场况</DialogTitle>
-                          <DialogDescription>
-                            手动修正当前场次、庄家与本场数，点数不发生变化。
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="mt-2 space-y-4 text-xs">
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <Label className="text-xs">场风</Label>
-                              <Select
-                                value={editWind}
-                                onValueChange={(v) =>
-                                  setEditWind(v as RoundWind)
-                                }
-                              >
-                                <SelectTrigger className="mt-1 h-8 text-xs">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="东">东风场</SelectItem>
-                                  <SelectItem value="南">南风场</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label className="text-xs">局数</Label>
-                              <Input
-                                className="mt-1 h-8 text-xs"
-                                type="number"
-                                min={1}
-                                max={4}
-                                value={editNumber}
-                                onChange={(e) =>
-                                  setEditNumber(
-                                    Math.min(
-                                      4,
-                                      Math.max(1, Number(e.target.value) || 1)
-                                    )
-                                  )
-                                }
-                              />
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <Label className="text-xs">本场数</Label>
-                              <Input
-                                className="mt-1 h-8 text-xs"
-                                type="number"
-                                min={0}
-                                value={editHonba}
-                                onChange={(e) =>
-                                  setEditHonba(
-                                    Math.max(0, Number(e.target.value) || 0)
-                                  )
-                                }
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs">庄家</Label>
-                              <Select
-                                value={String(editDealer)}
-                                onValueChange={(v) =>
-                                  setEditDealer(Number(v) as SeatIndex)
-                                }
-                              >
-                                <SelectTrigger className="mt-1 h-8 text-xs">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {state.present.names.map((name, idx) => (
-                                    <SelectItem key={idx} value={String(idx)}>
-                                      {name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                        </div>
-                        <DialogFooter className="mt-4 flex flex-row justify-end gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-8 px-3 text-xs"
-                            onClick={() => setEditRoundOpen(false)}
-                          >
-                            取消
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            className="h-8 px-3 text-xs"
-                            onClick={handleEditRoundConfirm}
-                          >
-                            确认
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                    <Dialog
-                      open={editNamesOpen}
-                      onOpenChange={setEditNamesOpen}
-                    >
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-3 text-xs"
-                        >
-                          编辑昵称
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>编辑四家昵称</DialogTitle>
-                          <DialogDescription>
-                            为东南西北四家设置便于识别的昵称，保存后将应用于当前局面与后续历史记录。
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
-                          {PLAYER_LABELS.map((label, idx) => (
-                            <div key={idx}>
-                              <Label className="text-xs">{label}</Label>
-                              <Input
-                                className="mt-1 h-8 text-xs"
-                                value={editNames[idx] ?? ""}
-                                onChange={(e) => {
-                                  const next = [...editNames];
-                                  next[idx] = e.target.value;
-                                  setEditNames(next);
-                                }}
-                                placeholder={label}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                        <p className="mt-3 text-[11px] text-slate-500">
-                          昵称会保存在本地浏览器。重置游戏时默认保留昵称，便于连续面麻。
-                        </p>
-                        <DialogFooter className="mt-4 flex flex-row justify-end gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-8 px-3 text-xs"
-                            onClick={() => setEditNamesOpen(false)}
-                          >
-                            取消
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            className="h-8 px-3 text-xs"
-                            onClick={() => {
-                              setState((prev) => ({
-                                past: [...prev.past, prev.present],
-                                present: {
-                                  ...prev.present,
-                                  names: sanitizeNames(editNames),
-                                },
-                                future: [],
-                              }));
-                              setEditNamesOpen(false);
-                            }}
-                          >
-                            保存昵称
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-
-                    <AlertDialog
-                      open={resetDialogOpen}
-                      onOpenChange={setResetDialogOpen}
-                    >
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-3 text-xs text-rose-600 hover:bg-rose-50"
-                        >
-                          <RefreshCcw className="mr-1 h-3 w-3" />
-                          重置游戏
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent className="max-w-sm">
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>确认重置游戏？</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            此操作会将四家点数、场次、本场数、场供与历史记录全部重置为初始状态。默认保留当前昵称。
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <div className="mt-3 rounded-lg bg-slate-50/80 px-3 py-2 text-xs text-slate-700">
-                          <label className="flex items-center gap-2">
-                            <Checkbox
-                              checked={resetAlsoNames}
-                              onCheckedChange={(v) =>
-                                setResetAlsoNames(Boolean(v))
-                              }
-                            />
-                            <span>
-                              同时将四家昵称重置为默认（东风家 / 南风家 / 西风家
-                              / 北风家）
-                            </span>
-                          </label>
-                          <p className="mt-2 text-[11px] text-slate-500">
-                            若不勾选，仅重置点数与对局记录，保留当前昵称，方便继续面麻。
-                          </p>
-                        </div>
-                        <AlertDialogFooter className="mt-4">
-                          <AlertDialogCancel
-                            className="h-8 px-3 text-xs"
-                            onClick={() => setResetAlsoNames(false)}
-                          >
-                            取消
-                          </AlertDialogCancel>
-                          <AlertDialogAction
-                            className="h-8 px-3 text-xs bg-rose-500 hover:bg-rose-600"
-                            onClick={() => {
-                              resetGame(resetAlsoNames);
-                              setResetAlsoNames(false);
-                            }}
-                          >
-                            确认重置
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-
-                    <Dialog open={settleOpen} onOpenChange={setSettleOpen}>
-                      <DialogTrigger asChild>
-                        <Button
-                          size="sm"
-                          className="h-8 px-3 text-xs bg-emerald-500 hover:bg-emerald-600 text-white"
-                        >
-                          <Check className="mr-1 h-3 w-3" />
-                          终局结算
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-[60vw]">
-                        <div className="flex gap-10 shrink-0">
-                          <div>
-                            <DialogHeader>
-                              <DialogTitle>终局结算</DialogTitle>
-                              <DialogDescription className="whitespace-nowrap">
-                                第一名+35，第二名+15，第三名-5，第四名-45
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="pt-4 pb-2">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow>
-                                    <TableHead>排名</TableHead>
-                                    <TableHead>玩家</TableHead>
-                                    <TableHead className="text-right">
-                                      分数
-                                    </TableHead>
-                                    <TableHead className="text-right">
-                                      马点
-                                    </TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {rankingList.map((player) => (
-                                    <TableRow
-                                      key={player.index}
-                                      className={`${
-                                        player.rank === 1
-                                          ? "bg-emerald-50/50"
-                                          : player.rank === 4
-                                          ? "bg-rose-50/50"
-                                          : ""
-                                      }`}
-                                    >
-                                      <TableCell>{player.rank}</TableCell>
-                                      <TableCell>{player.name}</TableCell>
-                                      <TableCell className="text-right">
-                                        {player.score}
-                                      </TableCell>
-                                      <TableCell className="text-right">
-                                        {uma[player.index].toFixed(1)}
-                                      </TableCell>
-                                    </TableRow>
-                                  ))}
-                                </TableBody>
-                              </Table>
-                            </div>
-                            <div className="text-xs text-slate-500 flex gap-4 flex-nowrap">
-                              <p className="whitespace-nowrap">
-                                持续时间：{elapsedMinutes} 分钟
-                              </p>
-                              <p className="whitespace-nowrap">
-                                结束时间：{beijingTime}
-                              </p>
-                            </div>
-                            <div className="mt-4 flex gap-2">
-                              <Button
-                                size="sm"
-                                className="h-8 px-3 text-xs"
-                                onClick={handleDistributeKyotaku}
-                                disabled={
-                                  state.present.kyotaku === 0 || isGameFinished
-                                }
-                              >
-                                分配剩余场供
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 px-3 text-xs text-rose-600 hover:bg-rose-50"
-                                onClick={() => {
-                                  setSettleOpen(false);
-                                  setResetDialogOpen(true);
-                                }}
-                              >
-                                <RefreshCcw className="mr-1 h-3 w-3" />
-                                重置游戏
-                              </Button>
-                            </div>
-                          </div>
-                          <div>
-                            <div className="max-h-[80vh] overflow-y-auto pr-2 text-xs">
-                              <div className="flex flex-wrap gap-2">
-                                {state.present.history.length < 1 && (
-                                  <div className="text-slate-400">
-                                    暂无历史记录
-                                  </div>
-                                )}
-                                {state.present.history.map((h) => (
-                                  <div
-                                    key={h.id}
-                                    className="flex flex-grow basis-80 gap-3 rounded-lg border border-slate-200 bg-white/70 p-3"
-                                  >
-                                    <div className="w-24 flex-shrink-0">
-                                      <div>{h.roundLabel}</div>
-                                      <div>{formatSettlementType(h.type)}</div>
-                                      <div className="mt-0.5 text-[11px] text-slate-400">
-                                        {h.timestamp}
-                                      </div>
-                                    </div>
-                                    <div className="grid flex-grow grid-cols-2 gap-1">
-                                      {(h.deltas ?? []).map((d, i) => (
-                                        <div
-                                          key={i}
-                                          className="rounded-md bg-slate-50/80 px-2 py-1"
-                                        >
-                                          <div className="truncate text-[11px] text-slate-600">
-                                            {state.present.names[i]}
-                                          </div>
-                                          <div
-                                            className={`text-[11px] font-semibold tabular-nums ${
-                                              d > 0
-                                                ? "text-emerald-600"
-                                                : d < 0
-                                                ? "text-rose-600"
-                                                : "text-slate-400"
-                                            }`}
-                                          >
-                                            {formatDiff(d)}
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                </div>
-
-                <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
-
                 <div className="space-y-2">
                   <div className="text-[11px] font-semibold tracking-wide text-slate-500">
                     结算信息
@@ -2533,6 +2135,404 @@ function App() {
                         )}
                       </TooltipContent>
                     </Tooltip>
+                  </div>
+                </div>
+
+                <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+
+                <div className="space-y-2">
+                  <div className="text-[11px] font-semibold tracking-wide text-slate-500">
+                    比赛进程
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Dialog
+                      open={editRoundOpen}
+                      onOpenChange={setEditRoundOpen}
+                    >
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-3 text-xs"
+                        >
+                          调整场况
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>调整场况</DialogTitle>
+                          <DialogDescription>
+                            手动修正当前场次、庄家与本场数，点数不发生变化。
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="mt-2 space-y-4 text-xs">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-xs">场风</Label>
+                              <Select
+                                value={editWind}
+                                onValueChange={(v) =>
+                                  setEditWind(v as RoundWind)
+                                }
+                              >
+                                <SelectTrigger className="mt-1 h-8 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="东">东风场</SelectItem>
+                                  <SelectItem value="南">南风场</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label className="text-xs">局数</Label>
+                              <Input
+                                className="mt-1 h-8 text-xs"
+                                type="number"
+                                min={1}
+                                max={4}
+                                value={editNumber}
+                                onChange={(e) =>
+                                  setEditNumber(
+                                    Math.min(
+                                      4,
+                                      Math.max(1, Number(e.target.value) || 1)
+                                    )
+                                  )
+                                }
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-xs">本场数</Label>
+                              <Input
+                                className="mt-1 h-8 text-xs"
+                                type="number"
+                                min={0}
+                                value={editHonba}
+                                onChange={(e) =>
+                                  setEditHonba(
+                                    Math.max(0, Number(e.target.value) || 0)
+                                  )
+                                }
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs">庄家</Label>
+                              <Select
+                                value={String(editDealer)}
+                                onValueChange={(v) =>
+                                  setEditDealer(Number(v) as SeatIndex)
+                                }
+                              >
+                                <SelectTrigger className="mt-1 h-8 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {state.present.names.map((name, idx) => (
+                                    <SelectItem key={idx} value={String(idx)}>
+                                      {name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </div>
+                        <DialogFooter className="mt-4 flex flex-row justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-3 text-xs"
+                            onClick={() => setEditRoundOpen(false)}
+                          >
+                            取消
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-8 px-3 text-xs"
+                            onClick={handleEditRoundConfirm}
+                          >
+                            确认
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                    <Dialog
+                      open={editNamesOpen}
+                      onOpenChange={setEditNamesOpen}
+                    >
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-3 text-xs"
+                        >
+                          编辑昵称
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>编辑四家昵称</DialogTitle>
+                          <DialogDescription>
+                            为东南西北四家设置便于识别的昵称，保存后将应用于当前局面与后续历史记录。
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="mt-2 grid grid-cols-2 gap-3 text-xs">
+                          {PLAYER_LABELS.map((label, idx) => (
+                            <div key={idx}>
+                              <Label className="text-xs">{label}</Label>
+                              <Input
+                                className="mt-1 h-8 text-xs"
+                                value={editNames[idx] ?? ""}
+                                onChange={(e) => {
+                                  const next = [...editNames];
+                                  next[idx] = e.target.value;
+                                  setEditNames(next);
+                                }}
+                                placeholder={label}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        <p className="mt-3 text-[11px] text-slate-500">
+                          昵称会保存在本地浏览器。重置游戏时默认保留昵称，便于连续面麻。
+                        </p>
+                        <DialogFooter className="mt-4 flex flex-row justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-3 text-xs"
+                            onClick={() => setEditNamesOpen(false)}
+                          >
+                            取消
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-8 px-3 text-xs"
+                            onClick={() => {
+                              setState((prev) => ({
+                                past: [...prev.past, prev.present],
+                                present: {
+                                  ...prev.present,
+                                  names: sanitizeNames(editNames),
+                                },
+                                future: [],
+                              }));
+                              setEditNamesOpen(false);
+                            }}
+                          >
+                            保存昵称
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+
+                    <AlertDialog
+                      open={resetDialogOpen}
+                      onOpenChange={setResetDialogOpen}
+                    >
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-3 text-xs text-rose-600 hover:bg-rose-50"
+                        >
+                          <RefreshCcw className="mr-1 h-3 w-3" />
+                          重置游戏
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="max-w-sm">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>确认重置游戏？</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            此操作会将四家点数、场次、本场数、场供与历史记录全部重置为初始状态。默认保留当前昵称。
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <div className="mt-3 rounded-lg bg-slate-50/80 px-3 py-2 text-xs text-slate-700">
+                          <label className="flex items-center gap-2">
+                            <Checkbox
+                              checked={resetAlsoNames}
+                              onCheckedChange={(v) =>
+                                setResetAlsoNames(Boolean(v))
+                              }
+                            />
+                            <span>
+                              同时将四家昵称重置为默认（东风家 / 南风家 / 西风家
+                              / 北风家）
+                            </span>
+                          </label>
+                          <p className="mt-2 text-[11px] text-slate-500">
+                            若不勾选，仅重置点数与对局记录，保留当前昵称，方便继续面麻。
+                          </p>
+                        </div>
+                        <AlertDialogFooter className="mt-4">
+                          <AlertDialogCancel
+                            className="h-8 px-3 text-xs"
+                            onClick={() => setResetAlsoNames(false)}
+                          >
+                            取消
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            className="h-8 px-3 text-xs bg-rose-500 hover:bg-rose-600"
+                            onClick={() => {
+                              resetGame(resetAlsoNames);
+                              setResetAlsoNames(false);
+                            }}
+                          >
+                            确认重置
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+
+                    <Dialog open={settleOpen} onOpenChange={setSettleOpen}>
+                      <DialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          className="h-8 px-3 text-xs bg-emerald-500 hover:bg-emerald-600 text-white"
+                        >
+                          <Check className="mr-1 h-3 w-3" />
+                          终局结算
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-[60vw]">
+                        <div className="flex gap-10 shrink-0">
+                          <div>
+                            <DialogHeader>
+                              <DialogTitle>终局结算</DialogTitle>
+                              <DialogDescription className="whitespace-nowrap">
+                                第一名+35，第二名+15，第三名-5，第四名-45
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="pt-4 pb-2">
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>排名</TableHead>
+                                    <TableHead>玩家</TableHead>
+                                    <TableHead className="text-right">
+                                      分数
+                                    </TableHead>
+                                    <TableHead className="text-right">
+                                      马点
+                                    </TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {rankingList.map((player) => (
+                                    <TableRow
+                                      key={player.index}
+                                      className={`${
+                                        player.rank === 1
+                                          ? "bg-emerald-50/50"
+                                          : player.rank === 4
+                                          ? "bg-rose-50/50"
+                                          : ""
+                                      }`}
+                                    >
+                                      <TableCell>{player.rank}</TableCell>
+                                      <TableCell>{player.name}</TableCell>
+                                      <TableCell className="text-right">
+                                        {player.score}
+                                      </TableCell>
+                                      <TableCell className="text-right">
+                                        {uma[player.index].toFixed(1)}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </TableBody>
+                              </Table>
+                            </div>
+                            <div className="text-xs text-slate-500 flex gap-4 flex-nowrap">
+                              <p className="whitespace-nowrap">
+                                持续时间：{elapsedMinutes} 分钟
+                              </p>
+                              <p className="whitespace-nowrap">
+                                结束时间：{beijingTime}
+                              </p>
+                            </div>
+                            <div className="mt-4 flex gap-2">
+                              <Button
+                                size="sm"
+                                className="h-8 px-3 text-xs"
+                                onClick={handleDistributeKyotaku}
+                                disabled={
+                                  state.present.kyotaku === 0 || isGameFinished
+                                }
+                              >
+                                分配剩余场供
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-3 text-xs text-rose-600 hover:bg-rose-50"
+                                onClick={() => {
+                                  setSettleOpen(false);
+                                  setResetDialogOpen(true);
+                                }}
+                              >
+                                <RefreshCcw className="mr-1 h-3 w-3" />
+                                重置游戏
+                              </Button>
+                            </div>
+                          </div>
+                          <div>
+                            <div className="max-h-[80vh] overflow-y-auto pr-2 text-xs">
+                              <div className="flex flex-wrap gap-2">
+                                {state.present.history.length < 1 && (
+                                  <div className="text-slate-400">
+                                    暂无历史记录
+                                  </div>
+                                )}
+                                {state.present.history.map((h) => (
+                                  <div
+                                    key={h.id}
+                                    className="flex flex-grow basis-80 gap-3 rounded-lg border border-slate-200 bg-white/70 p-3"
+                                  >
+                                    <div className="w-24 flex-shrink-0">
+                                      <div>{h.roundLabel}</div>
+                                      <div>{formatSettlementType(h.type)}</div>
+                                      <div className="mt-0.5 text-[11px] text-slate-400">
+                                        {h.timestamp}
+                                      </div>
+                                    </div>
+                                    <div className="grid flex-grow grid-cols-2 gap-1">
+                                      {(h.deltas ?? []).map((d, i) => (
+                                        <div
+                                          key={i}
+                                          className="rounded-md bg-slate-50/80 px-2 py-1"
+                                        >
+                                          <div className="truncate text-[11px] text-slate-600">
+                                            {state.present.names[i]}
+                                          </div>
+                                          <div
+                                            className={`text-[11px] font-semibold tabular-nums ${
+                                              d > 0
+                                                ? "text-emerald-600"
+                                                : d < 0
+                                                ? "text-rose-600"
+                                                : "text-slate-400"
+                                            }`}
+                                          >
+                                            {formatDiff(d)}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </div>
               </CardContent>
