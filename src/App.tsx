@@ -2448,7 +2448,7 @@ function App() {
                             <span>同时重置玩家昵称</span>
                           </label>
                           <p className="mt-2 text-[11px] text-slate-500">
-                            勾选后昵称将被重置为默认值，且清空历史记录。
+                            勾选后昵称将被重置为默认值，且昵称历史记录也会被清空。
                           </p>
                         </div>
                         <AlertDialogFooter className="mt-4">
