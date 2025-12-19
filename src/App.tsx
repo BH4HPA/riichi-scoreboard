@@ -2481,7 +2481,7 @@ function App() {
                           终局结算
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-[60vw]">
+                      <DialogContent className="max-w-[70vw]">
                         <div className="flex gap-10 shrink-0">
                           <div>
                             <DialogHeader>
@@ -2573,7 +2573,7 @@ function App() {
                                 {state.present.history.map((h) => (
                                   <div
                                     key={h.id}
-                                    className="flex flex-grow basis-80 gap-3 rounded-lg border border-slate-200 bg-white/70 p-3"
+                                    className="flex flex-grow rounded-lg border border-slate-200 bg-white/70 p-3"
                                   >
                                     <div className="w-24 flex-shrink-0">
                                       <div>{h.roundLabel}</div>
