@@ -9,6 +9,7 @@ import {
   Timer,
   Wand2,
   Check,
+  ChevronsUpDown,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,19 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -476,6 +490,12 @@ function App() {
   const [resetAlsoNames, setResetAlsoNames] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [shouldSettle, setShouldSettle] = useState(false);
+  const [comboboxOpen, setComboboxOpen] = useState([
+    false,
+    false,
+    false,
+    false,
+  ]);
 
   // 编辑场况
   const [editWind, setEditWind] = useState<RoundWind>("东");
@@ -648,6 +668,18 @@ function App() {
   const isGameFinished = useMemo(() => {
     return state.present.kyokuIndex >= 8;
   }, [state.present.kyokuIndex]);
+
+  const historicalNames = useMemo(() => {
+    const pastNames = state.past.flatMap((snapshot) => snapshot.names || []);
+    const presentNames = Array.isArray(state.present.names)
+      ? state.present.names
+      : [];
+    const allNames = [...pastNames, ...presentNames];
+    const uniqueNames = [...new Set(allNames)];
+    return uniqueNames.filter(
+      (name) => name && !(PLAYER_LABELS as unknown as string[]).includes(name)
+    );
+  }, [state.past, state.present.names]);
 
   function resetGame(resetNames: boolean) {
     setState(() => {
@@ -2285,16 +2317,78 @@ function App() {
                           {PLAYER_LABELS.map((label, idx) => (
                             <div key={idx}>
                               <Label className="text-xs">{label}</Label>
-                              <Input
-                                className="mt-1 h-8 text-xs"
-                                value={editNames[idx] ?? ""}
-                                onChange={(e) => {
-                                  const next = [...editNames];
-                                  next[idx] = e.target.value;
-                                  setEditNames(next);
+                              <Popover
+                                open={comboboxOpen[idx]}
+                                onOpenChange={(open) => {
+                                  const next = [...comboboxOpen];
+                                  next[idx] = open;
+                                  setComboboxOpen(next);
                                 }}
-                                placeholder={label}
-                              />
+                              >
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={comboboxOpen[idx]}
+                                    className="mt-1 h-8 w-full justify-between text-xs"
+                                  >
+                                    {editNames[idx] || `选择或输入...`}
+                                    <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[200px] p-0">
+                                  <Command>
+                                    <CommandInput
+                                      placeholder="搜索或创建昵称..."
+                                      className="h-8 text-xs"
+                                      value={editNames[idx] ?? ""}
+                                      onValueChange={(search) => {
+                                        const next = [...editNames];
+                                        next[idx] = search;
+                                        setEditNames(next);
+                                      }}
+                                    />
+                                    <CommandList>
+                                      <CommandEmpty>
+                                        未找到历史昵称
+                                      </CommandEmpty>
+                                      {historicalNames.length > 0 && (
+                                        <CommandGroup>
+                                          {historicalNames.map((name) => (
+                                            <CommandItem
+                                              key={name}
+                                              value={name}
+                                              onSelect={(currentValue) => {
+                                                const next = [...editNames];
+                                                next[idx] =
+                                                  currentValue ===
+                                                  editNames[idx]
+                                                    ? ""
+                                                    : currentValue;
+                                                setEditNames(next);
+                                                const nextOpen = [
+                                                  ...comboboxOpen,
+                                                ];
+                                                nextOpen[idx] = false;
+                                                setComboboxOpen(nextOpen);
+                                              }}
+                                            >
+                                              <Check
+                                                className={`mr-2 h-3 w-3 ${
+                                                  editNames[idx] === name
+                                                    ? "opacity-100"
+                                                    : "opacity-0"
+                                                }`}
+                                              />
+                                              {name}
+                                            </CommandItem>
+                                          ))}
+                                        </CommandGroup>
+                                      )}
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
                             </div>
                           ))}
                         </div>
