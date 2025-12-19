@@ -2567,7 +2567,7 @@ function App() {
                               <div className="flex flex-wrap gap-2">
                                 {state.present.history.length < 1 && (
                                   <div className="text-slate-400">
-                                    暂无历史记录
+                                    没有历史结算记录。
                                   </div>
                                 )}
                                 {state.present.history.map((h) => (
