@@ -37,14 +37,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -2317,54 +2309,50 @@ function App() {
                           {PLAYER_LABELS.map((label, idx) => (
                             <div key={idx}>
                               <Label className="text-xs">{label}</Label>
-                              <Popover
-                                open={comboboxOpen[idx]}
-                                onOpenChange={(open) => {
-                                  const next = [...comboboxOpen];
-                                  next[idx] = open;
-                                  setComboboxOpen(next);
-                                }}
-                              >
-                                <PopoverTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    aria-expanded={comboboxOpen[idx]}
-                                    className="mt-1 h-8 w-full justify-between text-xs"
-                                  >
-                                    {editNames[idx] || `选择或输入...`}
-                                    <ChevronsUpDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-[200px] p-0">
-                                  <Command>
-                                    <CommandInput
-                                      placeholder="搜索或创建昵称..."
-                                      className="h-8 text-xs"
-                                      value={editNames[idx] ?? ""}
-                                      onValueChange={(search) => {
-                                        const next = [...editNames];
-                                        next[idx] = search;
-                                        setEditNames(next);
-                                      }}
-                                    />
-                                    <CommandList>
-                                      <CommandEmpty>
-                                        未找到历史昵称
-                                      </CommandEmpty>
-                                      {historicalNames.length > 0 && (
-                                        <CommandGroup>
+                              <div className="relative mt-1 flex items-center">
+                                <Input
+                                  className="h-8 text-xs pr-8"
+                                  value={editNames[idx] ?? ""}
+                                  onChange={(e) => {
+                                    const next = [...editNames];
+                                    next[idx] = e.target.value;
+                                    setEditNames(next);
+                                  }}
+                                  placeholder={label}
+                                />
+                                <Popover
+                                  open={comboboxOpen[idx]}
+                                  onOpenChange={(open) => {
+                                    const next = [...comboboxOpen];
+                                    next[idx] = open;
+                                    setComboboxOpen(next);
+                                  }}
+                                >
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="absolute right-0 top-0 h-8 w-8 p-0"
+                                    >
+                                      <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[200px] p-0">
+                                    <div className="py-1">
+                                      {historicalNames.length > 0 ? (
+                                        <>
+                                          <div className="px-3 py-1.5 text-[11px] font-semibold text-slate-500">
+                                            历史记录
+                                          </div>
                                           {historicalNames.map((name) => (
-                                            <CommandItem
+                                            <button
                                               key={name}
-                                              value={name}
-                                              onSelect={(currentValue) => {
+                                              className={
+                                                "w-full text-left px-3 py-1.5 text-xs hover:bg-slate-100"
+                                              }
+                                              onClick={() => {
                                                 const next = [...editNames];
-                                                next[idx] =
-                                                  currentValue ===
-                                                  editNames[idx]
-                                                    ? ""
-                                                    : currentValue;
+                                                next[idx] = name;
                                                 setEditNames(next);
                                                 const nextOpen = [
                                                   ...comboboxOpen,
@@ -2373,22 +2361,19 @@ function App() {
                                                 setComboboxOpen(nextOpen);
                                               }}
                                             >
-                                              <Check
-                                                className={`mr-2 h-3 w-3 ${
-                                                  editNames[idx] === name
-                                                    ? "opacity-100"
-                                                    : "opacity-0"
-                                                }`}
-                                              />
                                               {name}
-                                            </CommandItem>
+                                            </button>
                                           ))}
-                                        </CommandGroup>
+                                        </>
+                                      ) : (
+                                        <div className="px-3 py-4 text-center text-xs text-slate-500">
+                                          暂无历史记录
+                                        </div>
                                       )}
-                                    </CommandList>
-                                  </Command>
-                                </PopoverContent>
-                              </Popover>
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
                             </div>
                           ))}
                         </div>
