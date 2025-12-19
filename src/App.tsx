@@ -116,7 +116,20 @@ function sanitizeNames(input: unknown): string[] {
   });
 }
 
-function createInitialGameState(): GameState {
+function createInitialGameState(ignoreLocalStorage = false): GameState {
+  if (typeof window !== "undefined" && !ignoreLocalStorage) {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as GameState;
+        if (parsed && parsed.present) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load scoreboard state", e);
+    }
+  }
   return {
     past: [],
     present: {
@@ -513,20 +526,7 @@ function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // load from localStorage
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as GameState;
-      if (parsed && parsed.present) {
-        setState(parsed);
-      }
-    } catch (e) {
-      console.error("Failed to load scoreboard state", e);
-    }
-  }, []);
+
 
   // persist
   useEffect(() => {
@@ -640,7 +640,7 @@ function App() {
 
   function resetGame(resetNames: boolean) {
     setState(() => {
-      const initial = createInitialGameState();
+      const initial = createInitialGameState(true);
       if (!resetNames) {
         initial.present.names = state.present.names;
       }
@@ -1283,8 +1283,12 @@ function App() {
                           className="h-8 px-3 text-xs"
                           onClick={() => {
                             setState((prev) => ({
-                              ...prev,
-                              names: sanitizeNames(editNames),
+                              past: [...prev.past, prev.present],
+                              present: {
+                                ...prev.present,
+                                names: sanitizeNames(editNames),
+                              },
+                              future: [],
                             }));
                             setEditNamesOpen(false);
                           }}
