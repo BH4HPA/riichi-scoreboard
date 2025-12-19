@@ -1192,7 +1192,7 @@ function App() {
 
   return (
     <TooltipProvider>
-      <div className="app-bg h-[100vh] sm:min-h-screen w-full px-4 py-6 md:px-6 md:py-8">
+      <div className="app-bg lg:h-[100vh] min-h-screen w-full px-4 py-6 md:px-6 md:py-8">
         <div className="mx-auto h-full flex w-full flex-col gap-6 rounded-3xl border border-white/70 bg-white/70 p-5 shadow-xl shadow-amber-100/60 backdrop-blur-md md:p-8">
           {/* Header */}
           <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -1411,7 +1411,7 @@ function App() {
 
           {/* Bottom: history & controls */}
           <section className="grid gap-5 lg:grid-cols-[3fr,1fr] h-full min-h-0">
-            <Card className="border-none bg-white/80 shadow-md shadow-slate-200/70 h-full overflow-y-auto relative">
+            <Card className="border-none bg-white/80 shadow-md shadow-slate-200/70 h-full overflow-y-auto relative max-h-[300px] lg:max-h-[none]">
               {/* <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                 <CardTitle className="text-sm font-semibold text-slate-700">
                   历史记录
@@ -1420,13 +1420,13 @@ function App() {
                   记录每一局的场次、庄家、立直玩家、点差变动与结算详情
                 </span>
               </CardHeader> */}
-              <CardContent className="p-4 pt-0 w-full h-full flex justify-center items-start">
+              <CardContent className="p-4 pt-0 w-full h-full flex justify-start items-start">
                 {state.present.history.length === 0 ? (
-                  <div className="mt-4 w-full h-[calc(100%-1rem)] flex items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 text-xs text-slate-500">
+                  <div className="mt-4 p-4 w-full h-[calc(100%-1rem)] flex items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 text-xs text-slate-500">
                     暂无记录，请通过操作栏录入对局结算。
                   </div>
                 ) : (
-                  <div className="w-full space-y-2 pr-2 text-xs">
+                  <div className="w-full space-y-2 pr-2 text-xs min-w-[640px]">
                     <Table disableOverflow>
                       <TableHeader className="bg-white" disableBorderBottom>
                         <TableRow disableBorderBottom>
@@ -2481,12 +2481,12 @@ function App() {
                           终局结算
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-[70vw]">
-                        <div className="flex gap-10 shrink-0">
-                          <div>
+                      <DialogContent className="max-w-5xl">
+                        <div className="flex gap-10 flex-wrap lg:flex-nowrap">
+                          <div className="flex-1 lg:flex-none">
                             <DialogHeader>
                               <DialogTitle>终局结算</DialogTitle>
-                              <DialogDescription className="whitespace-nowrap">
+                              <DialogDescription className="whitespace-normal lg:whitespace-nowrap">
                                 第一名+35，第二名+15，第三名-5，第四名-45
                               </DialogDescription>
                             </DialogHeader>
@@ -2562,7 +2562,7 @@ function App() {
                               </Button>
                             </div>
                           </div>
-                          <div>
+                          <div className="hidden lg:block">
                             <div className="max-h-[80vh] overflow-y-auto pr-2 text-xs">
                               <div className="flex flex-wrap gap-2">
                                 {state.present.history.length < 1 && (
