@@ -583,7 +583,7 @@ function App() {
   const diffMatrix = useMemo(
     () =>
       state.present.points.map((score, i) =>
-        state.present.points.map((other, j) => (i === j ? 0 : score - other))
+        state.present.points.map((other, j) => (i === j ? 0 : other - score))
       ),
     [state.present.points]
   );
@@ -1369,38 +1369,43 @@ function App() {
                       <TableHead className="w-20 text-xs text-slate-500">
                         对比
                       </TableHead>
-                      {state.present.names.map((name, idx) => (
+                      {rankingList.map((player) => (
                         <TableHead
-                          key={idx}
-                          className="text-center text-xs text-slate-500 truncate max-w-4"
+                          key={player.index}
+                          className="text-center text-xs text-slate-500 truncate max-w-20"
                         >
-                          {name}
+                          {player.name}
                         </TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {diffMatrix.map((row, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="text-xs font-medium text-slate-600 truncate max-w-4">
-                          {state.present.names[i]}
+                    {rankingList.map((player) => (
+                      <TableRow key={player.index}>
+                        <TableCell className="text-xs font-medium text-slate-600 truncate max-w-20">
+                          {player.name}
                         </TableCell>
-                        {row.map((diff, j) => (
-                          <TableCell
-                            key={j}
-                            className={`text-center text-xs tabular-nums ${
-                              i === j
-                                ? "text-slate-400"
-                                : diff > 0
-                                ? "text-emerald-600"
-                                : diff < 0
-                                ? "text-rose-600"
-                                : "text-slate-400"
-                            }`}
-                          >
-                            {i === j ? "—" : formatDiff(diff)}
-                          </TableCell>
-                        ))}
+                        {rankingList.map((otherPlayer) => {
+                          const diff = diffMatrix[player.index][otherPlayer.index];
+                          return (
+                            <TableCell
+                              key={otherPlayer.index}
+                              className={`text-center text-xs tabular-nums ${
+                                player.index === otherPlayer.index
+                                  ? "text-slate-400"
+                                  : diff > 0
+                                  ? "text-emerald-600"
+                                  : diff < 0
+                                  ? "text-rose-600"
+                                  : "text-slate-400"
+                              }`}
+                            >
+                              {player.index === otherPlayer.index
+                                ? "—"
+                                : formatDiff(diff)}
+                            </TableCell>
+                          );
+                        })}
                       </TableRow>
                     ))}
                   </TableBody>
