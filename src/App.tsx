@@ -1673,10 +1673,10 @@ function App() {
                             </div>
                           </div>
                         </div>
-                        <div className="mt-3 rounded-lg bg-slate-50/80 px-3 py-2">
-                          <div className="mb-1 text-[11px] font-medium text-slate-600">
-                            结算预览
-                          </div>
+                        <div className="mb-[-0.6rem] text-[11px] font-medium text-slate-600">
+                          结算预览
+                        </div>
+                        <div className="rounded-lg bg-slate-50/80 px-3 py-2">
                           <div className="grid grid-cols-2 gap-2">
                             {state.present.names.map((name, idx) => {
                               const delta = drawPreview.deltas[idx] ?? 0;
@@ -1703,18 +1703,24 @@ function App() {
                               );
                             })}
                           </div>
-                          <div className="mt-2 text-[11px] text-slate-500">
-                            立直供托：
-                            {formatPoints(
+                          <div className="mt-3 text-[11px] text-slate-600">
+                            流局的场供收入：{" "}
+                            <span
+                              className={`font-semibold ${
+                                (drawPreview.riichiIncome ?? 0) > 0
+                                  ? "text-emerald-600"
+                                  : (drawPreview.riichiIncome ?? 0) < 0
+                                  ? "text-rose-600"
+                                  : "text-slate-400"
+                              }`}
+                            >
+                              {formatDiff(drawPreview.riichiIncome ?? 0)} 点
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-500">
+                            历史立直供托 {formatPoints(
                               drawPreview.kyotakuBefore * 1000
-                            )} → {formatPoints(drawPreview.kyotakuAfter * 1000)}{" "}
-                            点
-                            {drawPreview.riichiIncome > 0 && (
-                              <span className="ml-1">
-                                （本局立直供托计入{" "}
-                                {formatPoints(drawPreview.riichiIncome)} 点）
-                              </span>
-                            )}
+                            )} 点，收入后共 {formatPoints(drawPreview.kyotakuAfter * 1000)}{" "}点
                           </div>
                         </div>
                         <DialogFooter className="mt-4 flex flex-row justify-end gap-2">
@@ -1838,10 +1844,10 @@ function App() {
                             </div>
                           </div>
                         </div>
-                        <div className="mt-3 rounded-lg bg-slate-50/80 px-3 py-2">
-                          <div className="mb-1 text-[11px] font-medium text-slate-600">
-                            结算预览
-                          </div>
+                        <div className="mb-[-0.6rem] text-[11px] font-medium text-slate-600">
+                          结算预览
+                        </div>
+                        <div className="rounded-lg bg-slate-50/80 px-3 py-2">
                           {tsumoPreview ? (
                             <div className="space-y-3">
                               <div className="grid grid-cols-2 gap-2">
@@ -1897,25 +1903,21 @@ function App() {
                                     点
                                   </span>
                                   <div className="mt-1 text-[11px] text-slate-500">
-                                    （含本场棒 {state.present.honba * 300}{" "}
+                                    得分{" "}
+                                    {tsumoPreview.deltas[
+                                      tsumoPreview.winnerIndex
+                                    ] -
+                                      state.present.honba * 300 -
+                                      tsumoPreview.kyotakuIncome -
+                                      tsumoPreview.riichiIncome}{" "}
+                                    点、本场棒 {state.present.honba * 300}{" "}
                                     点、历史立直供托{" "}
                                     {formatPoints(tsumoPreview.kyotakuIncome)}{" "}
                                     点、本局立直供托{" "}
-                                    {formatPoints(tsumoPreview.riichiIncome)}{" "}
-                                    点）
+                                    {formatPoints(tsumoPreview.riichiIncome)} 点
                                   </div>
                                 </div>
                               )}
-                              <div className="mt-2 text-[11px] text-slate-500">
-                                立直供托：
-                                {formatPoints(
-                                  tsumoPreview.kyotakuBefore * 1000 +
-                                    tsumoPreview.riichiIncome
-                                )}{" "}
-                                →{" "}
-                                {formatPoints(tsumoPreview.kyotakuAfter * 1000)}{" "}
-                                点
-                              </div>
                             </div>
                           ) : (
                             <div className="text-[11px] text-slate-400">
@@ -2070,10 +2072,10 @@ function App() {
                             </div>
                           </div>
                         </div>
-                        <div className="mt-3 rounded-lg bg-slate-50/80 px-3 py-2">
-                          <div className="mb-1 text-[11px] font-medium text-slate-600">
-                            结算预览
-                          </div>
+                        <div className="mb-[-0.6rem] text-[11px] font-medium text-slate-600">
+                          结算预览
+                        </div>
+                        <div className="rounded-lg bg-slate-50/80 px-3 py-2">
                           {ronPreview ? (
                             <div className="space-y-3">
                               <div className="grid grid-cols-2 gap-2">
@@ -2129,23 +2131,19 @@ function App() {
                                     点
                                   </span>
                                   <div className="mt-1 text-[11px] text-slate-500">
-                                    （含本场棒 {state.present.honba * 300}{" "}
+                                    得分{" "}
+                                    {ronPreview.deltas[ronPreview.winnerIndex] -
+                                      state.present.honba * 300 -
+                                      ronPreview.kyotakuIncome -
+                                      ronPreview.riichiIncome}{" "}
+                                    点、本场棒 {state.present.honba * 300}{" "}
                                     点、历史立直供托{" "}
                                     {formatPoints(ronPreview.kyotakuIncome)}{" "}
                                     点、本局立直供托{" "}
-                                    {formatPoints(ronPreview.riichiIncome)} 点）
+                                    {formatPoints(ronPreview.riichiIncome)} 点
                                   </div>
                                 </div>
                               )}
-                              <div className="mt-2 text-[11px] text-slate-500">
-                                立直供托：
-                                {formatPoints(
-                                  ronPreview.kyotakuBefore * 1000 +
-                                    ronPreview.riichiIncome
-                                )}{" "}
-                                → {formatPoints(ronPreview.kyotakuAfter * 1000)}{" "}
-                                点
-                              </div>
                             </div>
                           ) : (
                             <div className="text-[11px] text-slate-400">
