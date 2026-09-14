@@ -1,0 +1,41 @@
+{
+  "name": "@riichi/web",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@radix-ui/react-alert-dialog": "^1.1.23",
+    "@radix-ui/react-checkbox": "^1.3.11",
+    "@radix-ui/react-dialog": "^1.1.23",
+    "@radix-ui/react-label": "^2.1.15",
+    "@radix-ui/react-select": "^2.3.7",
+    "@radix-ui/react-slot": "^1.3.3",
+    "@radix-ui/react-switch": "^1.3.7",
+    "@radix-ui/react-tabs": "^1.1.21",
+    "@radix-ui/react-tooltip": "^1.2.16",
+    "@riichi/core": "workspace:*",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.46.0",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router": "^8.3.1",
+    "tailwind-merge": "^3.7.0",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.0"
+  }
+}

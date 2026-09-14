@@ -1,0 +1,16 @@
+{
+  "name": "@riichi/core",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  }
+}
