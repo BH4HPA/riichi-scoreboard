@@ -29,8 +29,8 @@ export interface RoomRules {
     kuitan: boolean;
     /** 一发 → hand/options（disabled_yaku 含 Ippatsu 时关闭） */
     ippatsu: boolean;
-    /** 人和：无 / 满贯 / 役满 → hand/options 与 scoring */
-    renhou: "none" | "mangan" | "yakuman";
+    /** 人和：无 / 役满 → hand/options（disabled_yaku） */
+    renhou: "none" | "yakuman";
     /** 流局满贯 → reducer/commands/draw */
     nagashiMangan: boolean;
     /** 国士无双可抢暗杠 → 牌键盘"抢杠"选项在暗杠场景是否可用（引擎不区分，仅 UI 约束） */

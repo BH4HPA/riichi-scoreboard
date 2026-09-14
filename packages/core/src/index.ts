@@ -14,3 +14,6 @@ export * from "./reducer/game";
 export * from "./reducer/reduce";
 export * from "./format/round";
 export * from "./format/describe";
+export * from "./hand/options";
+export * from "./reference/yakuTable";
+export * from "./reference/fuTable";

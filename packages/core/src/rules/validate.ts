@@ -75,7 +75,7 @@ export function validateRules(input: unknown): RoomRules {
       kanDora: bool(hand.kanDora, "hand.kanDora"),
       kuitan: bool(hand.kuitan, "hand.kuitan"),
       ippatsu: bool(hand.ippatsu, "hand.ippatsu"),
-      renhou: oneOf(hand.renhou, ["none", "mangan", "yakuman"], "hand.renhou"),
+      renhou: oneOf(hand.renhou, ["none", "yakuman"], "hand.renhou"),
       nagashiMangan: bool(hand.nagashiMangan, "hand.nagashiMangan"),
       kokushiAnkanChankan: bool(hand.kokushiAnkanChankan, "hand.kokushiAnkanChankan"),
     },
