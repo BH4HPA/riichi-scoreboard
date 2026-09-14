@@ -109,7 +109,7 @@ export interface RoomState {
   gameNo: number;
 }
 
-export function seatNames(room: RoomState): string[] {
+export function seatNames(room: { seats: (PlayerRef | null)[] }): string[] {
   return room.seats.map((p, i) => p?.name ?? DEFAULT_SEAT_NAMES[i]!);
 }
 

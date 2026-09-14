@@ -1,10 +1,22 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { MLEAGUE_PRESET } from "@riichi/core";
+import { createBrowserRouter, RouterProvider } from "react-router";
+import { TooltipProvider } from "@/ui/controls";
+import { Landing } from "@/app/routes/Landing";
+import { Console } from "@/app/routes/Console";
+import { Room } from "@/app/routes/Room";
 import "./index.css";
+
+const router = createBrowserRouter([
+  { path: "/", element: <Landing /> },
+  { path: "/console", element: <Console /> },
+  { path: "/r/:code", element: <Room /> },
+]);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <main className="p-4 text-sm">立直麻将计分板 v2 骨架，默认规则 {MLEAGUE_PRESET.name}</main>
+    <TooltipProvider>
+      <RouterProvider router={router} />
+    </TooltipProvider>
   </StrictMode>,
 );

@@ -1,1 +1,64 @@
 @import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --font-sans: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-pos: var(--pos);
+  --color-neg: var(--neg);
+}
+
+:root {
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --surface-2: #f1f3f6;
+  --border: #e3e6eb;
+  --fg: #14181f;
+  --muted: #6b7280;
+  --accent: #d97706;
+  --accent-fg: #ffffff;
+  --pos: #059669;
+  --neg: #e11d48;
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #0b0f14;
+  --surface: #121821;
+  --surface-2: #1a2230;
+  --border: #243040;
+  --fg: #f3f4f6;
+  --muted: #94a3b8;
+  --accent: #f59e0b;
+  --accent-fg: #111111;
+  --pos: #34d399;
+  --neg: #fb7185;
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "tnum";
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
