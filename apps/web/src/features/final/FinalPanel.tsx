@@ -86,7 +86,10 @@ export function FinalPanel({
       <div className="mt-2 flex flex-wrap gap-x-4 text-xs text-muted">
         <span>
           持续时间：
-          {Math.max(0, Math.floor(((game.finishedAt ?? game.startedAt) - game.startedAt) / 60000))}{" "}
+          {Math.max(
+            0,
+            Math.floor(((game.finishedAt ?? game.startedAt) - game.startedAt) / 60000),
+          )}{" "}
           分钟
         </span>
         {game.finishedAt && <span>结束时间：{formatDateTime(game.finishedAt)}</span>}

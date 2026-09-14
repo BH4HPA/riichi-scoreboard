@@ -28,7 +28,9 @@ export function ConsoleLobby({ room, onNewRoom }: { room: RoomView; onNewRoom: (
         </div>
         <div className="text-center">
           <div className="text-sm text-muted">房间码</div>
-          <div className="text-5xl font-semibold tabular tracking-[0.25em]">{room.code}</div>
+          <div className="text-5xl font-semibold tabular tracking-[0.25em]" data-testid="room-code">
+            {room.code}
+          </div>
           <div className="mt-2 text-sm text-muted">{url}</div>
         </div>
         <p className="text-center text-sm text-muted">

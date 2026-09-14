@@ -28,6 +28,7 @@ export function SeatCards({
             key={seat}
             type="button"
             disabled={!clickable}
+            data-testid={`seat-${seat}`}
             onClick={() => onPick?.(seat)}
             className={cn(
               "flex items-center gap-3 rounded-xl border p-3 text-left transition-colors",
