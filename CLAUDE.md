@@ -16,6 +16,8 @@ Package manager is **Yarn 4** (via corepack). Node >= 22.13 (node:sqlite); use 2
 - `yarn build` — builds server (`apps/server/dist`) and web (`apps/web/dist`)
 - `yarn test` — Vitest across `packages/core` and `apps/server`
 - `yarn typecheck` / `yarn lint` / `yarn format:check`
+- `yarn e2e` — Playwright smoke test (builds web, starts server on :8799, drives TV + 4 phones)
+- `docker compose up -d --build` — single container (server + built web), data volume at `/data`
 
 ## Architecture
 

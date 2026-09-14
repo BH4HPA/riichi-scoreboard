@@ -8,8 +8,17 @@
 corepack enable
 yarn install
 yarn dev        # server :8787 + web :5173（手机用电脑局域网 IP 访问 :5173）
-yarn test
+yarn test       # 单测（core + server）
+yarn e2e        # Playwright 端到端冒烟
 ```
+
+## 部署
+
+```bash
+docker compose up -d --build   # 单容器，:8787，数据卷 /data（SQLite + 头像）
+```
+
+前端与后端同源部署时无需配置；前端单独托管到 COS 时，构建前设置 `VITE_API_BASE_URL`，并在服务端设置 `CORS_ORIGINS`。
 
 ## 结构
 

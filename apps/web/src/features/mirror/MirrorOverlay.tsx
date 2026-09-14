@@ -39,7 +39,7 @@ export function MirrorOverlay({
   }
 
   return (
-    <div className="pointer-events-none fixed right-6 top-6 z-30 w-[420px] max-w-[40vw] rounded-2xl border border-accent/50 bg-surface/95 p-4 shadow-2xl backdrop-blur">
+    <div className="rounded-xl border border-accent/60 bg-surface p-4 shadow-lg shadow-accent/10">
       <div className="flex items-center gap-2 text-sm text-muted">
         <Badge tone="accent">{who}</Badge>
         {intent.kind === "settlement" && <span>正在录入{MODE_LABELS[intent.mode]}</span>}

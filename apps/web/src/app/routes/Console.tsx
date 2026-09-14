@@ -119,6 +119,7 @@ export function Console() {
                 </div>
               </div>
               <div className="flex flex-col gap-4">
+                <MirrorOverlay intents={intents} names={names} rules={room.rules} />
                 {game.present.status === "finished" && (
                   <div className="rounded-xl border border-pos/40 bg-surface p-4">
                     <h2 className="mb-2 text-lg font-semibold">终局结算</h2>
@@ -136,8 +137,6 @@ export function Console() {
                 </div>
               </div>
             </main>
-
-            <MirrorOverlay intents={intents} names={names} rules={room.rules} />
 
             <Dialog open={panelOpen} onOpenChange={setPanelOpen}>
               <DialogContent title="主控台操作" description="也可以用手机远程操作。">

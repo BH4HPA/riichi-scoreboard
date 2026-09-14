@@ -40,7 +40,7 @@ export function HistoryTable({ history, tv = false }: { history: HistoryEntry[];
       <table className={cn("w-full min-w-[640px] border-collapse text-sm", tv && "text-base")}>
         <thead className="sticky top-0 bg-surface text-xs text-muted">
           <tr>
-            <th className="w-28 px-2 py-1.5 text-left font-medium">场次</th>
+            <th className={cn("px-2 py-1.5 text-left font-medium", tv ? "w-40" : "w-28")}>场次</th>
             <th className="w-16 px-2 py-1.5 text-left font-medium">庄家</th>
             <th className="w-28 px-2 py-1.5 text-left font-medium">立直玩家</th>
             <th className="w-44 px-2 py-1.5 text-left font-medium">点差变动</th>

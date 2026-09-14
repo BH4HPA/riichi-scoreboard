@@ -1,0 +1,21 @@
+services:
+  riichi:
+    image: "${RIICHI_IMAGE:-riichi-scoreboard}:${RIICHI_TAG:-local}"
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    ports:
+      - "${RIICHI_PORT:-8787}:8787"
+    environment:
+      # 前端与后端同源部署时留空；前端另行托管到 COS 时填其 origin，逗号分隔
+      CORS_ORIGINS: "${CORS_ORIGINS:-}"
+    volumes:
+      - riichi_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8787/health"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+volumes:
+  riichi_data:

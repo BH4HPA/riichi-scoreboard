@@ -69,8 +69,9 @@ export function PointsGrid({
                 </div>
               </div>
               {isDealer && (
-                <Badge tone="accent">
-                  <Crown className="h-3 w-3" /> 庄家
+                <Badge tone="accent" aria-label="庄家">
+                  <Crown className="h-3 w-3" />
+                  {tv && "庄家"}
                 </Badge>
               )}
             </div>
