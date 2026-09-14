@@ -1,31 +1,133 @@
 import { DomainError } from "../progress/advance";
 import type { RoomRules } from "../types/rules";
 import type { EvaluatedHand, HandInput } from "../types/state";
-import { doraFromIndicator, seatWind, windTile, type Meld, type Seat, type Tile, type Wind } from "../types/tiles";
+import {
+  doraFromIndicator,
+  seatWind,
+  windTile,
+  type Meld,
+  type Seat,
+  type Tile,
+  type Wind,
+} from "../types/tiles";
 
 /** riichi-rs 役 id（与 riichi_rs.d.ts 的 Yaku 常量一致）。 */
 export const YAKU_ID = {
-  Kokushimusou13Sides: 0, Kokushimusou: 1, Chuurenpoto9Sides: 2, Chuurenpoto: 3, SuuankouTanki: 4, Suuankou: 5,
-  Daisuushi: 6, Shosuushi: 7, Daisangen: 8, Tsuuiisou: 9, Ryuuiisou: 10, Chinroutou: 11, Suukantsu: 12,
-  Tenhou: 13, Chihou: 14, Renhou: 15, Daisharin: 16,
-  Chinitsu: 17, Honitsu: 18, Ryanpeikou: 19, Junchan: 20, Chanta: 21, Toitoi: 22, Honroutou: 23, Sankantsu: 24,
-  Shosangen: 25, SanshokuDoukou: 26, Sanankou: 27, Chiitoitsu: 28, DaburuRiichi: 29, Ittsu: 30, Sanshoku: 31,
-  Tanyao: 32, Pinfu: 33, Iipeikou: 34, Menzentsumo: 35, Riichi: 36, Ippatsu: 37, Rinshan: 38, Chankan: 39,
-  Haitei: 40, Houtei: 41, RoundWindEast: 42, RoundWindSouth: 43, RoundWindWest: 44, RoundWindNorth: 45,
-  OwnWindEast: 46, OwnWindSouth: 47, OwnWindWest: 48, OwnWindNorth: 49, Haku: 50, Hatsu: 51, Chun: 52,
-  Dora: 53, Uradora: 54, Akadora: 55,
+  Kokushimusou13Sides: 0,
+  Kokushimusou: 1,
+  Chuurenpoto9Sides: 2,
+  Chuurenpoto: 3,
+  SuuankouTanki: 4,
+  Suuankou: 5,
+  Daisuushi: 6,
+  Shosuushi: 7,
+  Daisangen: 8,
+  Tsuuiisou: 9,
+  Ryuuiisou: 10,
+  Chinroutou: 11,
+  Suukantsu: 12,
+  Tenhou: 13,
+  Chihou: 14,
+  Renhou: 15,
+  Daisharin: 16,
+  Chinitsu: 17,
+  Honitsu: 18,
+  Ryanpeikou: 19,
+  Junchan: 20,
+  Chanta: 21,
+  Toitoi: 22,
+  Honroutou: 23,
+  Sankantsu: 24,
+  Shosangen: 25,
+  SanshokuDoukou: 26,
+  Sanankou: 27,
+  Chiitoitsu: 28,
+  DaburuRiichi: 29,
+  Ittsu: 30,
+  Sanshoku: 31,
+  Tanyao: 32,
+  Pinfu: 33,
+  Iipeikou: 34,
+  Menzentsumo: 35,
+  Riichi: 36,
+  Ippatsu: 37,
+  Rinshan: 38,
+  Chankan: 39,
+  Haitei: 40,
+  Houtei: 41,
+  RoundWindEast: 42,
+  RoundWindSouth: 43,
+  RoundWindWest: 44,
+  RoundWindNorth: 45,
+  OwnWindEast: 46,
+  OwnWindSouth: 47,
+  OwnWindWest: 48,
+  OwnWindNorth: 49,
+  Haku: 50,
+  Hatsu: 51,
+  Chun: 52,
+  Dora: 53,
+  Uradora: 54,
+  Akadora: 55,
 } as const;
 
 export const YAKU_NAMES: Record<number, string> = {
-  0: "国士无双十三面", 1: "国士无双", 2: "纯正九莲宝灯", 3: "九莲宝灯", 4: "四暗刻单骑", 5: "四暗刻",
-  6: "大四喜", 7: "小四喜", 8: "大三元", 9: "字一色", 10: "绿一色", 11: "清老头", 12: "四杠子",
-  13: "天和", 14: "地和", 15: "人和", 16: "大车轮",
-  17: "清一色", 18: "混一色", 19: "两杯口", 20: "纯全带幺九", 21: "混全带幺九", 22: "对对和", 23: "混老头", 24: "三杠子",
-  25: "小三元", 26: "三色同刻", 27: "三暗刻", 28: "七对子", 29: "两立直", 30: "一气通贯", 31: "三色同顺",
-  32: "断幺九", 33: "平和", 34: "一杯口", 35: "门前清自摸和", 36: "立直", 37: "一发", 38: "岭上开花", 39: "抢杠",
-  40: "海底捞月", 41: "河底捞鱼", 42: "场风 东", 43: "场风 南", 44: "场风 西", 45: "场风 北",
-  46: "自风 东", 47: "自风 南", 48: "自风 西", 49: "自风 北", 50: "役牌 白", 51: "役牌 发", 52: "役牌 中",
-  53: "宝牌", 54: "里宝牌", 55: "赤宝牌",
+  0: "国士无双十三面",
+  1: "国士无双",
+  2: "纯正九莲宝灯",
+  3: "九莲宝灯",
+  4: "四暗刻单骑",
+  5: "四暗刻",
+  6: "大四喜",
+  7: "小四喜",
+  8: "大三元",
+  9: "字一色",
+  10: "绿一色",
+  11: "清老头",
+  12: "四杠子",
+  13: "天和",
+  14: "地和",
+  15: "人和",
+  16: "大车轮",
+  17: "清一色",
+  18: "混一色",
+  19: "两杯口",
+  20: "纯全带幺九",
+  21: "混全带幺九",
+  22: "对对和",
+  23: "混老头",
+  24: "三杠子",
+  25: "小三元",
+  26: "三色同刻",
+  27: "三暗刻",
+  28: "七对子",
+  29: "两立直",
+  30: "一气通贯",
+  31: "三色同顺",
+  32: "断幺九",
+  33: "平和",
+  34: "一杯口",
+  35: "门前清自摸和",
+  36: "立直",
+  37: "一发",
+  38: "岭上开花",
+  39: "抢杠",
+  40: "海底捞月",
+  41: "河底捞鱼",
+  42: "场风 东",
+  43: "场风 南",
+  44: "场风 西",
+  45: "场风 北",
+  46: "自风 东",
+  47: "自风 南",
+  48: "自风 西",
+  49: "自风 北",
+  50: "役牌 白",
+  51: "役牌 发",
+  52: "役牌 中",
+  53: "宝牌",
+  54: "里宝牌",
+  55: "赤宝牌",
 };
 
 /** 与 riichi-rs `RiichiInput` 同形，core 不依赖其类型定义。 */
@@ -81,7 +183,8 @@ export function validateHandInput(hand: HandInput, rules: RoomRules): void {
   if (!hand.closed.every(isTile)) throw new DomainError("bad_tiles", "暗牌含非法牌");
   for (const m of hand.melds) {
     if (!m.tiles.every(isTile)) throw new DomainError("bad_tiles", "副露含非法牌");
-    if (m.tiles.length !== 3 && m.tiles.length !== 4) throw new DomainError("bad_meld", "副露必须是 3 或 4 张");
+    if (m.tiles.length !== 3 && m.tiles.length !== 4)
+      throw new DomainError("bad_meld", "副露必须是 3 或 4 张");
     if (m.tiles.length === 3 && !m.open) throw new DomainError("bad_meld", "3 张的副露必须是明的");
   }
   const total = hand.closed.length + hand.melds.reduce((a, m) => a + meldTileCount(m), 0);
@@ -99,17 +202,22 @@ export function validateHandInput(hand: HandInput, rules: RoomRules): void {
   if (hand.uraIndicators.length > 0) {
     if (!rules.hand.uraDora) throw new DomainError("bad_ura", "当前规则无里宝");
     if (!hand.riichi && !hand.doubleRiichi) throw new DomainError("bad_ura", "未立直不能计里宝");
-    if (hand.uraIndicators.length > hand.doraIndicators.length || !hand.uraIndicators.every(isTile)) {
+    if (
+      hand.uraIndicators.length > hand.doraIndicators.length ||
+      !hand.uraIndicators.every(isTile)
+    ) {
       throw new DomainError("bad_ura", "里宝指示牌数量不能超过宝牌指示牌");
     }
   }
   if (hand.ippatsu && !rules.hand.ippatsu) throw new DomainError("bad_ippatsu", "当前规则无一发");
-  if (hand.ippatsu && !hand.riichi && !hand.doubleRiichi) throw new DomainError("bad_ippatsu", "未立直不能一发");
+  if (hand.ippatsu && !hand.riichi && !hand.doubleRiichi)
+    throw new DomainError("bad_ippatsu", "未立直不能一发");
   const tileCounts = new Map<Tile, number>();
   for (const t of [...hand.closed, ...hand.melds.flatMap((m) => m.tiles)]) {
     tileCounts.set(t, (tileCounts.get(t) ?? 0) + 1);
   }
-  for (const [t, n] of tileCounts) if (n > 4) throw new DomainError("bad_tiles", `牌 ${t} 超过 4 张`);
+  for (const [t, n] of tileCounts)
+    if (n > 4) throw new DomainError("bad_tiles", `牌 ${t} 超过 4 张`);
 }
 
 /** 牌面 + 规则 → 引擎输入。 */
@@ -118,13 +226,10 @@ export function toEngineInput(hand: HandInput, ctx: HandContext, rules: RoomRule
   const dora = hand.doraIndicators.map(doraFromIndicator);
   if (hand.riichi || hand.doubleRiichi) dora.push(...hand.uraIndicators.map(doraFromIndicator));
 
+  // 引擎约定：自摸时 closed_part 含 14 张且自摸牌在最后；荣和时 closed_part 为 13 张，和张单独由 tile_discarded_by_someone 传入
   const closed = [...hand.closed];
-  if (hand.tsumo) {
-    // 引擎要求自摸牌在最后
-    const idx = closed.lastIndexOf(hand.winTile);
-    closed.splice(idx, 1);
-    closed.push(hand.winTile);
-  }
+  closed.splice(closed.lastIndexOf(hand.winTile), 1);
+  if (hand.tsumo) closed.push(hand.winTile);
 
   const disabled: number[] = [];
   if (!rules.hand.ippatsu) disabled.push(YAKU_ID.Ippatsu);

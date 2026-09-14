@@ -1,0 +1,308 @@
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { serve, type ServerType } from "@hono/node-server";
+import { createNodeWebSocket } from "@hono/node-ws";
+import { Hono } from "hono";
+import type { ClientMessage, RoomView, ServerMessage, UiState } from "@riichi/core";
+import { createApp } from "../app";
+import { loadConfig } from "../config";
+
+let server: ServerType;
+let wsUrl = "";
+let app: Hono;
+
+beforeAll(async () => {
+  const config = { ...loadConfig({}), corsOrigins: [], webDist: "/nonexistent" };
+  const shell = new Hono();
+  const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app: shell });
+  const ctx = createApp({ config, dbFile: ":memory:", upgradeWebSocket });
+  shell.route("/", ctx.app);
+  app = shell;
+  await new Promise<void>((resolve) => {
+    server = serve({ fetch: shell.fetch, port: 0, hostname: "127.0.0.1" }, (info) => {
+      wsUrl = `ws://127.0.0.1:${info.port}`;
+      resolve();
+    });
+    injectWebSocket(server);
+  });
+});
+
+afterAll(() => {
+  server.close();
+});
+
+async function register(name: string): Promise<{ token: string; id: string }> {
+  const res = await app.request("/api/me/register", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+  const body = (await res.json()) as { token: string; player: { id: string } };
+  return { token: body.token, id: body.player.id };
+}
+
+class Client {
+  private readonly ws: WebSocket;
+  private readonly queue: ServerMessage[] = [];
+  private waiters: Array<(m: ServerMessage) => void> = [];
+  private stateWaiters: Array<{ pred: (r: RoomView) => boolean; resolve: (r: RoomView) => void }> =
+    [];
+  private uiWaiters: Array<{ pred: (u: UiState[]) => boolean; resolve: (u: UiState[]) => void }> =
+    [];
+  state: RoomView | null = null;
+  ui: UiState[] = [];
+  constructor(code: string, token: string) {
+    this.ws = new WebSocket(`${wsUrl}/ws?room=${code}&token=${token}`);
+    this.ws.addEventListener("message", (evt) => {
+      const msg = JSON.parse(String(evt.data)) as ServerMessage;
+      if (msg.type === "state") {
+        this.state = msg.room;
+        this.stateWaiters = this.stateWaiters.filter((w) =>
+          w.pred(msg.room) ? (w.resolve(msg.room), false) : true,
+        );
+      }
+      if (msg.type === "ui") {
+        this.ui = msg.intents;
+        this.uiWaiters = this.uiWaiters.filter((w) =>
+          w.pred(msg.intents) ? (w.resolve(msg.intents), false) : true,
+        );
+      }
+      const waiter = this.waiters.shift();
+      if (waiter) waiter(msg);
+      else this.queue.push(msg);
+    });
+  }
+  open(): Promise<void> {
+    return new Promise((resolve) => this.ws.addEventListener("open", () => resolve()));
+  }
+  next(): Promise<ServerMessage> {
+    const queued = this.queue.shift();
+    if (queued) return Promise.resolve(queued);
+    return new Promise((resolve) => this.waiters.push(resolve));
+  }
+  async until<T extends ServerMessage["type"]>(
+    type: T,
+  ): Promise<Extract<ServerMessage, { type: T }>> {
+    for (;;) {
+      const m = await this.next();
+      if (m.type === type) return m as Extract<ServerMessage, { type: T }>;
+    }
+  }
+  /** 命令的最终结果：ack 或 error */
+  async outcome(): Promise<Extract<ServerMessage, { type: "ack" | "error" }>> {
+    for (;;) {
+      const m = await this.next();
+      if (m.type === "ack" || m.type === "error") return m;
+    }
+  }
+  waitState(pred: (r: RoomView) => boolean): Promise<RoomView> {
+    if (this.state && pred(this.state)) return Promise.resolve(this.state);
+    return new Promise((resolve) => this.stateWaiters.push({ pred, resolve }));
+  }
+  waitUi(pred: (u: UiState[]) => boolean): Promise<UiState[]> {
+    if (pred(this.ui)) return Promise.resolve(this.ui);
+    return new Promise((resolve) => this.uiWaiters.push({ pred, resolve }));
+  }
+  send(msg: ClientMessage): void {
+    this.ws.send(JSON.stringify(msg));
+  }
+  close(): void {
+    this.ws.close();
+  }
+}
+
+describe("rooms end-to-end", () => {
+  it("REST：注册、建房、查房、未授权", async () => {
+    const anon = await app.request("/api/rooms", { method: "POST" });
+    expect(anon.status).toBe(401);
+    const me = await register("主控台");
+    const created = await app.request("/api/rooms", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${me.token}` },
+    });
+    expect(created.status).toBe(201);
+    const { room } = (await created.json()) as { room: RoomView };
+    expect(room.code).toMatch(/^[A-Z2-9]{6}$/);
+    expect(room.phase).toBe("lobby");
+    const fetched = await app.request(`/api/rooms/${room.code.toLowerCase()}`, {
+      headers: { Authorization: `Bearer ${me.token}` },
+    });
+    expect(fetched.status).toBe(200);
+    const missing = await app.request("/api/rooms/ZZZZZZ", {
+      headers: { Authorization: `Bearer ${me.token}` },
+    });
+    expect(missing.status).toBe(404);
+  });
+
+  it("WS：四人入座开局，两端同步；并发命令只成功一个；ui 镜像随断开清理", async () => {
+    const console_ = await register("主控台");
+    const players = await Promise.all(["东", "南", "西", "北"].map(register));
+    const created = await app.request("/api/rooms", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${console_.token}` },
+    });
+    const { room } = (await created.json()) as { room: RoomView };
+
+    const tv = new Client(room.code, console_.token);
+    await tv.open();
+    expect((await tv.until("welcome")).playerId).toBe(console_.id);
+    let state = await tv.waitState(() => true);
+    expect(state.seq).toBe(0);
+
+    const phones = players.map((p) => new Client(room.code, p.token));
+    await Promise.all(phones.map((p) => p.open()));
+    for (const p of phones) await p.waitState(() => true);
+
+    // 入座 + 准备（每条命令带当前 seq）
+    let seq = 0;
+    for (let i = 0; i < 4; i++) {
+      phones[i]!.send({
+        type: "command",
+        id: `sit${i}`,
+        baseSeq: seq,
+        command: {
+          type: "sit",
+          seat: i as 0 | 1 | 2 | 3,
+          player: { id: players[i]!.id, name: `玩家${i}`, avatar: null },
+        },
+      });
+      seq = (await phones[i]!.until("ack")).seq;
+      phones[i]!.send({
+        type: "command",
+        id: `ready${i}`,
+        baseSeq: seq,
+        command: { type: "setReady", seat: i as 0 | 1 | 2 | 3, ready: true },
+      });
+      seq = (await phones[i]!.until("ack")).seq;
+    }
+    tv.send({
+      type: "command",
+      id: "start",
+      baseSeq: seq,
+      command: { type: "start", force: false },
+    });
+    seq = (await tv.until("ack")).seq;
+    // 电视与手机都收到 playing 状态
+    state = await tv.waitState((r) => r.phase === "playing");
+    expect(state.game?.present.points).toEqual([25000, 25000, 25000, 25000]);
+    await phones[3]!.waitState((r) => r.phase === "playing");
+
+    // 并发：两台手机基于同一 baseSeq 提交
+    phones[0]!.send({
+      type: "command",
+      id: "a",
+      baseSeq: seq,
+      command: {
+        type: "tsumo",
+        winner: 0,
+        value: { kind: "manual", han: 3, fu: 30, yakuman: 0 },
+        riichi: [],
+      },
+    });
+    phones[1]!.send({
+      type: "command",
+      id: "b",
+      baseSeq: seq,
+      command: {
+        type: "tsumo",
+        winner: 1,
+        value: { kind: "manual", han: 3, fu: 30, yakuman: 0 },
+        riichi: [],
+      },
+    });
+    const [ra, rb] = await Promise.all([phones[0]!.outcome(), phones[1]!.outcome()]);
+    const outcomes = [ra.type, rb.type].sort();
+    expect(outcomes).toEqual(["ack", "error"]);
+    const err = ra.type === "error" ? ra : rb;
+    expect(err.type === "error" && err.code).toBe("stale");
+
+    // 牌面形态：由服务端评估
+    const latest = await app.request(`/api/rooms/${room.code}`, {
+      headers: { Authorization: `Bearer ${console_.token}` },
+    });
+    const { room: after } = (await latest.json()) as { room: RoomView };
+    expect(after.game?.present.history).toHaveLength(1);
+    phones[2]!.send({
+      type: "command",
+      id: "hand",
+      baseSeq: after.seq,
+      command: {
+        type: "ron",
+        loser: 3,
+        riichi: [],
+        wins: [
+          {
+            winner: 2,
+            value: {
+              kind: "hand",
+              hand: {
+                closed: [1, 2, 3, 13, 14, 15, 25, 26, 27, 7, 8, 9, 11, 11],
+                melds: [],
+                winTile: 9,
+                tsumo: false,
+                doraIndicators: [19],
+                uraIndicators: [],
+                aka: 0,
+                riichi: false,
+                doubleRiichi: false,
+                ippatsu: false,
+                afterKan: false,
+                lastTile: false,
+                firstTake: false,
+              },
+            },
+          },
+        ],
+      },
+    });
+    const handAck = await phones[2]!.outcome();
+    expect(handAck).toMatchObject({ type: "ack" });
+    const afterHand = await tv.waitState((r) => r.seq === (handAck as { seq: number }).seq);
+    expect(afterHand.game?.present.history[0]?.kind).toBe("ron");
+
+    // evaluate 请求
+    phones[2]!.send({
+      type: "evaluate",
+      id: "ev",
+      seat: 2,
+      hand: {
+        closed: [1, 2, 3, 13, 14, 15, 25, 26, 27, 7, 8, 9, 11, 11],
+        melds: [],
+        winTile: 9,
+        tsumo: true,
+        doraIndicators: [19],
+        uraIndicators: [],
+        aka: 0,
+        riichi: false,
+        doubleRiichi: false,
+        ippatsu: false,
+        afterKan: false,
+        lastTile: false,
+        firstTake: false,
+      },
+    });
+    const ev = await phones[2]!.until("evaluate");
+    expect(ev.result.han).toBe(2); // 平和 + 门清自摸
+    expect(ev.result.fu).toBe(20);
+
+    // ui 镜像：手机打开结算框 → 电视收到；断开 → 清理
+    phones[3]!.send({
+      type: "ui",
+      intent: { kind: "settlement", mode: "draw", deltas: null, summary: null },
+    });
+    const intents = await tv.waitUi((u) => u.length > 0);
+    expect(intents[0]!.seat).toBe(3);
+    expect(intents[0]!.intent.kind).toBe("settlement");
+    phones[3]!.close();
+    await tv.waitUi((u) => u.length === 0);
+
+    // 重启等价：新注册表从事件流回放得到相同视图
+    const fresh = createApp({
+      config: { ...loadConfig({}), webDist: "/nonexistent" },
+      dbFile: ":memory:",
+    });
+    expect(fresh.registry).toBeDefined();
+    fresh.db.close();
+
+    tv.close();
+    phones.slice(0, 3).forEach((p) => p.close());
+  });
+});

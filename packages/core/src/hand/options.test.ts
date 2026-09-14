@@ -8,7 +8,22 @@ const R = MLEAGUE_RULES;
 
 function hand(partial: Partial<HandInput> = {}): HandInput {
   return {
-    closed: [TILE.M1, TILE.M2, TILE.M3, TILE.P4, TILE.P5, TILE.P6, TILE.S7, TILE.S8, TILE.S9, TILE.M7, TILE.M8, TILE.M9, TILE.P2, TILE.P2],
+    closed: [
+      TILE.M1,
+      TILE.M2,
+      TILE.M3,
+      TILE.P4,
+      TILE.P5,
+      TILE.P6,
+      TILE.S7,
+      TILE.S8,
+      TILE.S9,
+      TILE.M7,
+      TILE.M8,
+      TILE.M9,
+      TILE.P2,
+      TILE.P2,
+    ],
     melds: [],
     winTile: TILE.M9,
     tsumo: false,
@@ -29,6 +44,8 @@ describe("toEngineInput", () => {
   it("荣和：和张作为 tile_discarded_by_someone，宝牌由指示牌推导", () => {
     const input = toEngineInput(hand(), { seat: 1, dealer: 0, roundWind: 0 }, R);
     expect(input.options.tile_discarded_by_someone).toBe(TILE.M9);
+    expect(input.closed_part).toHaveLength(13);
+    expect(input.closed_part.filter((t) => t === TILE.M9)).toHaveLength(0);
     expect(input.options.dora).toEqual([TILE.M2]);
     expect(input.options.bakaze).toBe(TILE.East);
     expect(input.options.jikaze).toBe(TILE.South);
@@ -42,6 +59,7 @@ describe("toEngineInput", () => {
       { seat: 0, dealer: 0, roundWind: 1 },
       R,
     );
+    expect(input.closed_part).toHaveLength(14);
     expect(input.closed_part[input.closed_part.length - 1]).toBe(TILE.M1);
     expect(input.options.tile_discarded_by_someone).toBe(-1);
     expect(input.options.dora).toEqual([TILE.M2, TILE.S2]);
@@ -51,7 +69,19 @@ describe("toEngineInput", () => {
 
   it("副露算 3 张，总数须为 14", () => {
     const h = hand({
-      closed: [TILE.M1, TILE.M2, TILE.M3, TILE.P4, TILE.P5, TILE.P6, TILE.S7, TILE.S8, TILE.S9, TILE.P2, TILE.P2],
+      closed: [
+        TILE.M1,
+        TILE.M2,
+        TILE.M3,
+        TILE.P4,
+        TILE.P5,
+        TILE.P6,
+        TILE.S7,
+        TILE.S8,
+        TILE.S9,
+        TILE.P2,
+        TILE.P2,
+      ],
       melds: [{ open: false, tiles: [TILE.Chun, TILE.Chun, TILE.Chun, TILE.Chun] }],
       winTile: TILE.P2,
     });
@@ -63,8 +93,12 @@ describe("toEngineInput", () => {
     expect(() => validateHandInput(hand({ aka: 4 }), R)).toThrow(/赤宝牌/);
     expect(() => validateHandInput(hand({ uraIndicators: [TILE.S1] }), R)).toThrow(/未立直/);
     const noIppatsu = { ...R, hand: { ...R.hand, ippatsu: false } };
-    expect(() => validateHandInput(hand({ riichi: true, ippatsu: true }), noIppatsu)).toThrow(/一发/);
-    expect(toEngineInput(hand(), { seat: 0, dealer: 0, roundWind: 0 }, noIppatsu).options.disabled_yaku).toContain(YAKU_ID.Ippatsu);
+    expect(() => validateHandInput(hand({ riichi: true, ippatsu: true }), noIppatsu)).toThrow(
+      /一发/,
+    );
+    expect(
+      toEngineInput(hand(), { seat: 0, dealer: 0, roundWind: 0 }, noIppatsu).options.disabled_yaku,
+    ).toContain(YAKU_ID.Ippatsu);
   });
 
   it("fromEngineOutput 按规则裁定役满叠加", () => {

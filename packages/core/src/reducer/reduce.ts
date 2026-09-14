@@ -15,7 +15,7 @@ export function createRoom(code: string, rules: RoomRules): RoomState {
     seats: [null, null, null, null],
     ready: [false, false, false, false],
     game: null,
-    gamesFinished: 0,
+    gameNo: 0,
   };
 }
 
@@ -93,6 +93,7 @@ export function reduceRoom(room: RoomState, event: RoomEvent): RoomState {
         ...next,
         phase: "playing",
         game: createUndoable(createGame(next.rules, event.at)),
+        gameNo: next.gameNo + 1,
       };
     }
     return next;
@@ -100,7 +101,12 @@ export function reduceRoom(room: RoomState, event: RoomEvent): RoomState {
 
   if (cmd.type === "newGame") {
     if (room.seats.some((p) => p === null)) throw new DomainError("not_full", "四个座位尚未坐满");
-    return { ...room, phase: "playing", game: createUndoable(createGame(room.rules, event.at)) };
+    return {
+      ...room,
+      phase: "playing",
+      game: createUndoable(createGame(room.rules, event.at)),
+      gameNo: room.gameNo + 1,
+    };
   }
 
   if (!room.game) throw new DomainError("no_game", "尚未开局");
@@ -122,12 +128,10 @@ export function reduceRoom(room: RoomState, event: RoomEvent): RoomState {
     names: seatNames(room),
     rules: room.rules,
   });
-  const finishedNow = present.status === "finished" && room.game.present.status !== "finished";
   return {
     ...room,
     game: push(room.game, present),
     phase: present.status === "finished" ? "finished" : "playing",
-    gamesFinished: room.gamesFinished + (finishedNow ? 1 : 0),
   };
 }
 

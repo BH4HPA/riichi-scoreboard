@@ -105,8 +105,8 @@ export interface RoomState {
   seats: (PlayerRef | null)[];
   ready: boolean[];
   game: Undoable<GameState> | null;
-  /** 本房间已完成的对局数（用于战绩与新局编号） */
-  gamesFinished: number;
+  /** 本房间第几局（开局/重开一局时递增，用于战绩落库的键） */
+  gameNo: number;
 }
 
 export function seatNames(room: RoomState): string[] {

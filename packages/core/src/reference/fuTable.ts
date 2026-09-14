@@ -14,7 +14,13 @@ export const FU_BASE: FuRule[] = [
   { item: "副露平和形荣和", fu: "30 固定", note: "副露无役牌顺子手荣和按 30 符" },
 ];
 
-export const FU_MELDS: Array<{ item: string; closedSimple: number; openSimple: number; closedTerminal: number; openTerminal: number }> = [
+export const FU_MELDS: Array<{
+  item: string;
+  closedSimple: number;
+  openSimple: number;
+  closedTerminal: number;
+  openTerminal: number;
+}> = [
   { item: "刻子", closedSimple: 4, openSimple: 2, closedTerminal: 8, openTerminal: 4 },
   { item: "杠子", closedSimple: 16, openSimple: 8, closedTerminal: 32, openTerminal: 16 },
 ];

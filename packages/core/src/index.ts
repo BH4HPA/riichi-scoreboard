@@ -17,3 +17,4 @@ export * from "./format/describe";
 export * from "./hand/options";
 export * from "./reference/yakuTable";
 export * from "./reference/fuTable";
+export * from "./protocol";

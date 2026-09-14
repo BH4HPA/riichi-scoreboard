@@ -279,6 +279,6 @@ describe("reduceRoom / 整局回放", () => {
     expect(fresh.phase).toBe("playing");
     expect(fresh.game!.past).toHaveLength(0);
     expect(fresh.game!.present.startedAt).toBe(777);
-    expect(fresh.gamesFinished).toBe(1);
+    expect(fresh.gameNo).toBe(2);
   });
 });

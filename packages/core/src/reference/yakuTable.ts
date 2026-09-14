@@ -49,7 +49,14 @@ export const YAKU_TABLE_3HAN_PLUS: YakuInfo[] = [
 
 export const YAKU_TABLE_YAKUMAN: YakuInfo[] = [
   { id: 1, name: "国士无双", closed: 0, open: null, yakuman: 1 },
-  { id: 0, name: "国士无双十三面", closed: 0, open: null, yakuman: 2, note: "两倍役满需开启多倍役满" },
+  {
+    id: 0,
+    name: "国士无双十三面",
+    closed: 0,
+    open: null,
+    yakuman: 2,
+    note: "两倍役满需开启多倍役满",
+  },
   { id: 5, name: "四暗刻", closed: 0, open: null, yakuman: 1 },
   { id: 4, name: "四暗刻单骑", closed: 0, open: null, yakuman: 2, note: "两倍役满需开启多倍役满" },
   { id: 8, name: "大三元", closed: 0, open: 0, yakuman: 1, note: "有包牌" },
@@ -60,7 +67,14 @@ export const YAKU_TABLE_YAKUMAN: YakuInfo[] = [
   { id: 11, name: "清老头", closed: 0, open: 0, yakuman: 1 },
   { id: 12, name: "四杠子", closed: 0, open: 0, yakuman: 1, note: "有包牌" },
   { id: 3, name: "九莲宝灯", closed: 0, open: null, yakuman: 1 },
-  { id: 2, name: "纯正九莲宝灯", closed: 0, open: null, yakuman: 2, note: "两倍役满需开启多倍役满" },
+  {
+    id: 2,
+    name: "纯正九莲宝灯",
+    closed: 0,
+    open: null,
+    yakuman: 2,
+    note: "两倍役满需开启多倍役满",
+  },
   { id: 13, name: "天和", closed: 0, open: null, yakuman: 1 },
   { id: 14, name: "地和", closed: 0, open: null, yakuman: 1 },
   { id: 15, name: "人和", closed: 0, open: null, yakuman: 1, note: "按房间规则决定是否成立" },
