@@ -8,8 +8,9 @@ export function mountStatic(app: Hono, webDist: string): boolean {
   const index = path.join(webDist, "index.html");
   if (!fs.existsSync(index)) return false;
   const root = path.relative(process.cwd(), webDist) || ".";
-  app.use("/*", serveStatic({ root }));
   const html = fs.readFileSync(index, "utf8");
-  app.get("/*", (c) => c.html(html));
+  const isApp = (path: string) => !path.startsWith("/api/") && path !== "/ws" && path !== "/health";
+  app.use("/*", async (c, next) => (isApp(c.req.path) ? serveStatic({ root })(c, next) : next()));
+  app.get("/*", (c, next) => (isApp(c.req.path) ? c.html(html) : next()));
   return true;
 }

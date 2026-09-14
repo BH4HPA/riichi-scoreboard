@@ -11,6 +11,7 @@ services:
       CORS_ORIGINS: "${CORS_ORIGINS:-}"
     volumes:
       - riichi_data:/data
+    init: true
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8787/health"]

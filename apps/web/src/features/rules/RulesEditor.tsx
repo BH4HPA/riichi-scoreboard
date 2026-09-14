@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
 import { Save, Trash2 } from "lucide-react";
-import { BUILTIN_PRESETS, RulesError, validateRules, type RoomRules } from "@riichi/core";
+import {
+  BUILTIN_PRESETS,
+  RulesError,
+  rulesSummary,
+  umaDescription,
+  validateRules,
+  type RoomRules,
+} from "@riichi/core";
+import { ApiError } from "@/api/client";
 import { useSession } from "@/api/session";
 import { Button } from "@/ui/button";
 import { Input, Label, Select, Switch } from "@/ui/controls";
 import { useRoomStore } from "@/ws/store";
 import { getPath, RULE_GROUPS, setPath, type RuleField } from "./fields";
-import { umaDescription } from "@/features/final/FinalPanel";
 
 function FieldControl({
   field,
@@ -52,6 +59,13 @@ function FieldControl({
   }
 }
 
+function displayValue(field: RuleField, value: unknown): string {
+  if (field.control.type === "switch") return value ? "开" : "关";
+  if (field.control.type === "select")
+    return field.control.options.find((o) => o.value === String(value))?.label ?? String(value);
+  return String(value);
+}
+
 /** 规则编辑器：预设选择/保存 + 分组开关。editable=false 时只读展示。 */
 export function RulesEditor({
   value,
@@ -86,7 +100,18 @@ export function RulesEditor({
       setSelected(preset.id);
       notify("info", `已保存预设「${name}」`);
     } catch (err) {
-      notify("error", err instanceof RulesError ? err.message : "保存失败");
+      notify(
+        "error",
+        err instanceof RulesError || err instanceof ApiError ? err.message : "保存失败",
+      );
+    }
+  };
+  const remove = async () => {
+    try {
+      await deletePreset(selected);
+      setSelected("mleague");
+    } catch (err) {
+      notify("error", err instanceof ApiError ? err.message : "删除失败");
     }
   };
 
@@ -102,16 +127,13 @@ export function RulesEditor({
             disabled={!editable}
             className="flex-1"
           />
-          {editable && selected !== "mleague" && presets.some((p) => p.id === selected) && (
+          {editable && presets.some((p) => p.id === selected) && (
             <Button
               variant="outline"
               size="icon"
               className="h-10 w-10"
               aria-label="删除预设"
-              onClick={async () => {
-                await deletePreset(selected);
-                setSelected("mleague");
-              }}
+              onClick={remove}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -158,34 +180,11 @@ export function RulesEditor({
   );
 }
 
-function displayValue(field: RuleField, value: unknown): string {
-  if (field.control.type === "switch") return value ? "开" : "关";
-  if (field.control.type === "select")
-    return field.control.options.find((o) => o.value === String(value))?.label ?? String(value);
-  return String(value);
-}
-
 /** 关键规则摘要（电视镜像与大厅用） */
 export function RulesSummary({ rules }: { rules: RoomRules }) {
-  const items: string[] = [
-    rules.progress.length === "east" ? "东风战" : "半庄",
-    `${rules.final.startPoints / 1000}000 起 / ${rules.final.returnPoints / 1000}000 返`,
-    `马 ${rules.final.uma.join("/")}`,
-    rules.scoring.kiriageMangan ? "切上满贯" : "无切上",
-    rules.scoring.kazoeYakuman ? "累计役满" : "13 番封顶三倍满",
-    rules.scoring.doubleYakuman ? "多倍役满" : "无多倍役满",
-    `赤 ${rules.hand.akaCount}`,
-    rules.hand.kuitan ? "食断" : "无食断",
-    rules.win.multiRon === "atamahane" ? "头跳" : rules.win.multiRon === "double" ? "双响" : "三响",
-    rules.progress.tobi.enabled ? "击飞" : "无击飞",
-    rules.progress.enchousen.enabled ? `西入 ${rules.progress.enchousen.threshold}` : "无西入",
-    rules.progress.agariYame ? "和了止" : "无和了止",
-    rules.progress.abortiveDraws ? "途中流局" : "无途中流局",
-    rules.final.tieRule === "split" ? "同点按分" : "同点起家优先",
-  ];
   return (
     <div className="flex flex-wrap gap-1">
-      {items.map((t) => (
+      {rulesSummary(rules).map((t) => (
         <span key={t} className="rounded-md bg-surface-2 px-1.5 py-0.5 text-xs">
           {t}
         </span>

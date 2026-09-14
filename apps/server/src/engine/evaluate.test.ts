@@ -84,6 +84,62 @@ describe("evaluateHand (riichi-rs-node)", () => {
     expect(r.isAgari).toBe(false);
   });
 
+  it("连风雀头：东场东家 双东雀头 门清立直荣和 两面听", () => {
+    const r = evaluateHand(
+      hand({
+        closed: [
+          TILE.M1,
+          TILE.M2,
+          TILE.M3,
+          TILE.P4,
+          TILE.P5,
+          TILE.P6,
+          TILE.S7,
+          TILE.S8,
+          TILE.S9,
+          TILE.S2,
+          TILE.S3,
+          TILE.East,
+          TILE.East,
+          TILE.S4,
+        ],
+        winTile: TILE.S4,
+        riichi: true,
+        doraIndicators: [],
+      }),
+      { seat: 0, dealer: 0, roundWind: 0 },
+      MLEAGUE_RULES,
+    );
+    expect(r.isAgari).toBe(true);
+    // 副底 20 + 门清荣和 10 + 连风雀头 4 → 34 → 切上 40 符（引擎按 4 符计连风雀头）
+    expect(r.fu).toBe(40);
+  });
+
+  it("无役牌型返回原因 noYaku", () => {
+    const r = evaluateHand(
+      hand({
+        closed: [
+          TILE.M1,
+          TILE.M2,
+          TILE.M3,
+          TILE.P4,
+          TILE.P5,
+          TILE.P6,
+          TILE.M7,
+          TILE.M8,
+          TILE.M9,
+          TILE.P2,
+          TILE.P2,
+        ],
+        melds: [{ open: true, tiles: [TILE.S2, TILE.S2, TILE.S2] }],
+        winTile: TILE.M9,
+      }),
+      { seat: 1, dealer: 0, roundWind: 0 },
+      MLEAGUE_RULES,
+    );
+    expect(r).toMatchObject({ isAgari: false, reason: "noYaku" });
+  });
+
   it("役满：大三元，复合役满按规则叠加", () => {
     const daisangen = hand({
       closed: [

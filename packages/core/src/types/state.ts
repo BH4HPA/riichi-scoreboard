@@ -37,6 +37,8 @@ export interface EvaluatedHand extends HandValue {
   /** riichi-rs 役 id → 番数 */
   yaku: Record<string, number>;
   isAgari: boolean;
+  /** 非和牌时的原因：无役 / 不是和牌形 */
+  reason?: "noYaku" | "notAgari";
 }
 
 export type WinValue =
@@ -74,22 +76,31 @@ export type HistoryEntry = HistoryBase &
     | { kind: "abortive"; reason: AbortiveReason }
     | { kind: "chombo"; offender: Seat }
     | { kind: "kyotaku"; to: Seat | null; amount: number }
-    | { kind: "adjust"; to: { kyoku: number; honba: number; dealer: Seat } }
+    | { kind: "adjust"; to: { kyoku: number; honba: number } }
   );
 
 export interface GameState {
   status: "playing" | "finished";
+  /** 开局时的四家快照（战绩落库与历史展示以此为准） */
+  players: PlayerRef[];
   points: number[];
   kyotaku: number;
   honba: number;
-  /** 0..3 东1-4，4..7 南1-4，8..11 西1-4（延长战） */
+  /**
+   * 局序号：0..3 东场、4..7 南场，延长战继续往后（半庄 8..11 西场，东风战 4..7 南场）。
+   * 座位固定东南西北，庄家 = kyoku % 4。
+   */
   kyoku: number;
-  dealer: Seat;
   history: HistoryEntry[];
   tobi: TobiRecord | null;
   startedAt: number;
   finishedAt: number | null;
   final: FinalResult | null;
+}
+
+/** 庄家座位由局序号唯一决定。 */
+export function dealerOf(kyoku: number): Seat {
+  return (kyoku % 4) as Seat;
 }
 
 export interface Undoable<T> {
@@ -109,8 +120,17 @@ export interface RoomState {
   gameNo: number;
 }
 
+export const DEFAULT_SEAT_NAMES = ["东风家", "南风家", "西风家", "北风家"] as const;
+
 export function seatNames(room: { seats: (PlayerRef | null)[] }): string[] {
   return room.seats.map((p, i) => p?.name ?? DEFAULT_SEAT_NAMES[i]!);
 }
 
-export const DEFAULT_SEAT_NAMES = ["东风家", "南风家", "西风家", "北风家"] as const;
+export function seatOfPlayer(
+  seats: readonly (PlayerRef | null)[],
+  playerId: string | null,
+): Seat | null {
+  if (!playerId) return null;
+  const idx = seats.findIndex((p) => p?.id === playerId);
+  return idx === -1 ? null : (idx as Seat);
+}

@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { useParams } from "react-router";
 import { BookOpen, History, ScrollText, User, Wifi } from "lucide-react";
-import { seatNames } from "@riichi/core";
-import { Button } from "@/ui/button";
+import { seatNames, seatOfPlayer } from "@riichi/core";
 import { Dialog, DialogContent } from "@/ui/dialog";
 import { ConnectionBadge, Notice } from "@/ui/notice";
-import { mySeat as seatOf, useRoomStore } from "@/ws/store";
-import { SocketContext, useCommand, useRoomConnection } from "@/ws/useRoom";
+import { useRoomStore } from "@/ws/store";
+import { SocketContext, useRoomConnection } from "@/ws/useRoom";
 import { PhoneLobby } from "@/features/lobby/PhoneLobby";
 import { RoundHeader } from "@/features/scoreboard/RoundHeader";
 import { PointsGrid } from "@/features/scoreboard/PointsGrid";
@@ -32,7 +31,7 @@ export function Room() {
   if (status === "closed" && !room) {
     return (
       <div className="flex min-h-dvh items-center justify-center px-6 text-center text-neg">
-        房间 {roomCode} 不存在或已关闭
+        房间 {roomCode} 不存在或连接被拒绝
       </div>
     );
   }
@@ -43,7 +42,7 @@ export function Room() {
       </div>
     );
   }
-  const mySeat = seatOf(room, playerId);
+  const mySeat = seatOfPlayer(room.seats, playerId);
 
   return (
     <SocketContext.Provider value={socket}>
@@ -57,17 +56,24 @@ export function Room() {
   );
 }
 
+const NAV: Array<[Exclude<Sheet, null>, typeof History, string]> = [
+  ["history", History, "记录"],
+  ["reference", BookOpen, "番符表"],
+  ["rules", ScrollText, "规则"],
+  ["me", User, "我的"],
+];
+
 function PhoneGame() {
   const room = useRoomStore((s) => s.room)!;
   const playerId = useRoomStore((s) => s.playerId);
-  const send = useCommand();
   const [sheet, setSheet] = useState<Sheet>(null);
   const [refTab, setRefTab] = useState<ReferenceTab>("yaku");
   useMirror(sheet === "reference", { kind: "reference", tab: refTab }, true);
   useMirror(sheet === "rules", { kind: "rules" }, true);
   const game = room.game!;
   const names = seatNames(room);
-  const mySeat = seatOf(room, playerId);
+  const mySeat = seatOfPlayer(room.seats, playerId);
+  const closeSheet = (open: boolean) => !open && setSheet(null);
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col gap-3 px-4 pb-24 pt-4">
@@ -103,21 +109,18 @@ function PhoneGame() {
         <DiffMatrix game={game.present} names={names} rules={room.rules} />
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 backdrop-blur">
+      <nav
+        className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 backdrop-blur"
+        aria-label="功能"
+      >
         <div className="mx-auto grid max-w-md grid-cols-4">
-          {(
-            [
-              ["history", History, "记录"],
-              ["reference", BookOpen, "番符表"],
-              ["rules", ScrollText, "规则"],
-              ["me", User, "我的"],
-            ] as const
-          ).map(([key, Icon, label]) => (
+          {NAV.map(([key, Icon, label]) => (
             <button
               key={key}
               type="button"
               onClick={() => setSheet(key)}
-              className="flex flex-col items-center gap-0.5 py-2 text-[11px] text-muted hover:text-fg"
+              aria-pressed={sheet === key}
+              className="flex flex-col items-center gap-0.5 py-2 text-[11px] text-muted hover:text-fg aria-pressed:text-fg"
             >
               <Icon className="h-5 w-5" />
               {label}
@@ -126,35 +129,26 @@ function PhoneGame() {
         </div>
       </nav>
 
-      <Dialog open={sheet === "history"} onOpenChange={(o) => !o && setSheet(null)}>
+      <Dialog open={sheet === "history"} onOpenChange={closeSheet}>
         <DialogContent title="历史记录" description={`共 ${game.present.history.length} 条`}>
           <HistoryList history={game.present.history} />
         </DialogContent>
       </Dialog>
-      <Dialog open={sheet === "reference"} onOpenChange={(o) => !o && setSheet(null)}>
+      <Dialog open={sheet === "reference"} onOpenChange={closeSheet}>
         <DialogContent title="番符表" description="打开时电视会同步显示">
           <ReferenceSheet rules={room.rules} tab={refTab} onTabChange={setRefTab} />
         </DialogContent>
       </Dialog>
-      <Dialog open={sheet === "rules"} onOpenChange={(o) => !o && setSheet(null)}>
+      <Dialog open={sheet === "rules"} onOpenChange={closeSheet}>
         <DialogContent title="房间规则" description="对局进行中，规则已锁定">
           <RulesEditor value={room.rules} onChange={() => undefined} editable={false} />
         </DialogContent>
       </Dialog>
-      <Dialog open={sheet === "me"} onOpenChange={(o) => !o && setSheet(null)}>
-        <DialogContent title="我的">
-          <ProfileEditor
-            onNameChange={(name) =>
-              mySeat !== null && send({ type: "setPlayerName", seat: mySeat, name })
-            }
-          />
+      <Dialog open={sheet === "me"} onOpenChange={closeSheet}>
+        <DialogContent title="我的" description="昵称与头像会同步到房间">
+          <ProfileEditor />
           <h3 className="mb-2 mt-4 text-sm font-medium">战绩</h3>
           <StatsPanel />
-          <div className="mt-4">
-            <Button variant="ghost" size="sm" onClick={() => setSheet(null)}>
-              关闭
-            </Button>
-          </div>
         </DialogContent>
       </Dialog>
     </div>

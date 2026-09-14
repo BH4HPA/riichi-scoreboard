@@ -3,9 +3,10 @@ import { validateRules } from "../rules/validate";
 import { isGameCommand, type LobbyCommand } from "../types/commands";
 import type { RoomEvent } from "../types/events";
 import type { RoomRules } from "../types/rules";
-import { seatNames, type RoomState } from "../types/state";
+import { seatNames, type PlayerRef, type RoomState } from "../types/state";
 import { applyGameCommand, createGame } from "./game";
 import { createUndoable, push, redo, undo } from "./undoable";
+import { assertSeat } from "./validateCommand";
 
 export function createRoom(code: string, rules: RoomRules): RoomState {
   return {
@@ -19,14 +20,24 @@ export function createRoom(code: string, rules: RoomRules): RoomState {
   };
 }
 
+function requireLobby(room: RoomState, what: string): void {
+  if (room.phase !== "lobby") {
+    throw new DomainError(
+      "locked",
+      room.phase === "playing" ? `开局后不能${what}` : `请先返回大厅再${what}`,
+    );
+  }
+}
+
 function applyLobbyCommand(room: RoomState, cmd: LobbyCommand): RoomState {
   switch (cmd.type) {
     case "setRules": {
-      if (room.phase === "playing") throw new DomainError("locked", "开局后不能修改规则");
+      requireLobby(room, "修改规则");
       return { ...room, rules: validateRules(cmd.rules) };
     }
     case "sit": {
-      if (room.phase === "playing") throw new DomainError("locked", "开局后不能换座");
+      requireLobby(room, "换座");
+      assertSeat(cmd.seat);
       const seats = [...room.seats];
       const existing = seats.findIndex((p) => p?.id === cmd.player.id);
       if (existing !== -1) seats[existing] = null;
@@ -38,7 +49,8 @@ function applyLobbyCommand(room: RoomState, cmd: LobbyCommand): RoomState {
       return { ...room, seats, ready };
     }
     case "leave": {
-      if (room.phase === "playing") throw new DomainError("locked", "开局后不能离座");
+      requireLobby(room, "离座");
+      assertSeat(cmd.seat);
       const seats = [...room.seats];
       const ready = [...room.ready];
       seats[cmd.seat] = null;
@@ -46,40 +58,49 @@ function applyLobbyCommand(room: RoomState, cmd: LobbyCommand): RoomState {
       return { ...room, seats, ready };
     }
     case "setReady": {
+      assertSeat(cmd.seat);
       if (!room.seats[cmd.seat]) throw new DomainError("empty_seat", "座位为空");
       const ready = [...room.ready];
       ready[cmd.seat] = cmd.ready;
       return { ...room, ready };
     }
-    case "setPlayerName": {
-      const player = room.seats[cmd.seat];
-      if (!player) throw new DomainError("empty_seat", "座位为空");
-      const name = cmd.name.trim();
-      if (name.length === 0 || name.length > 12)
-        throw new DomainError("bad_name", "昵称需为 1–12 个字符");
+    case "syncProfile": {
+      assertSeat(cmd.seat);
+      const current = room.seats[cmd.seat];
+      if (!current || current.id !== cmd.player.id)
+        throw new DomainError("empty_seat", "座位与玩家不符");
       const seats = [...room.seats];
-      seats[cmd.seat] = { ...player, name };
-      return { ...room, seats };
-    }
-    case "setPlayerAvatar": {
-      const player = room.seats[cmd.seat];
-      if (!player) throw new DomainError("empty_seat", "座位为空");
-      const seats = [...room.seats];
-      seats[cmd.seat] = { ...player, avatar: cmd.avatar };
+      seats[cmd.seat] = cmd.player;
       return { ...room, seats };
     }
     case "start": {
-      if (room.phase === "playing") throw new DomainError("already_playing", "对局进行中");
+      requireLobby(room, "开局");
       if (room.seats.some((p) => p === null)) throw new DomainError("not_full", "四个座位尚未坐满");
-      if (!cmd.force && room.ready.some((r) => !r))
+      if (!cmd.force && room.ready.some((r) => !r)) {
         throw new DomainError("not_ready", "还有玩家未准备");
+      }
       return room; // 实际建局在 reduce 中使用事件时间
     }
     case "toLobby": {
       if (room.phase === "playing") throw new DomainError("locked", "对局进行中不能返回大厅");
       return { ...room, phase: "lobby", game: null, ready: [false, false, false, false] };
     }
+    default:
+      throw new DomainError("bad_command", `未知命令 ${(cmd as { type: string }).type}`);
   }
+}
+
+function startGame(room: RoomState, at: number): RoomState {
+  const players = room.seats.map((p) => {
+    if (!p) throw new DomainError("not_full", "四个座位尚未坐满");
+    return p;
+  }) as PlayerRef[];
+  return {
+    ...room,
+    phase: "playing",
+    game: createUndoable(createGame(room.rules, players, at)),
+    gameNo: room.gameNo + 1,
+  };
 }
 
 /** 纯函数：房间状态 + 事件 → 新房间状态。失败抛 DomainError / RulesError。 */
@@ -88,25 +109,13 @@ export function reduceRoom(room: RoomState, event: RoomEvent): RoomState {
 
   if (!isGameCommand(cmd)) {
     const next = applyLobbyCommand(room, cmd);
-    if (cmd.type === "start") {
-      return {
-        ...next,
-        phase: "playing",
-        game: createUndoable(createGame(next.rules, event.at)),
-        gameNo: next.gameNo + 1,
-      };
-    }
-    return next;
+    return cmd.type === "start" ? startGame(next, event.at) : next;
   }
 
   if (cmd.type === "newGame") {
-    if (room.seats.some((p) => p === null)) throw new DomainError("not_full", "四个座位尚未坐满");
-    return {
-      ...room,
-      phase: "playing",
-      game: createUndoable(createGame(room.rules, event.at)),
-      gameNo: room.gameNo + 1,
-    };
+    if (room.phase !== "finished")
+      throw new DomainError("not_finished", "对局尚未结束，请先终局结算");
+    return startGame(room, event.at);
   }
 
   if (!room.game) throw new DomainError("no_game", "尚未开局");

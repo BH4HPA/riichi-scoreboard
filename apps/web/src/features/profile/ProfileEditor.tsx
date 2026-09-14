@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera } from "lucide-react";
+import { formatPoints, formatScore, type PlayerStats } from "@riichi/core";
 import { useSession } from "@/api/session";
 import { api, ApiError } from "@/api/client";
 import { Avatar } from "@/ui/avatar";
 import { Button } from "@/ui/button";
 import { Input, Label } from "@/ui/controls";
 import { useRoomStore } from "@/ws/store";
-import { formatDateTime } from "@/lib/utils";
+import { cn, formatDateTime } from "@/lib/utils";
 
 /** 浏览器端把图片缩放到 256px 正方形 JPEG，服务端只做校验。 */
 async function resizeAvatar(file: File, size = 256): Promise<Blob> {
@@ -24,11 +25,8 @@ async function resizeAvatar(file: File, size = 256): Promise<Blob> {
   );
 }
 
-export function ProfileEditor({
-  onNameChange,
-}: {
-  onNameChange?: ((name: string) => void) | undefined;
-}) {
+/** 昵称与头像：保存到玩家档案，服务端会同步到已入座的房间。 */
+export function ProfileEditor() {
   const { player, updateProfile, uploadAvatar } = useSession();
   const notify = useRoomStore((s) => s.notify);
   const [name, setName] = useState(player?.name ?? "");
@@ -47,7 +45,6 @@ export function ProfileEditor({
     setBusy(true);
     try {
       await updateProfile({ name: trimmed });
-      onNameChange?.(trimmed);
     } catch (err) {
       notify("error", err instanceof ApiError ? err.message : "保存失败");
     } finally {
@@ -90,9 +87,10 @@ export function ProfileEditor({
         onChange={(e) => pick(e.target.files?.[0])}
       />
       <div className="flex-1">
-        <Label>昵称</Label>
+        <Label htmlFor="profile-name">昵称</Label>
         <div className="mt-1 flex gap-2">
           <Input
+            id="profile-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={12}
@@ -112,27 +110,12 @@ export function ProfileEditor({
   );
 }
 
-interface Stats {
-  games: number;
-  averageRank: number | null;
-  totalScore: number;
-  rankCounts: [number, number, number, number];
-  recent: Array<{
-    room_code: string;
-    game_no: number;
-    finished_at: number;
-    points: number;
-    rank: number;
-    score: number;
-  }>;
-}
-
 export function StatsPanel() {
   const { token } = useSession();
-  const [stats, setStats] = useState<Stats | null>(null);
+  const [stats, setStats] = useState<PlayerStats | null>(null);
   useEffect(() => {
     if (!token) return;
-    api<{ stats: Stats }>("/api/me/stats", { token })
+    api<{ stats: PlayerStats }>("/api/me/stats", { token })
       .then((r) => setStats(r.stats))
       .catch(() => setStats(null));
   }, [token]);
@@ -145,7 +128,7 @@ export function StatsPanel() {
         <Stat label="平均顺位" value={stats.averageRank?.toFixed(2) ?? "—"} />
         <Stat
           label="累计得分"
-          value={`${stats.totalScore > 0 ? "+" : ""}${stats.totalScore.toFixed(1)}`}
+          value={formatScore(stats.totalScore)}
           tone={stats.totalScore >= 0 ? "pos" : "neg"}
         />
       </div>
@@ -159,16 +142,13 @@ export function StatsPanel() {
       <ul className="divide-y divide-border text-sm">
         {stats.recent.map((r) => (
           <li
-            key={`${r.room_code}-${r.game_no}`}
+            key={`${r.roomCode}-${r.gameNo}`}
             className="flex items-center justify-between py-1.5"
           >
-            <span className="text-muted">{formatDateTime(r.finished_at)}</span>
+            <span className="text-muted">{formatDateTime(r.finishedAt)}</span>
             <span className="tabular">
-              {r.rank} 位 · {r.points.toLocaleString("en-US")} ·{" "}
-              <span className={r.score >= 0 ? "text-pos" : "text-neg"}>
-                {r.score > 0 ? "+" : ""}
-                {r.score.toFixed(1)}
-              </span>
+              {r.rank} 位 · {formatPoints(r.points)} ·{" "}
+              <span className={r.score >= 0 ? "text-pos" : "text-neg"}>{formatScore(r.score)}</span>
             </span>
           </li>
         ))}
@@ -182,7 +162,11 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "po
     <div className="rounded-lg bg-surface-2 px-2 py-2">
       <div className="text-[11px] text-muted">{label}</div>
       <div
-        className={`text-lg font-semibold tabular ${tone === "pos" ? "text-pos" : tone === "neg" ? "text-neg" : ""}`}
+        className={cn(
+          "text-lg font-semibold tabular",
+          tone === "pos" && "text-pos",
+          tone === "neg" && "text-neg",
+        )}
       >
         {value}
       </div>

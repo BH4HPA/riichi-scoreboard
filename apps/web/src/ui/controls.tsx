@@ -47,11 +47,7 @@ export function Badge({
   );
 }
 
-export function Card({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("rounded-xl border border-border bg-surface", className)} {...props} />;
-}
-
-export function Checkbox({ className, ...props }: ComponentProps<typeof CheckboxPrimitive.Root>) {
+function Checkbox({ className, ...props }: ComponentProps<typeof CheckboxPrimitive.Root>) {
   return (
     <CheckboxPrimitive.Root
       className={cn(
@@ -233,6 +229,7 @@ export function ChipGroup<T extends string | number>({
           key={String(o.value)}
           type="button"
           onClick={() => onChange(o.value)}
+          aria-pressed={value === o.value}
           className={cn(
             "h-8 min-w-9 rounded-md border border-border px-2 text-sm tabular",
             value === o.value

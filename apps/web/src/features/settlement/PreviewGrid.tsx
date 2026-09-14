@@ -1,4 +1,4 @@
-import { formatDiff, formatPoints, SEATS } from "@riichi/core";
+import { formatDiff, SEATS } from "@riichi/core";
 import { cn } from "@/lib/utils";
 
 export function PreviewGrid({
@@ -33,13 +33,4 @@ export function PreviewGrid({
       })}
     </div>
   );
-}
-
-export function incomeBreakdown(parts: {
-  base: number;
-  honba: number;
-  kyotaku: number;
-  riichi: number;
-}): string {
-  return `得分 ${formatPoints(parts.base)} 点、本场棒 ${formatPoints(parts.honba)} 点、历史立直供托 ${formatPoints(parts.kyotaku)} 点、本局立直供托 ${formatPoints(parts.riichi)} 点`;
 }

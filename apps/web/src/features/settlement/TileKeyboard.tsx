@@ -15,25 +15,8 @@ import {
 import { Button } from "@/ui/button";
 import { CheckRow, ChipGroup, Label } from "@/ui/controls";
 import { cn } from "@/lib/utils";
-import { TileFace, tileLabel } from "./TileFace";
-
-export function emptyHand(tsumo: boolean): HandInput {
-  return {
-    closed: [],
-    melds: [],
-    winTile: 0,
-    tsumo,
-    doraIndicators: [],
-    uraIndicators: [],
-    aka: 0,
-    riichi: false,
-    doubleRiichi: false,
-    ippatsu: false,
-    afterKan: false,
-    lastTile: false,
-    firstTake: false,
-  };
-}
+import { TileFace } from "./TileFace";
+import { tileLabel } from "./format";
 
 type Target = "closed" | "dora" | "ura" | "chi" | "pon" | "kan" | "ankan";
 

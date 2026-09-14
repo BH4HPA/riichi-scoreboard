@@ -1,42 +1,38 @@
-import type { RoomState } from "@riichi/core";
+import type { PlayerStats, RoomState } from "@riichi/core";
 import type { Database } from "./index";
 
-export interface ResultRow {
+interface ResultRow {
   room_code: string;
   game_no: number;
-  seat: number;
-  player_id: string;
   finished_at: number;
   points: number;
   rank: number;
   score: number;
 }
 
-export interface PlayerStats {
-  games: number;
-  averageRank: number | null;
-  totalScore: number;
-  rankCounts: [number, number, number, number];
-  recent: ResultRow[];
-}
-
 export class ResultsRepo {
   constructor(private readonly db: Database) {}
 
-  /** 让 game_results 与房间当前状态一致：已终局则写入，否则删除该局记录（撤销终局的情况）。 */
-  sync(room: RoomState): void {
-    const del = this.db.prepare("DELETE FROM game_results WHERE room_code = ? AND game_no = ?");
-    const game = room.game?.present;
-    if (!game || game.status !== "finished" || !game.final) {
-      del.run(room.code, room.gameNo);
-      return;
-    }
-    del.run(room.code, room.gameNo);
+  /**
+   * 只在对局状态跃迁时写库：playing→finished 写入（按开局时的玩家快照），
+   * finished→playing（撤销终局/调整场况）删除。其它事件不触碰战绩。
+   */
+  onTransition(prev: RoomState, next: RoomState): void {
+    const sameGame = prev.gameNo === next.gameNo;
+    const wasFinished = sameGame && prev.game?.present.status === "finished";
+    const isFinished = next.game?.present.status === "finished";
+    if (isFinished && !wasFinished) this.record(next);
+    else if (wasFinished && !isFinished && next.game) this.remove(next.code, next.gameNo);
+  }
+
+  private record(room: RoomState): void {
+    const game = room.game!.present;
+    if (!game.final) return;
+    this.remove(room.code, room.gameNo);
     const insert = this.db.prepare(
       "INSERT INTO game_results (room_code, game_no, seat, player_id, finished_at, points, rank, score) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     );
-    room.seats.forEach((player, seat) => {
-      if (!player) return;
+    game.players.forEach((player, seat) => {
       insert.run(
         room.code,
         room.gameNo,
@@ -50,9 +46,17 @@ export class ResultsRepo {
     });
   }
 
+  private remove(roomCode: string, gameNo: number): void {
+    this.db
+      .prepare("DELETE FROM game_results WHERE room_code = ? AND game_no = ?")
+      .run(roomCode, gameNo);
+  }
+
   statsFor(playerId: string, recentLimit = 20): PlayerStats {
     const rows = this.db
-      .prepare("SELECT * FROM game_results WHERE player_id = ? ORDER BY finished_at DESC")
+      .prepare(
+        "SELECT room_code, game_no, finished_at, points, rank, score FROM game_results WHERE player_id = ? ORDER BY finished_at DESC",
+      )
       .all(playerId) as unknown as ResultRow[];
     const rankCounts: [number, number, number, number] = [0, 0, 0, 0];
     let rankSum = 0;
@@ -68,7 +72,14 @@ export class ResultsRepo {
       averageRank: rows.length ? Math.round((rankSum / rows.length) * 100) / 100 : null,
       totalScore: Math.round(totalScore * 10) / 10,
       rankCounts,
-      recent: rows.slice(0, recentLimit),
+      recent: rows.slice(0, recentLimit).map((r) => ({
+        roomCode: r.room_code,
+        gameNo: r.game_no,
+        finishedAt: r.finished_at,
+        points: r.points,
+        rank: r.rank,
+        score: r.score,
+      })),
     };
   }
 }

@@ -3,32 +3,39 @@ import {
   DomainError,
   RulesError,
   createRoom,
-  isGameCommand,
+  dealerOf,
   kyokuWind,
   reduceRoom,
   replay,
+  seatOfPlayer,
   toRoomView,
+  validateCommand,
+  validateUiIntent,
   type ClientCommand,
+  type ClientWinValue,
   type Command,
   type EventActor,
   type GameCommand,
+  type PlayerRef,
   type RoomEvent,
   type RoomRules,
   type RoomState,
   type RoomView,
-  type UiIntent,
+  type Seat,
   type UiState,
   type WinValue,
 } from "@riichi/core";
+import { toPlayerRef, type PlayersRepo } from "../db/players";
 import type { RoomsRepo } from "../db/rooms";
 import type { ResultsRepo } from "../db/results";
 import { evaluateHand } from "../engine/evaluate";
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const SYSTEM_ACTOR: EventActor = { playerId: null, clientId: "system" };
 
 export interface RoomClient {
   clientId: string;
-  playerId: string | null;
+  playerId: string;
   name: string;
   send(message: string): void;
 }
@@ -49,11 +56,15 @@ export class RoomNotFound extends Error {
   }
 }
 
-export class StaleCommand extends Error {
-  constructor(public readonly currentSeq: number) {
+class StaleCommand extends Error {
+  constructor() {
     super("房间状态已更新，请刷新后重试");
     this.name = "StaleCommand";
   }
+}
+
+function samePlayer(a: PlayerRef, b: PlayerRef): boolean {
+  return a.id === b.id && a.name === b.name && a.avatar === b.avatar;
 }
 
 export class RoomRegistry {
@@ -62,6 +73,7 @@ export class RoomRegistry {
   constructor(
     private readonly roomsRepo: RoomsRepo,
     private readonly resultsRepo: ResultsRepo,
+    private readonly players: PlayersRepo,
     private readonly now: () => number = Date.now,
   ) {}
 
@@ -107,56 +119,86 @@ export class RoomRegistry {
     return toRoomView(room.state, room.seq);
   }
 
-  /** 校验 baseSeq → 补全牌面评估 → reduce → 落库 → 广播。 */
-  apply(
-    room: LiveRoom,
-    baseSeq: number,
-    clientCommand: ClientCommand,
-    actor: EventActor,
-  ): RoomEvent {
-    if (baseSeq !== room.seq) throw new StaleCommand(room.seq);
-    const command = this.enrich(room.state, clientCommand);
+  /** 校验 baseSeq → 形状校验 → 按 actor 补全/鉴权 → reduce → 事务落库 → 广播。 */
+  apply(room: LiveRoom, baseSeq: number, rawCommand: unknown, actor: EventActor): RoomEvent {
+    if (baseSeq !== room.seq) throw new StaleCommand();
+    const command = this.enrich(room.state, validateCommand(rawCommand), actor);
+    return this.commit(room, command, actor);
+  }
+
+  private commit(room: LiveRoom, command: Command, actor: EventActor): RoomEvent {
     const event: RoomEvent = { seq: room.seq + 1, at: this.now(), actor, command };
     const next = reduceRoom(room.state, event);
-    this.roomsRepo.appendEvent(room.code, event);
+    this.roomsRepo.transaction(() => {
+      this.roomsRepo.appendEvent(room.code, event);
+      this.resultsRepo.onTransition(room.state, next);
+    });
     room.state = next;
     room.seq = event.seq;
     room.lastActivity = event.at;
-    this.resultsRepo.sync(next);
     this.broadcastState(room);
     return event;
   }
 
-  private enrich(state: RoomState, cmd: ClientCommand): Command {
-    if (!isGameCommand(cmd as Command)) return cmd as Command;
-    const game = state.game?.present;
-    const evaluate = (seat: number, value: { kind: "manual" } | { kind: "hand" }): WinValue => {
-      if (value.kind === "manual") return value as WinValue;
-      if (!game) throw new DomainError("no_game", "尚未开局");
-      const hand = (value as { kind: "hand"; hand: Parameters<typeof evaluateHand>[0] }).hand;
-      const result = evaluateHand(
-        hand,
-        { seat: seat as 0 | 1 | 2 | 3, dealer: game.dealer, roundWind: kyokuWind(game.kyoku) },
-        state.rules,
-      );
-      return { kind: "hand", hand, result };
+  /** 客户端命令 → 内部命令：入座按 token 填玩家；座位类命令只能操作自己的座位；牌面交引擎评估。 */
+  private enrich(state: RoomState, cmd: ClientCommand, actor: EventActor): Command {
+    const own = (seat: Seat, what: string) => {
+      if (state.seats[seat]?.id !== actor.playerId) {
+        throw new DomainError("forbidden", `只能${what}自己的座位`);
+      }
     };
     switch (cmd.type) {
+      case "sit": {
+        const row = actor.playerId ? this.players.byId(actor.playerId) : null;
+        if (!row) throw new DomainError("unauthorized", "需要先注册设备");
+        return { type: "sit", seat: cmd.seat, player: toPlayerRef(row) };
+      }
+      case "leave":
+        own(cmd.seat, "离开");
+        return cmd;
+      case "setReady":
+        own(cmd.seat, "准备");
+        return cmd;
       case "tsumo":
-        return { ...cmd, value: evaluate(cmd.winner, cmd.value) } as GameCommand;
+        return { ...cmd, value: this.evaluate(state, cmd.winner, cmd.value) } as GameCommand;
       case "ron":
         return {
           ...cmd,
-          wins: cmd.wins.map((w) => ({ ...w, value: evaluate(w.winner, w.value) })),
+          wins: cmd.wins.map((w) => ({ ...w, value: this.evaluate(state, w.winner, w.value) })),
         } as GameCommand;
       default:
-        return cmd as Command;
+        return cmd;
     }
+  }
+
+  private evaluate(state: RoomState, seat: Seat, value: ClientWinValue): WinValue {
+    if (value.kind === "manual") return value;
+    const game = state.game?.present;
+    if (!game) throw new DomainError("no_game", "尚未开局");
+    const result = evaluateHand(
+      value.hand,
+      { seat, dealer: dealerOf(game.kyoku), roundWind: kyokuWind(game.kyoku) },
+      state.rules,
+    );
+    return { kind: "hand", hand: value.hand, result };
+  }
+
+  /** 玩家档案变更后，把已入座房间里的快照同步为最新（只处理内存中的房间；冷房间在下次加入时同步）。 */
+  syncProfile(player: PlayerRef): void {
+    for (const room of this.rooms.values()) this.syncSeat(room, player);
+  }
+
+  private syncSeat(room: LiveRoom, player: PlayerRef): void {
+    const seat = seatOfPlayer(room.state.seats, player.id);
+    if (seat === null || samePlayer(room.state.seats[seat]!, player)) return;
+    this.commit(room, { type: "syncProfile", seat, player }, SYSTEM_ACTOR);
   }
 
   join(room: LiveRoom, client: RoomClient): void {
     room.clients.set(client.clientId, client);
     room.lastActivity = this.now();
+    const row = this.players.byId(client.playerId);
+    if (row) this.syncSeat(room, toPlayerRef(row));
     client.send(JSON.stringify({ type: "state", room: this.view(room) }));
     client.send(JSON.stringify({ type: "ui", intents: this.uiList(room) }));
   }
@@ -167,15 +209,14 @@ export class RoomRegistry {
     room.lastActivity = this.now();
   }
 
-  setUi(room: LiveRoom, client: RoomClient, intent: UiIntent): void {
+  setUi(room: LiveRoom, client: RoomClient, rawIntent: unknown): void {
+    const intent = validateUiIntent(rawIntent);
     if (intent.kind === "none") {
       room.ui.delete(client.clientId);
     } else {
-      const seat = room.state.seats.findIndex((p) => p && p.id === client.playerId);
       room.ui.set(client.clientId, {
-        clientId: client.clientId,
         playerId: client.playerId,
-        seat: seat === -1 ? null : (seat as 0 | 1 | 2 | 3),
+        seat: seatOfPlayer(room.state.seats, client.playerId),
         name: client.name,
         intent,
         at: this.now(),
@@ -212,10 +253,19 @@ export class RoomRegistry {
   }
 }
 
-export function describeError(err: unknown): { code: string; message: string } {
-  if (err instanceof StaleCommand) return { code: "stale", message: err.message };
-  if (err instanceof DomainError) return { code: err.code, message: err.message };
-  if (err instanceof RulesError) return { code: "rules", message: err.message };
-  if (err instanceof RoomNotFound) return { code: "room_not_found", message: err.message };
-  return { code: "internal", message: err instanceof Error ? err.message : "未知错误" };
+export interface ErrorInfo {
+  code: string;
+  message: string;
+  /** 非预期异常（需要记日志） */
+  internal: boolean;
+}
+
+export function describeError(err: unknown): ErrorInfo {
+  if (err instanceof StaleCommand) return { code: "stale", message: err.message, internal: false };
+  if (err instanceof DomainError) return { code: err.code, message: err.message, internal: false };
+  if (err instanceof RulesError) return { code: "rules", message: err.message, internal: false };
+  if (err instanceof RoomNotFound) {
+    return { code: "room_not_found", message: err.message, internal: false };
+  }
+  return { code: "internal", message: "服务器内部错误", internal: true };
 }

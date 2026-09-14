@@ -1,6 +1,5 @@
 import type { RoomRules } from "../types/rules";
-import type { GameState } from "../types/state";
-import { nextSeat } from "../types/tiles";
+import { dealerOf, type GameState } from "../types/state";
 import { standings } from "../final/settle";
 
 export type Outcome =
@@ -46,7 +45,7 @@ function reachedEnchousenTarget(points: readonly number[], rules: RoomRules): bo
 /** 庄家是否为唯一一位（和了止/听牌止条件） */
 function dealerIsSoleTop(game: GameState): boolean {
   const [top, second] = standings(game.points);
-  return top === game.dealer && game.points[top!]! > game.points[second!]!;
+  return top === dealerOf(game.kyoku) && game.points[top!]! > game.points[second!]!;
 }
 
 /**
@@ -59,7 +58,7 @@ export function advance(
   rules: RoomRules,
   endGame = false,
 ): GameState {
-  let { kyoku, honba, dealer } = game;
+  let { kyoku, honba } = game;
   let dealerStays: boolean;
 
   switch (outcome.kind) {
@@ -79,12 +78,9 @@ export function advance(
       dealerStays = true;
       break;
   }
-  if (!dealerStays) {
-    dealer = nextSeat(dealer);
-    kyoku += 1;
-  }
+  if (!dealerStays) kyoku += 1;
 
-  const next: GameState = { ...game, kyoku, honba, dealer };
+  const next: GameState = { ...game, kyoku, honba };
   const inFinalKyoku = isFinalKyoku(game.kyoku, rules);
 
   if (anyTobi(next.points, rules)) return { ...next, status: "finished" };

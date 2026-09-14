@@ -1,17 +1,8 @@
-import { useEffect, useState } from "react";
 import { Clock3, Timer } from "lucide-react";
-import { formatPoints, roundLabel, type GameState, type RoomRules } from "@riichi/core";
+import { dealerOf, formatPoints, roundLabel, type GameState, type RoomRules } from "@riichi/core";
 import { Badge } from "@/ui/controls";
 import { cn, formatClock } from "@/lib/utils";
-
-export function useNow(intervalMs = 1000): Date {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), intervalMs);
-    return () => clearInterval(t);
-  }, [intervalMs]);
-  return now;
-}
+import { useNow } from "./useNow";
 
 export function RoundHeader({
   game,
@@ -31,6 +22,7 @@ export function RoundHeader({
   );
   const total = game.points.reduce((a, b) => a + b, 0);
   const expected = rules.final.startPoints * 4;
+  /** 桌上的棒：立直棒 + 本场棒（沿用旧版「场供」口径） */
   const tableSticks = game.kyotaku * 1000 + game.honba * rules.scoring.honbaValue;
   const label = game.status === "finished" ? "对局结束" : roundLabel(game.kyoku, game.honba);
   return (
@@ -41,7 +33,7 @@ export function RoundHeader({
         <span className={cn("font-semibold tabular", tv ? "text-3xl" : "text-lg")}>{label}</span>
         {game.status !== "finished" && (
           <Badge tone="accent" className={tv ? "text-sm" : ""}>
-            庄家：{names[game.dealer]}
+            庄家：{names[dealerOf(game.kyoku)]}
           </Badge>
         )}
       </div>

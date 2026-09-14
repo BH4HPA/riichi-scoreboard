@@ -5,7 +5,6 @@ import {
   doraFromIndicator,
   seatWind,
   windTile,
-  type Meld,
   type Seat,
   type Tile,
   type Wind,
@@ -170,9 +169,8 @@ export interface HandContext {
   roundWind: Wind;
 }
 
-function meldTileCount(meld: Meld): number {
-  return meld.tiles.length === 4 ? 3 : 3;
-}
+/** 副露占用的手牌张数：吃/碰/杠都折算 3 张（杠子第 4 张不计入 14 张）。 */
+const MELD_TILE_COUNT = 3;
 
 function isTile(t: unknown): t is Tile {
   return Number.isInteger(t) && (t as number) >= 1 && (t as number) <= 34;
@@ -187,7 +185,7 @@ export function validateHandInput(hand: HandInput, rules: RoomRules): void {
       throw new DomainError("bad_meld", "副露必须是 3 或 4 张");
     if (m.tiles.length === 3 && !m.open) throw new DomainError("bad_meld", "3 张的副露必须是明的");
   }
-  const total = hand.closed.length + hand.melds.reduce((a, m) => a + meldTileCount(m), 0);
+  const total = hand.closed.length + hand.melds.length * MELD_TILE_COUNT;
   if (total !== 14) throw new DomainError("bad_count", "暗牌与副露合计应为 14 张（含和张）");
   if (!isTile(hand.winTile) || !hand.closed.includes(hand.winTile)) {
     throw new DomainError("bad_win_tile", "和张必须包含在暗牌中");
@@ -263,7 +261,14 @@ export function toEngineInput(hand: HandInput, ctx: HandContext, rules: RoomRule
 /** 引擎输出 → EvaluatedHand（役满倍数按规则裁定）。 */
 export function fromEngineOutput(out: EngineOutput, rules: RoomRules): EvaluatedHand {
   const yakuman = out.yakuman > 0 ? (rules.scoring.yakumanStacking ? out.yakuman : 1) : 0;
-  return { han: out.han, fu: out.fu, yakuman, yaku: { ...out.yaku }, isAgari: out.is_agari };
+  return {
+    han: out.han,
+    fu: out.fu,
+    yakuman,
+    yaku: { ...out.yaku },
+    isAgari: out.is_agari,
+    ...(out.is_agari ? {} : { reason: "notAgari" as const }),
+  };
 }
 
 export function yakuName(id: number | string): string {

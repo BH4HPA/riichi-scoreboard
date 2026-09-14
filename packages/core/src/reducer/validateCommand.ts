@@ -1,0 +1,179 @@
+import { DomainError } from "../progress/advance";
+import type { ClientCommand, ClientWinValue, RonWin } from "../types/commands";
+import type { AbortiveReason, HandInput } from "../types/state";
+import type { Seat } from "../types/tiles";
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function bad(message: string): never {
+  throw new DomainError("bad_command", message);
+}
+
+export function assertSeat(value: unknown, what = "座位"): asserts value is Seat {
+  if (value !== 0 && value !== 1 && value !== 2 && value !== 3) bad(`${what}无效`);
+}
+
+function seat(v: unknown, what: string): Seat {
+  assertSeat(v, what);
+  return v;
+}
+
+function seatList(v: unknown, what: string): Seat[] {
+  if (!Array.isArray(v) || v.length > 4) bad(`${what}无效`);
+  const seats = v.map((s) => seat(s, what));
+  if (new Set(seats).size !== seats.length) bad(`${what}重复`);
+  return seats;
+}
+
+function bool(v: unknown, what: string): boolean {
+  if (typeof v !== "boolean") bad(`${what}必须是布尔值`);
+  return v;
+}
+
+function int(v: unknown, what: string, min: number, max: number): number {
+  if (typeof v !== "number" || !Number.isInteger(v) || v < min || v > max) bad(`${what}无效`);
+  return v;
+}
+
+function tiles(v: unknown, what: string, max: number): number[] {
+  if (!Array.isArray(v) || v.length > max) bad(`${what}无效`);
+  return v.map((t) => int(t, what, 1, 34));
+}
+
+function handInput(v: unknown): HandInput {
+  if (!isRecord(v)) bad("牌面无效");
+  if (!Array.isArray(v.melds) || v.melds.length > 4) bad("副露无效");
+  return {
+    closed: tiles(v.closed, "暗牌", 14),
+    melds: v.melds.map((m) => {
+      if (!isRecord(m)) bad("副露无效");
+      return { open: bool(m.open, "副露明暗"), tiles: tiles(m.tiles, "副露牌", 4) };
+    }),
+    winTile: int(v.winTile, "和张", 1, 34),
+    tsumo: bool(v.tsumo, "自摸标记"),
+    doraIndicators: tiles(v.doraIndicators, "宝牌指示牌", 5),
+    uraIndicators: tiles(v.uraIndicators, "里宝指示牌", 5),
+    aka: int(v.aka, "赤宝牌", 0, 4),
+    riichi: bool(v.riichi, "立直"),
+    doubleRiichi: bool(v.doubleRiichi, "两立直"),
+    ippatsu: bool(v.ippatsu, "一发"),
+    afterKan: bool(v.afterKan, "岭上/抢杠"),
+    lastTile: bool(v.lastTile, "海底/河底"),
+    firstTake: bool(v.firstTake, "首巡"),
+  };
+}
+
+function winValue(v: unknown): ClientWinValue {
+  if (!isRecord(v)) bad("和牌价值无效");
+  if (v.kind === "manual") {
+    return {
+      kind: "manual",
+      han: int(v.han, "番数", 0, 200),
+      fu: int(v.fu, "符数", 0, 110),
+      yakuman: int(v.yakuman, "役满倍数", 0, 6),
+    };
+  }
+  if (v.kind === "hand") return { kind: "hand", hand: handInput(v.hand) };
+  return bad("和牌价值类型无效");
+}
+
+function optionalSeat(v: unknown, what: string): { pao?: Seat } {
+  return v === undefined ? {} : { pao: seat(v, what) };
+}
+
+function optionalEnd(v: unknown): { endGame?: boolean } {
+  return v === undefined ? {} : { endGame: bool(v, "结束标记") };
+}
+
+const ABORTIVE: readonly AbortiveReason[] = ["kyuushu", "suufon", "suucha", "suukan", "sanchahou"];
+
+/**
+ * 把客户端发来的任意 JSON 规范化为 ClientCommand；结构不对即抛 DomainError("bad_command")。
+ * 只做形状校验，业务合法性（座位是否为空、规则是否允许）交给 reducer。
+ */
+export function validateCommand(input: unknown): ClientCommand {
+  if (!isRecord(input) || typeof input.type !== "string") bad("命令格式错误");
+  switch (input.type) {
+    case "setRules":
+      return {
+        type: "setRules",
+        rules: input.rules as ClientCommand extends never ? never : never,
+      };
+    case "sit":
+      return { type: "sit", seat: seat(input.seat, "座位") };
+    case "leave":
+      return { type: "leave", seat: seat(input.seat, "座位") };
+    case "setReady":
+      return {
+        type: "setReady",
+        seat: seat(input.seat, "座位"),
+        ready: bool(input.ready, "准备状态"),
+      };
+    case "start":
+      return { type: "start", force: bool(input.force, "强开标记") };
+    case "toLobby":
+    case "undo":
+    case "redo":
+    case "endGame":
+    case "newGame":
+      return { type: input.type };
+    case "tsumo":
+      return {
+        type: "tsumo",
+        winner: seat(input.winner, "自摸者"),
+        value: winValue(input.value),
+        riichi: seatList(input.riichi, "立直座位"),
+        ...optionalSeat(input.pao, "包牌者"),
+        ...optionalEnd(input.endGame),
+      };
+    case "ron": {
+      if (!Array.isArray(input.wins) || input.wins.length < 1 || input.wins.length > 3)
+        bad("荣和者无效");
+      const wins: RonWin<ClientWinValue>[] = input.wins.map((w) => {
+        if (!isRecord(w)) bad("荣和者无效");
+        return {
+          winner: seat(w.winner, "荣和者"),
+          value: winValue(w.value),
+          ...optionalSeat(w.pao, "包牌者"),
+        };
+      });
+      return {
+        type: "ron",
+        loser: seat(input.loser, "放铳者"),
+        wins,
+        riichi: seatList(input.riichi, "立直座位"),
+        ...optionalEnd(input.endGame),
+      };
+    }
+    case "draw": {
+      if (!Array.isArray(input.tenpai) || input.tenpai.length !== 4) bad("听牌标记无效");
+      return {
+        type: "draw",
+        tenpai: input.tenpai.map((t) => bool(t, "听牌标记")),
+        riichi: seatList(input.riichi, "立直座位"),
+        nagashi: seatList(input.nagashi ?? [], "流局满贯座位"),
+        ...optionalEnd(input.endGame),
+      };
+    }
+    case "abortive": {
+      if (!ABORTIVE.includes(input.reason as AbortiveReason)) bad("途中流局原因无效");
+      return {
+        type: "abortive",
+        reason: input.reason as AbortiveReason,
+        riichi: seatList(input.riichi, "立直座位"),
+      };
+    }
+    case "chombo":
+      return { type: "chombo", offender: seat(input.offender, "错和者") };
+    case "adjust":
+      return {
+        type: "adjust",
+        kyoku: int(input.kyoku, "局序号", 0, 15),
+        honba: int(input.honba, "本场数", 0, 99),
+      };
+    default:
+      return bad(`未知命令 ${input.type}`);
+  }
+}

@@ -1,5 +1,5 @@
 import { TIER_LABELS, yakumanLabel, type HandValue, type ScoreTier } from "../scoring/basePoints";
-import type { HistoryEntry, WinRecord } from "../types/state";
+import { dealerOf, type HistoryEntry, type WinRecord } from "../types/state";
 import type { Seat } from "../types/tiles";
 import { formatPoints, roundLabel } from "./round";
 
@@ -95,7 +95,7 @@ export function describeEntry(entry: HistoryEntry): string {
         ? `终局立直供托 ${formatPoints(entry.amount)} 点按规则处理。`
         : `一位 ${names[entry.to]} 终局立直供托分配：${names[entry.to]} 收入 ${formatPoints(entry.amount)} 点。`;
     case "adjust":
-      return `调整场况：${roundLabel(entry.kyoku, entry.honba)} → ${roundLabel(entry.to.kyoku, entry.to.honba)}，庄家 ${names[entry.to.dealer]}。`;
+      return `调整场况：${roundLabel(entry.kyoku, entry.honba)} → ${roundLabel(entry.to.kyoku, entry.to.honba)}，庄家 ${names[dealerOf(entry.to.kyoku)]}。`;
   }
 }
 

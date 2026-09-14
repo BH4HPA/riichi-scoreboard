@@ -22,7 +22,7 @@ export function SeatCards({
       {SEATS.map((seat) => {
         const p = seats[seat];
         const mine = mySeat === seat;
-        const clickable = onPick && !mine && (!p || false);
+        const clickable = Boolean(onPick) && !mine && !p;
         return (
           <button
             key={seat}

@@ -44,8 +44,12 @@ export function validateRules(input: unknown): RoomRules {
   const final = section(root.final, "final");
 
   const uma = final.uma;
-  if (!Array.isArray(uma) || uma.length !== 4 || !uma.every((n) => Number.isInteger(n))) {
-    throw new RulesError("final.uma 必须是 4 个整数");
+  if (
+    !Array.isArray(uma) ||
+    uma.length !== 4 ||
+    !uma.every((n) => Number.isInteger(n) && Math.abs(n) <= 1000)
+  ) {
+    throw new RulesError("final.uma 必须是 4 个 -1000..1000 的整数");
   }
   const startPoints = int(final.startPoints, "final.startPoints", 0, 100000);
   const returnPoints = int(final.returnPoints, "final.returnPoints", 0, 100000);
@@ -53,6 +57,9 @@ export function validateRules(input: unknown): RoomRules {
   if (startPoints % 100 !== 0 || returnPoints % 100 !== 0) {
     throw new RulesError("起始点与返点必须是 100 的倍数");
   }
+
+  const honbaValue = int(scoring.honbaValue, "scoring.honbaValue", 0, 10000);
+  if (honbaValue % 300 !== 0) throw new RulesError("本场点数必须是 300 的倍数（自摸时三家均摊）");
 
   const akaCount = int(hand.akaCount, "hand.akaCount", 0, 4);
   if (akaCount !== 0 && akaCount !== 3 && akaCount !== 4) {
@@ -66,7 +73,7 @@ export function validateRules(input: unknown): RoomRules {
       doubleYakuman: bool(scoring.doubleYakuman, "scoring.doubleYakuman"),
       yakumanStacking: bool(scoring.yakumanStacking, "scoring.yakumanStacking"),
       pao: bool(scoring.pao, "scoring.pao"),
-      honbaValue: int(scoring.honbaValue, "scoring.honbaValue", 0, 10000),
+      honbaValue,
       notenBappu: int(scoring.notenBappu, "scoring.notenBappu", 0, 10000),
     },
     hand: {

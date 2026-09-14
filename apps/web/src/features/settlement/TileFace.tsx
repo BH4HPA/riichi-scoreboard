@@ -1,5 +1,6 @@
 import { isHonor, tileNumber, tileSuit, type Tile } from "@riichi/core";
 import { cn } from "@/lib/utils";
+import { tileLabel } from "./format";
 
 const HONORS = ["東", "南", "西", "北", "白", "發", "中"];
 const SUIT_LABEL = { m: "萬", p: "筒", s: "索", z: "" } as const;
@@ -9,11 +10,6 @@ const SUIT_COLOR = {
   s: "text-emerald-600",
   z: "text-fg",
 } as const;
-
-export function tileLabel(tile: Tile): string {
-  if (isHonor(tile)) return HONORS[tile - 28]!;
-  return `${tileNumber(tile)}${SUIT_LABEL[tileSuit(tile)]}`;
-}
 
 export function TileFace({
   tile,
@@ -70,7 +66,13 @@ export function TileFace({
   );
   if (!onClick) return body;
   return (
-    <button type="button" onClick={onClick} className="active:scale-95">
+    <button
+      type="button"
+      onClick={onClick}
+      className="active:scale-95"
+      aria-label={tileLabel(tile)}
+      aria-pressed={selected}
+    >
       {body}
     </button>
   );

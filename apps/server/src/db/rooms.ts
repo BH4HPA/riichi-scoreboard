@@ -11,6 +11,19 @@ export interface RoomRow {
 export class RoomsRepo {
   constructor(private readonly db: Database) {}
 
+  /** 同步事务：fn 抛错则回滚并重新抛出。 */
+  transaction<T>(fn: () => T): T {
+    this.db.exec("BEGIN");
+    try {
+      const result = fn();
+      this.db.exec("COMMIT");
+      return result;
+    } catch (err) {
+      this.db.exec("ROLLBACK");
+      throw err;
+    }
+  }
+
   create(code: string, rules: RoomRules, now: number): void {
     this.db
       .prepare("INSERT INTO rooms (code, rules, created_at, updated_at) VALUES (?, ?, ?, ?)")

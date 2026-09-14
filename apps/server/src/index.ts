@@ -6,8 +6,8 @@ import { loadConfig } from "./config";
 
 const config = loadConfig();
 const shell = new Hono();
-const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app: shell });
-const { app, registry } = createApp({ config, upgradeWebSocket });
+const { injectWebSocket, upgradeWebSocket, wss } = createNodeWebSocket({ app: shell });
+const { app, registry, db } = createApp({ config, upgradeWebSocket });
 shell.route("/", app);
 
 const server = serve({ fetch: shell.fetch, port: config.port, hostname: config.host }, (info) => {
@@ -17,4 +17,18 @@ const server = serve({ fetch: shell.fetch, port: config.port, hostname: config.h
 });
 injectWebSocket(server);
 
-setInterval(() => registry.evictIdle(config.roomIdleMs), 10 * 60 * 1000).unref();
+const sweeper = setInterval(() => registry.evictIdle(config.roomIdleMs), 10 * 60 * 1000);
+sweeper.unref();
+
+function shutdown(signal: string): void {
+  console.log(`received ${signal}, shutting down`);
+  clearInterval(sweeper);
+  for (const socket of wss.clients) socket.close(1001, "server shutdown");
+  server.close(() => {
+    db.close();
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 5000).unref();
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

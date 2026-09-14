@@ -3,9 +3,6 @@ import {
   scoreTier,
   TIER_LABELS,
   yakumanLabel,
-  type ClientWinValue,
-  type EvaluatedHand,
-  type HandInput,
   type HandValue,
   type RoomRules,
   type Seat,
@@ -14,33 +11,8 @@ import { ChipGroup, Label, Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui
 import { useSocket } from "@/ws/useRoom";
 import { useRoomStore } from "@/ws/store";
 import { CommandError } from "@/ws/socket";
-import { emptyHand, TileKeyboard } from "./TileKeyboard";
-
-export interface ValueDraft {
-  mode: "manual" | "hand";
-  han: number;
-  fu: number;
-  yakuman: number;
-  hand: HandInput;
-  evaluated: EvaluatedHand | null;
-}
-
-export function createValueDraft(tsumo: boolean): ValueDraft {
-  return { mode: "manual", han: 3, fu: 40, yakuman: 0, hand: emptyHand(tsumo), evaluated: null };
-}
-
-/** 草稿 → 可计算的番符值；牌面未评估或非和牌形时为 null。 */
-export function draftValue(draft: ValueDraft): HandValue | null {
-  if (draft.mode === "manual") return { han: draft.han, fu: draft.fu, yakuman: draft.yakuman };
-  const e = draft.evaluated;
-  return e && e.isAgari ? { han: e.han, fu: e.fu, yakuman: e.yakuman } : null;
-}
-
-export function draftToClientValue(draft: ValueDraft): ClientWinValue {
-  if (draft.mode === "manual")
-    return { kind: "manual", han: draft.han, fu: draft.fu, yakuman: draft.yakuman };
-  return { kind: "hand", hand: draft.hand };
-}
+import { TileKeyboard } from "./TileKeyboard";
+import type { ValueDraft } from "./valueDraft";
 
 const HAN_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((n) => ({
   value: n,

@@ -142,7 +142,12 @@ export function ControlPanel({
       />
       <DrawDialog open={dialog === "draw"} onOpenChange={openOf("draw")} {...shared} />
       <AbortiveDialog open={dialog === "abortive"} onOpenChange={openOf("abortive")} {...shared} />
-      <ChomboDialog open={dialog === "chombo"} onOpenChange={openOf("chombo")} {...shared} />
+      <ChomboDialog
+        open={dialog === "chombo"}
+        onOpenChange={openOf("chombo")}
+        defaultSeat={mySeat}
+        {...shared}
+      />
       <AdjustDialog open={dialog === "adjust"} onOpenChange={openOf("adjust")} {...shared} />
       <ConfirmDialog
         open={dialog === "end"}

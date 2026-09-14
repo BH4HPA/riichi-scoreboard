@@ -252,13 +252,9 @@ describe("reduceRoom / 整局回放", () => {
       seq: 30,
       at: 0,
       actor: { playerId: null, clientId: "t" },
-      command: { type: "adjust", kyoku: 5, honba: 2, dealer: 1 },
+      command: { type: "adjust", kyoku: 5, honba: 2 },
     });
-    expect([
-      adjusted.game!.present.kyoku,
-      adjusted.game!.present.honba,
-      adjusted.game!.present.dealer,
-    ]).toEqual([5, 2, 1]);
+    expect([adjusted.game!.present.kyoku, adjusted.game!.present.honba]).toEqual([5, 2]);
     const undone = reduceRoom(adjusted, {
       seq: 31,
       at: 0,

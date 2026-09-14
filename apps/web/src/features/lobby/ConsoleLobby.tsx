@@ -8,17 +8,13 @@ import { useCommand } from "@/ws/useRoom";
 import { RulesEditor, RulesSummary } from "@/features/rules/RulesEditor";
 import { SeatCards } from "./SeatCards";
 
-export function joinUrl(code: string): string {
-  return `${window.location.origin}/r/${code}`;
-}
-
 export function ConsoleLobby({ room, onNewRoom }: { room: RoomView; onNewRoom: () => void }) {
   const send = useCommand();
   const [rulesOpen, setRulesOpen] = useState(false);
   const [draft, setDraft] = useState(room.rules);
   const full = room.seats.every((s) => s !== null);
   const allReady = full && room.ready.every(Boolean);
-  const url = joinUrl(room.code);
+  const url = `${window.location.origin}/r/${room.code}`;
 
   return (
     <div className="grid min-h-dvh grid-cols-[minmax(320px,2fr)_3fr] gap-8 p-8">
@@ -33,9 +29,7 @@ export function ConsoleLobby({ room, onNewRoom }: { room: RoomView; onNewRoom: (
           </div>
           <div className="mt-2 text-sm text-muted">{url}</div>
         </div>
-        <p className="text-center text-sm text-muted">
-          手机扫码加入，四人都点「准备」后自动可开局。
-        </p>
+        <p className="text-center text-sm text-muted">手机扫码加入，四人都点「准备」后即可开局。</p>
       </section>
 
       <section className="flex flex-col gap-6">

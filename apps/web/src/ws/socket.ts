@@ -25,13 +25,14 @@ type Pending =
   | { kind: "command"; resolve: (seq: number) => void; reject: (e: CommandError) => void }
   | { kind: "evaluate"; resolve: (r: EvaluatedHand) => void; reject: (e: CommandError) => void };
 
-/** 房间 WebSocket：自动重连、命令带 baseSeq、评估请求、镜像意图。 */
+/** 房间 WebSocket：自动重连、命令带 baseSeq、评估请求、镜像意图（按来源合并，取最近打开的）。 */
 export class RoomSocket {
   private ws: WebSocket | null = null;
   private readonly pending = new Map<string, Pending>();
   private closedByUser = false;
   private retry = 0;
-  private lastIntent: UiIntent = { kind: "none" };
+  private readonly intents = new Map<string, { intent: UiIntent; at: number }>();
+  private lastSent = "";
   private heartbeat: ReturnType<typeof setInterval> | null = null;
 
   constructor(
@@ -41,24 +42,35 @@ export class RoomSocket {
 
   connect(): void {
     this.closedByUser = false;
-    const store = useRoomStore.getState();
-    store.set({ status: this.retry === 0 ? "connecting" : "reconnecting" });
+    useRoomStore.getState().set({ status: this.retry === 0 ? "connecting" : "reconnecting" });
     const ws = new WebSocket(wsUrl(this.code, this.token));
     this.ws = ws;
     ws.onopen = () => {
+      if (this.ws !== ws) return;
       this.retry = 0;
       useRoomStore.getState().set({ status: "open" });
-      if (this.lastIntent.kind !== "none") this.raw({ type: "ui", intent: this.lastIntent });
+      this.lastSent = "";
+      this.flushUi();
       this.heartbeat = setInterval(() => this.raw({ type: "ping" }), 25_000);
     };
-    ws.onmessage = (evt) => this.handle(JSON.parse(String(evt.data)) as ServerMessage);
+    ws.onmessage = (evt) => {
+      if (this.ws !== ws) return;
+      let msg: ServerMessage;
+      try {
+        msg = JSON.parse(String(evt.data)) as ServerMessage;
+      } catch {
+        return;
+      }
+      this.handle(msg);
+    };
     ws.onclose = (evt) => {
+      if (this.ws !== ws) return;
       if (this.heartbeat) clearInterval(this.heartbeat);
       this.heartbeat = null;
       for (const p of this.pending.values())
         p.reject(new CommandError("disconnected", "连接已断开"));
       this.pending.clear();
-      if (this.closedByUser || evt.code === 4004) {
+      if (this.closedByUser || evt.code === 4001 || evt.code === 4004) {
         useRoomStore.getState().set({ status: "closed" });
         return;
       }
@@ -66,7 +78,7 @@ export class RoomSocket {
       this.retry += 1;
       useRoomStore.getState().set({ status: "reconnecting" });
       setTimeout(() => {
-        if (!this.closedByUser) this.connect();
+        if (!this.closedByUser && this.ws === ws) this.connect();
       }, delay);
     };
     ws.onerror = () => {
@@ -76,7 +88,10 @@ export class RoomSocket {
 
   close(): void {
     this.closedByUser = true;
-    this.ws?.close();
+    const ws = this.ws;
+    this.ws = null;
+    ws?.close();
+    useRoomStore.getState().set({ status: "closed" });
   }
 
   private raw(msg: ClientMessage): boolean {
@@ -89,7 +104,7 @@ export class RoomSocket {
     const store = useRoomStore.getState();
     switch (msg.type) {
       case "welcome":
-        store.set({ clientId: msg.clientId, playerId: msg.playerId });
+        store.set({ playerId: msg.playerId });
         return;
       case "state":
         store.set({ room: msg.room });
@@ -146,8 +161,19 @@ export class RoomSocket {
     });
   }
 
-  setUi(intent: UiIntent): void {
-    this.lastIntent = intent;
-    this.raw({ type: "ui", intent });
+  /** 某个来源（弹窗/面板）的镜像意图；kind=none 表示该来源已关闭。 */
+  setUi(source: string, intent: UiIntent): void {
+    if (intent.kind === "none") this.intents.delete(source);
+    else this.intents.set(source, { intent, at: Date.now() });
+    this.flushUi();
+  }
+
+  private flushUi(): void {
+    let latest: { intent: UiIntent; at: number } | null = null;
+    for (const entry of this.intents.values()) if (!latest || entry.at >= latest.at) latest = entry;
+    const intent: UiIntent = latest?.intent ?? { kind: "none" };
+    const payload = JSON.stringify(intent);
+    if (payload === this.lastSent) return;
+    if (this.raw({ type: "ui", intent })) this.lastSent = payload;
   }
 }

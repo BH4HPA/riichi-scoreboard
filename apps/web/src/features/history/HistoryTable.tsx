@@ -9,7 +9,7 @@ import {
 import { Badge } from "@/ui/controls";
 import { cn, formatTime } from "@/lib/utils";
 
-export function DeltaCells({ entry, compact = false }: { entry: HistoryEntry; compact?: boolean }) {
+function DeltaCells({ entry, compact = false }: { entry: HistoryEntry; compact?: boolean }) {
   return (
     <div className={cn("grid grid-cols-2 gap-x-3 gap-y-0.5", compact ? "text-[11px]" : "text-xs")}>
       {SEATS.map((s) => {

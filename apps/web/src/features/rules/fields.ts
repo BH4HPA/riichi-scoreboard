@@ -49,7 +49,8 @@ export const RULE_GROUPS: RuleGroup[] = [
       {
         path: "scoring.honbaValue",
         label: "本场点数",
-        control: { type: "number", min: 0, max: 3000, step: 100 },
+        hint: "300 的倍数，自摸时三家均摊",
+        control: { type: "number", min: 0, max: 3000, step: 300 },
       },
       {
         path: "scoring.notenBappu",

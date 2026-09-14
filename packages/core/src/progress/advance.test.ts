@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MLEAGUE_RULES } from "../rules/mleague";
-import type { GameState } from "../types/state";
+import { dealerOf, type GameState } from "../types/state";
 import { DomainError, advance } from "./advance";
 
 const R = MLEAGUE_RULES;
@@ -8,11 +8,11 @@ const R = MLEAGUE_RULES;
 function game(partial: Partial<GameState> = {}): GameState {
   return {
     status: "playing",
+    players: [],
     points: [25000, 25000, 25000, 25000],
     kyotaku: 0,
     honba: 0,
     kyoku: 0,
-    dealer: 0,
     history: [],
     tobi: null,
     startedAt: 0,
@@ -25,34 +25,32 @@ function game(partial: Partial<GameState> = {}): GameState {
 describe("advance", () => {
   it("闲家和：轮庄、本场清零", () => {
     const g = advance(game({ honba: 2 }), { kind: "win", dealerWon: false }, R);
-    expect([g.kyoku, g.honba, g.dealer, g.status]).toEqual([1, 0, 1, "playing"]);
+    expect([g.kyoku, g.honba, dealerOf(g.kyoku), g.status]).toEqual([1, 0, 1, "playing"]);
   });
   it("庄家和：连庄、本场 +1", () => {
     const g = advance(game({ honba: 2 }), { kind: "win", dealerWon: true }, R);
-    expect([g.kyoku, g.honba, g.dealer]).toEqual([0, 3, 0]);
+    expect([g.kyoku, g.honba, dealerOf(g.kyoku)]).toEqual([0, 3, 0]);
   });
   it("流局：本场 +1，庄家听牌连庄 / 不听轮庄", () => {
     expect(advance(game(), { kind: "draw", dealerTenpai: true }, R).honba).toBe(1);
     const g = advance(game(), { kind: "draw", dealerTenpai: false }, R);
-    expect([g.kyoku, g.honba, g.dealer]).toEqual([1, 1, 1]);
+    expect([g.kyoku, g.honba, dealerOf(g.kyoku)]).toEqual([1, 1, 1]);
   });
   it("途中流局：连庄本场 +1；错和：不变", () => {
     expect(advance(game(), { kind: "abortive" }, R).honba).toBe(1);
     expect(advance(game({ honba: 3 }), { kind: "chombo" }, R).honba).toBe(3);
   });
   it("南4 闲家和 → 终局；庄家和 → 继续", () => {
-    expect(
-      advance(game({ kyoku: 7, dealer: 3 }), { kind: "win", dealerWon: false }, R).status,
-    ).toBe("finished");
-    expect(advance(game({ kyoku: 7, dealer: 3 }), { kind: "win", dealerWon: true }, R).status).toBe(
-      "playing",
+    expect(advance(game({ kyoku: 7 }), { kind: "win", dealerWon: false }, R).status).toBe(
+      "finished",
     );
+    expect(advance(game({ kyoku: 7 }), { kind: "win", dealerWon: true }, R).status).toBe("playing");
   });
   it("东风战在东4 结束", () => {
     const east = { ...R, progress: { ...R.progress, length: "east" as const } };
-    expect(
-      advance(game({ kyoku: 3, dealer: 3 }), { kind: "draw", dealerTenpai: false }, east).status,
-    ).toBe("finished");
+    expect(advance(game({ kyoku: 3 }), { kind: "draw", dealerTenpai: false }, east).status).toBe(
+      "finished",
+    );
   });
 
   describe("击飞", () => {
@@ -103,15 +101,15 @@ describe("advance", () => {
     };
     it("南4 结束无人 30000 → 西1", () => {
       const g = advance(
-        game({ kyoku: 7, dealer: 3, points: [29000, 27000, 24000, 20000] }),
+        game({ kyoku: 7, points: [29000, 27000, 24000, 20000] }),
         { kind: "win", dealerWon: false },
         ench,
       );
-      expect([g.status, g.kyoku, g.dealer]).toEqual(["playing", 8, 0]);
+      expect([g.status, g.kyoku, dealerOf(g.kyoku)]).toEqual(["playing", 8, 0]);
     });
     it("南4 结束有人 30000 → 终局", () => {
       const g = advance(
-        game({ kyoku: 7, dealer: 3, points: [30000, 27000, 24000, 19000] }),
+        game({ kyoku: 7, points: [30000, 27000, 24000, 19000] }),
         { kind: "win", dealerWon: false },
         ench,
       );
@@ -119,7 +117,7 @@ describe("advance", () => {
     });
     it("西场中任一局结束有人 30000 → 终局（含连庄）", () => {
       const g = advance(
-        game({ kyoku: 8, dealer: 0, points: [31000, 27000, 24000, 18000] }),
+        game({ kyoku: 8, points: [31000, 27000, 24000, 18000] }),
         { kind: "win", dealerWon: true },
         ench,
       );
@@ -127,7 +125,7 @@ describe("advance", () => {
     });
     it("西4 仍无人达标 → 终局", () => {
       const g = advance(
-        game({ kyoku: 11, dealer: 3, points: [29000, 27000, 24000, 20000] }),
+        game({ kyoku: 11, points: [29000, 27000, 24000, 20000] }),
         { kind: "draw", dealerTenpai: false },
         ench,
       );
@@ -139,7 +137,7 @@ describe("advance", () => {
     const yame = { ...R, progress: { ...R.progress, agariYame: true, tenpaiYame: true } };
     it("最终局庄家和且唯一一位可结束", () => {
       const g = advance(
-        game({ kyoku: 7, dealer: 3, points: [20000, 25000, 25000, 30000] }),
+        game({ kyoku: 7, points: [20000, 25000, 25000, 30000] }),
         { kind: "win", dealerWon: true },
         yame,
         true,
@@ -149,7 +147,7 @@ describe("advance", () => {
     it("非一位不可结束", () => {
       expect(() =>
         advance(
-          game({ kyoku: 7, dealer: 3, points: [40000, 20000, 20000, 20000] }),
+          game({ kyoku: 7, points: [40000, 20000, 20000, 20000] }),
           { kind: "win", dealerWon: true },
           yame,
           true,
@@ -159,7 +157,7 @@ describe("advance", () => {
     it("M-League 不允许", () => {
       expect(() =>
         advance(
-          game({ kyoku: 7, dealer: 3, points: [20000, 25000, 25000, 30000] }),
+          game({ kyoku: 7, points: [20000, 25000, 25000, 30000] }),
           { kind: "win", dealerWon: true },
           R,
           true,
@@ -168,7 +166,7 @@ describe("advance", () => {
     });
     it("听牌止", () => {
       const g = advance(
-        game({ kyoku: 7, dealer: 3, points: [20000, 25000, 25000, 30000] }),
+        game({ kyoku: 7, points: [20000, 25000, 25000, 30000] }),
         { kind: "draw", dealerTenpai: true },
         yame,
         true,

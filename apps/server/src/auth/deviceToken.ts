@@ -3,7 +3,7 @@ import type { PlayerRow, PlayersRepo } from "../db/players";
 
 export type AuthEnv = { Variables: { player: PlayerRow } };
 
-export function bearerToken(c: Context): string | null {
+function bearerToken(c: Context): string | null {
   const header = c.req.header("authorization");
   if (!header?.startsWith("Bearer ")) return null;
   return header.slice(7).trim() || null;

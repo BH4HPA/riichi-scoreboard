@@ -5,16 +5,21 @@ import { Hono } from "hono";
 import type { ClientMessage, RoomView, ServerMessage, UiState } from "@riichi/core";
 import { createApp } from "../app";
 import { loadConfig } from "../config";
+import { PlayersRepo } from "../db/players";
+import { ResultsRepo } from "../db/results";
+import { RoomsRepo } from "../db/rooms";
+import { RoomRegistry } from "./registry";
 
 let server: ServerType;
 let wsUrl = "";
 let app: Hono;
+let ctx: ReturnType<typeof createApp>;
 
 beforeAll(async () => {
   const config = { ...loadConfig({}), corsOrigins: [], webDist: "/nonexistent" };
   const shell = new Hono();
   const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app: shell });
-  const ctx = createApp({ config, dbFile: ":memory:", upgradeWebSocket });
+  ctx = createApp({ config, dbFile: ":memory:", upgradeWebSocket, quiet: true });
   shell.route("/", ctx.app);
   app = shell;
   await new Promise<void>((resolve) => {
@@ -158,11 +163,7 @@ describe("rooms end-to-end", () => {
         type: "command",
         id: `sit${i}`,
         baseSeq: seq,
-        command: {
-          type: "sit",
-          seat: i as 0 | 1 | 2 | 3,
-          player: { id: players[i]!.id, name: `玩家${i}`, avatar: null },
-        },
+        command: { type: "sit", seat: i as 0 | 1 | 2 | 3 },
       });
       seq = (await phones[i]!.until("ack")).seq;
       phones[i]!.send({
@@ -173,6 +174,30 @@ describe("rooms end-to-end", () => {
       });
       seq = (await phones[i]!.until("ack")).seq;
     }
+    // 入座信息由服务端按 token 填充
+    const seated = await tv.waitState((r) => r.seats.every((p) => p !== null));
+    expect(seated.seats.map((p) => p?.name)).toEqual(["东", "南", "西", "北"]);
+    // 只能操作自己的座位
+    phones[0]!.send({
+      type: "command",
+      id: "steal",
+      baseSeq: seq,
+      command: { type: "setReady", seat: 1, ready: false },
+    });
+    expect(await phones[0]!.outcome()).toMatchObject({ type: "error", code: "forbidden" });
+    // 畸形命令被拒绝，房间不受影响
+    phones[0]!.send({
+      type: "command",
+      id: "bad",
+      baseSeq: seq,
+      command: { type: "leave", seat: 9 } as never,
+    });
+    expect(await phones[0]!.outcome()).toMatchObject({ type: "error", code: "bad_command" });
+    // 未认证的 WebSocket 被拒绝
+    const anon = new Client(room.code, "not-a-token");
+    await anon.open();
+    expect(await anon.until("error")).toMatchObject({ code: "unauthorized" });
+
     tv.send({
       type: "command",
       id: "start",
@@ -294,13 +319,41 @@ describe("rooms end-to-end", () => {
     phones[3]!.close();
     await tv.waitUi((u) => u.length === 0);
 
-    // 重启等价：新注册表从事件流回放得到相同视图
-    const fresh = createApp({
-      config: { ...loadConfig({}), webDist: "/nonexistent" },
-      dbFile: ":memory:",
+    // 终局 → 战绩落库；返回大厅不删战绩
+    const cur = await tv.waitState(() => true);
+    tv.send({ type: "command", id: "end", baseSeq: cur.seq, command: { type: "endGame" } });
+    const endAck = await tv.outcome();
+    expect(endAck).toMatchObject({ type: "ack" });
+    const statsOf = async (token: string) =>
+      (
+        (await (
+          await app.request("/api/me/stats", { headers: { Authorization: `Bearer ${token}` } })
+        ).json()) as {
+          stats: { games: number; recent: Array<{ roomCode: string; rank: number }> };
+        }
+      ).stats;
+    let stats = await statsOf(players[0]!.token);
+    expect(stats.games).toBe(1);
+    expect(stats.recent[0]).toMatchObject({ roomCode: room.code });
+    tv.send({
+      type: "command",
+      id: "lobby",
+      baseSeq: (endAck as { seq: number }).seq,
+      command: { type: "toLobby" },
     });
-    expect(fresh.registry).toBeDefined();
-    fresh.db.close();
+    expect(await tv.outcome()).toMatchObject({ type: "ack" });
+    stats = await statsOf(players[0]!.token);
+    expect(stats.games).toBe(1);
+
+    // 重启等价：从数据库重新回放得到的房间状态与在线注册表一致
+    const online = ctx.registry.get(room.code);
+    const rebuilt = new RoomRegistry(
+      new RoomsRepo(ctx.db),
+      new ResultsRepo(ctx.db),
+      new PlayersRepo(ctx.db),
+    ).get(room.code);
+    expect(rebuilt.seq).toBe(online.seq);
+    expect(rebuilt.state).toEqual(online.state);
 
     tv.close();
     phones.slice(0, 3).forEach((p) => p.close());

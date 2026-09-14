@@ -1,12 +1,13 @@
 import {
   calcBasePoints,
-  drawPayment,
+  dealerOf,
+  describeValue,
+  drawDeltas,
   ronPayment,
   scoreTier,
   sticksCollector,
   tsumoPayment,
-  describeValue,
-  type DrawPayment,
+  type DrawResult,
   type GameState,
   type HandValue,
   type RoomRules,
@@ -21,6 +22,16 @@ export interface WinPreview {
   baseIncome: number;
 }
 
+function baseIncome(payment: WinPayment, winner: Seat, riichi: Seat[], collects: boolean): number {
+  return (
+    payment.deltas[winner]! -
+    payment.honbaIncome -
+    payment.kyotakuIncome -
+    payment.riichiIncome +
+    (collects && riichi.includes(winner) ? 1000 : 0)
+  );
+}
+
 export function previewTsumo(
   game: GameState,
   rules: RoomRules,
@@ -33,7 +44,7 @@ export function previewTsumo(
   const payment = tsumoPayment(
     {
       winner,
-      dealer: game.dealer,
+      dealer: dealerOf(game.kyoku),
       base,
       honba: game.honba,
       kyotaku: game.kyotaku,
@@ -45,12 +56,7 @@ export function previewTsumo(
   return {
     payment,
     valueText: describeValue(value, scoreTier(value, rules)),
-    baseIncome:
-      payment.deltas[winner]! -
-      payment.honbaIncome -
-      payment.kyotakuIncome -
-      payment.riichiIncome +
-      (riichi.includes(winner) ? 1000 : 0),
+    baseIncome: baseIncome(payment, winner, riichi, true),
   };
 }
 
@@ -73,13 +79,12 @@ export function previewRon(
   );
   const deltas = [0, 0, 0, 0];
   const previews = wins.map((w) => {
-    const base = calcBasePoints(w.value, rules);
     const payment = ronPayment(
       {
         winner: w.winner,
         loser,
-        dealer: game.dealer,
-        base,
+        dealer: dealerOf(game.kyoku),
+        base: calcBasePoints(w.value, rules),
         honba: game.honba,
         kyotaku: game.kyotaku,
         riichi,
@@ -92,17 +97,18 @@ export function previewRon(
     return {
       payment,
       valueText: describeValue(w.value, scoreTier(w.value, rules)),
-      baseIncome:
-        payment.deltas[w.winner]! -
-        payment.honbaIncome -
-        payment.kyotakuIncome -
-        payment.riichiIncome +
-        (riichi.includes(w.winner) && w.winner === collector ? 1000 : 0),
+      baseIncome: baseIncome(payment, w.winner, riichi, w.winner === collector),
     };
   });
   return { deltas, wins: previews };
 }
 
-export function previewDraw(rules: RoomRules, tenpai: boolean[], riichi: Seat[]): DrawPayment {
-  return drawPayment(tenpai, riichi, rules);
+export function previewDraw(
+  game: GameState,
+  rules: RoomRules,
+  tenpai: boolean[],
+  riichi: Seat[],
+  nagashi: Seat[],
+): DrawResult {
+  return drawDeltas(tenpai, riichi, nagashi, dealerOf(game.kyoku), game.honba, rules);
 }

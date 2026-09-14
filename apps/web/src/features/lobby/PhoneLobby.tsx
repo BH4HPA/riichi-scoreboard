@@ -1,6 +1,5 @@
 import { useState } from "react";
 import type { RoomView, Seat } from "@riichi/core";
-import { useSession } from "@/api/session";
 import { Button } from "@/ui/button";
 import { Dialog, DialogContent, DialogFooter } from "@/ui/dialog";
 import { useCommand } from "@/ws/useRoom";
@@ -11,17 +10,11 @@ import { SeatCards } from "./SeatCards";
 
 export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | null }) {
   const send = useCommand();
-  const player = useSession((s) => s.player);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [draft, setDraft] = useState(room.rules);
   useMirror(rulesOpen, { kind: "rules" }, true);
   const ready = mySeat !== null && room.ready[mySeat] === true;
   const full = room.seats.every((s) => s !== null);
-
-  const sit = (seat: Seat) => {
-    if (!player) return;
-    void send({ type: "sit", seat, player });
-  };
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-4 py-5">
@@ -43,18 +36,19 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
       </div>
 
       <div className="rounded-xl border border-border bg-surface p-3">
-        <ProfileEditor
-          onNameChange={(name) =>
-            mySeat !== null && send({ type: "setPlayerName", seat: mySeat, name })
-          }
-        />
+        <ProfileEditor />
       </div>
 
       <div>
         <h2 className="mb-2 text-sm font-medium text-muted">
           {mySeat === null ? "选择座位" : "座位"}
         </h2>
-        <SeatCards seats={room.seats} ready={room.ready} mySeat={mySeat} onPick={sit} />
+        <SeatCards
+          seats={room.seats}
+          ready={room.ready}
+          mySeat={mySeat}
+          onPick={(seat) => send({ type: "sit", seat })}
+        />
       </div>
 
       <div className="rounded-xl border border-border bg-surface p-3">

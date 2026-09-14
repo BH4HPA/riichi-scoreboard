@@ -2,19 +2,13 @@ import {
   formatPoints,
   formatScore,
   standings,
+  umaDescription,
   type GameState,
   type PlayerRef,
   type RoomRules,
 } from "@riichi/core";
 import { Avatar } from "@/ui/avatar";
 import { cn, formatDateTime } from "@/lib/utils";
-
-export function umaDescription(rules: RoomRules): string {
-  const [a, b, c, d] = rules.final.uma;
-  const oka = ((rules.final.returnPoints - rules.final.startPoints) * 4) / 1000;
-  const sign = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
-  return `${rules.final.startPoints / 1000}000 起 / ${rules.final.returnPoints / 1000}000 返，顺位马 ${sign(a)}/${sign(b)}/${sign(c)}/${sign(d)}${oka ? `，oka ${sign(oka)} 归一位` : ""}${rules.final.tieRule === "split" ? "，同点按分" : "，同点起家优先"}`;
-}
 
 export function FinalPanel({
   game,
@@ -32,6 +26,7 @@ export function FinalPanel({
   const final = game.final;
   if (!final) return null;
   const order = standings(final.points);
+  const finishedAt = game.finishedAt ?? game.startedAt;
   return (
     <div>
       <p className="text-xs text-muted">{umaDescription(rules)}</p>
@@ -84,15 +79,8 @@ export function FinalPanel({
         </tbody>
       </table>
       <div className="mt-2 flex flex-wrap gap-x-4 text-xs text-muted">
-        <span>
-          持续时间：
-          {Math.max(
-            0,
-            Math.floor(((game.finishedAt ?? game.startedAt) - game.startedAt) / 60000),
-          )}{" "}
-          分钟
-        </span>
-        {game.finishedAt && <span>结束时间：{formatDateTime(game.finishedAt)}</span>}
+        <span>持续时间：{Math.max(0, Math.floor((finishedAt - game.startedAt) / 60000))} 分钟</span>
+        <span>结束时间：{formatDateTime(finishedAt)}</span>
         {game.tobi && <span>击飞：{names[game.tobi.seat]}</span>}
       </div>
     </div>

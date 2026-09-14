@@ -32,10 +32,11 @@ function useConsoleRoom() {
       token,
     });
     localStorage.setItem(ROOM_KEY, room.code);
-    setCode(room.code);
+    return room.code;
   }, [ensure]);
 
   useEffect(() => {
+    let active = true;
     (async () => {
       try {
         const { token } = await ensure();
@@ -43,24 +44,37 @@ function useConsoleRoom() {
         if (saved) {
           try {
             await api(`/api/rooms/${saved}`, { token });
-            setCode(saved);
+            if (active) setCode(saved);
             return;
           } catch (err) {
             if (!(err instanceof ApiError && err.status === 404)) throw err;
           }
         }
-        await create();
+        if (!active) return;
+        const fresh = await create();
+        if (active) setCode(fresh);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "无法连接服务器");
+        if (active) setError(err instanceof Error ? err.message : "无法连接服务器");
       }
     })();
+    return () => {
+      active = false;
+    };
   }, [ensure, create]);
 
-  return { code, error, create };
+  const newRoom = useCallback(async () => {
+    try {
+      setCode(await create());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "无法创建房间");
+    }
+  }, [create]);
+
+  return { code, error, newRoom };
 }
 
 export function Console() {
-  const { code, error, create } = useConsoleRoom();
+  const { code, error, newRoom } = useConsoleRoom();
   const socket = useRoomConnection(code);
   const room = useRoomStore((s) => s.room);
   const intents = useRoomStore((s) => s.intents);
@@ -89,7 +103,7 @@ export function Console() {
     <SocketContext.Provider value={socket}>
       <div className="min-h-dvh bg-bg text-fg">
         {room.phase === "lobby" || !game ? (
-          <ConsoleLobby room={room} onNewRoom={create} />
+          <ConsoleLobby room={room} onNewRoom={newRoom} />
         ) : (
           <div className="flex min-h-dvh flex-col gap-4 p-6">
             <header className="flex items-center gap-4">

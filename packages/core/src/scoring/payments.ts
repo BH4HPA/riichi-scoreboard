@@ -164,6 +164,28 @@ export function nagashiPayment(
   return deltas;
 }
 
+export interface DrawResult extends DrawPayment {
+  nagashi: Seat[];
+}
+
+/** 一次流局的完整点数变动：流局满贯成立时替代不听罚符，立直棒仍进场供。 */
+export function drawDeltas(
+  tenpaiFlags: readonly boolean[],
+  riichi: readonly Seat[],
+  nagashi: readonly Seat[],
+  dealer: Seat,
+  honba: number,
+  rules: RoomRules,
+): DrawResult {
+  const draw = drawPayment(tenpaiFlags, riichi, rules);
+  if (nagashi.length === 0) return { ...draw, nagashi: [] };
+  const deltas = emptyDeltas();
+  applyRiichi(deltas, riichi);
+  const extra = nagashiPayment(nagashi, dealer, honba, rules);
+  for (const s of SEATS) deltas[s]! += extra[s]!;
+  return { ...draw, deltas, nagashi: [...nagashi] };
+}
+
 /** 错和满贯罚符：庄家 4000 all，闲家 2000/4000。 */
 export function chomboPayment(offender: Seat, dealer: Seat): number[] {
   const deltas = emptyDeltas();

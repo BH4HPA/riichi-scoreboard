@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { defaultRules, validateRules, RulesError } from "@riichi/core";
 import { requirePlayer, type AuthEnv } from "../../auth/deviceToken";
 import type { PlayersRepo } from "../../db/players";
@@ -9,12 +10,12 @@ interface Deps {
   players: PlayersRepo;
 }
 
-export function roomRoutes(deps: Deps): Hono {
+export function roomRoutes(deps: Deps): Hono<AuthEnv> {
   const app = new Hono<AuthEnv>();
   app.use("*", requirePlayer(deps.players));
 
   /** 主控台建房；可带初始规则。 */
-  app.post("/", async (c) => {
+  app.post("/", bodyLimit({ maxSize: 16 * 1024 }), async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { rules?: unknown };
     let rules = defaultRules();
     if (body.rules !== undefined) {
@@ -42,5 +43,5 @@ export function roomRoutes(deps: Deps): Hono {
     }
   });
 
-  return app as unknown as Hono;
+  return app;
 }

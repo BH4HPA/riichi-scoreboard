@@ -18,7 +18,7 @@ yarn e2e        # Playwright 端到端冒烟
 docker compose up -d --build   # 单容器，:8787，数据卷 /data（SQLite + 头像）
 ```
 
-前端与后端同源部署时无需配置；前端单独托管到 COS 时，构建前设置 `VITE_API_BASE_URL`，并在服务端设置 `CORS_ORIGINS`。
+前端与后端同源部署时无需配置；前端单独托管到 COS 时，构建前设置 `VITE_API_BASE_URL`，在服务端设置 `CORS_ORIGINS`，并把 COS 静态站点的 404 回退到 `index.html`（`/console`、`/r/:code` 是前端路由）。
 
 ## 结构
 
