@@ -1,3 +1,3 @@
-import { CORE_VERSION } from "@riichi/core";
+import { MLEAGUE_PRESET } from "@riichi/core";
 
-console.log(`riichi server bootstrap, core ${CORE_VERSION}`);
+console.log(`riichi server bootstrap, default preset ${MLEAGUE_PRESET.name}`);

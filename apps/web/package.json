@@ -7,7 +7,7 @@
     "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "yarn run -T tsc -p tsconfig.json"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.23",

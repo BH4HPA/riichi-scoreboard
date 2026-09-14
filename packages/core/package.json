@@ -10,7 +10,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json",
-    "test": "vitest run"
+    "typecheck": "yarn run -T tsc -p tsconfig.json",
+    "test": "yarn run -T vitest run"
   }
 }
