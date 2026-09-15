@@ -32,6 +32,8 @@ export interface CreateAppOptions {
   config: ServerConfig;
   dbFile?: string;
   upgradeWebSocket?: UpgradeWebSocket;
+  /** 测试用：缩短 WebSocket 空闲断开与自动开局倒计时 */
+  timings?: { wsIdleMs?: number; autoStartMs?: number };
   /** 测试时关闭请求日志 */
   quiet?: boolean;
 }
@@ -67,6 +69,7 @@ export function createApp({
   config,
   dbFile,
   upgradeWebSocket,
+  timings,
   quiet = false,
 }: CreateAppOptions): AppContext {
   const db = openDatabase(dbFile ?? path.join(config.dataDir, "riichi.sqlite"));
@@ -74,7 +77,7 @@ export function createApp({
   const rooms = new RoomsRepo(db);
   const results = new ResultsRepo(db);
   const presets = new PresetsRepo(db);
-  const registry = new RoomRegistry(rooms, results, players);
+  const registry = new RoomRegistry(rooms, results, players, Date.now, timings?.autoStartMs);
   const local = config.cos ? null : new LocalStore(path.join(config.dataDir, "objects"));
   const store: ObjectStore = config.cos ? new CosStore(config.cos) : local!;
 
@@ -109,7 +112,7 @@ export function createApp({
   });
 
   if (upgradeWebSocket) {
-    mountWebSocket(app, upgradeWebSocket, { registry, players });
+    mountWebSocket(app, upgradeWebSocket, { registry, players, idleMs: timings?.wsIdleMs });
   }
   // 拆分托管（前端在别的域名）时不托管静态产物；CORS 白名单第一项就是前端站点，误入者 302 过去
   mountStatic(app, { webDist: config.webDist, redirectTo: config.corsOrigins[0] ?? null });

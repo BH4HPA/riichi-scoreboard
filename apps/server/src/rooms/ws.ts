@@ -7,6 +7,7 @@ import {
   kyokuWind,
   validateHandShape,
   WS_CLOSE,
+  WS_KEEPALIVE,
   type ClientMessage,
   type ServerMessage,
 } from "@riichi/core";
@@ -23,6 +24,8 @@ import {
 interface Deps {
   registry: RoomRegistry;
   players: PlayersRepo;
+  /** 多久没收到客户端消息就断开（默认见 WS_KEEPALIVE）；测试可缩短 */
+  idleMs?: number | undefined;
 }
 
 /** 单条消息上限：一手牌面 + 元数据远小于此。 */
@@ -52,6 +55,18 @@ export function mountWebSocket(app: Hono, upgradeWebSocket: UpgradeWebSocket, de
       const clientId = randomBytes(6).toString("hex");
       let room: LiveRoom | null = null;
       let client: RoomClient | null = null;
+      // 空闲看门狗：手机被系统杀掉/断网时不会发 close 帧，靠它把"在线"状态收回
+      const idleMs = deps.idleMs ?? WS_KEEPALIVE.serverIdleMs;
+      let idle: ReturnType<typeof setTimeout> | null = null;
+      const touch = (ws: WSContext) => {
+        if (idle) clearTimeout(idle);
+        idle = setTimeout(() => ws.close(WS_CLOSE.idle, "idle"), idleMs);
+        idle.unref?.();
+      };
+      const untouch = () => {
+        if (idle) clearTimeout(idle);
+        idle = null;
+      };
 
       const send = (ws: WSContext, message: ServerMessage) => ws.send(JSON.stringify(message));
       const fail = (ws: WSContext, id: string | null, err: unknown) => {
@@ -90,6 +105,7 @@ export function mountWebSocket(app: Hono, upgradeWebSocket: UpgradeWebSocket, de
             close: (c, r) => ws.close(c, r),
           };
           send(ws, { type: "welcome", playerId: player.id });
+          touch(ws);
           try {
             deps.registry.join(room, client);
           } catch (err) {
@@ -98,6 +114,7 @@ export function mountWebSocket(app: Hono, upgradeWebSocket: UpgradeWebSocket, de
         },
         onMessage(evt, ws) {
           if (!room || !client) return;
+          touch(ws);
           const msg = parse(evt.data);
           if (!msg) {
             send(ws, {
@@ -166,10 +183,12 @@ export function mountWebSocket(app: Hono, upgradeWebSocket: UpgradeWebSocket, de
           }
         },
         onClose() {
+          untouch();
           if (room) deps.registry.leave(room, clientId);
         },
         onError(err) {
           console.error(`[ws] room=${code} client=${clientId} socket error`, err);
+          untouch();
           if (room) deps.registry.leave(room, clientId);
         },
       };

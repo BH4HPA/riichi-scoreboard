@@ -3,8 +3,25 @@ import { assertSeat, validateHandShape } from "./reducer/validateCommand";
 import { YAKU_PAGES } from "./reference/yakuTable";
 import type { ClientCommand } from "./types/commands";
 import type { RoomRules } from "./types/rules";
-import type { EvaluatedHand, GameState, HandInput, PlayerRef, RoomState } from "./types/state";
+import {
+  isLocalPlayer,
+  type EvaluatedHand,
+  type GameState,
+  type HandInput,
+  type PlayerRef,
+  type RoomState,
+} from "./types/state";
 import type { Seat } from "./types/tiles";
+
+/**
+ * WebSocket 保活节奏。线上经腾讯云 CDN 回源，CDN 对约 10 s 无数据的连接会静默回收且不通知两端：
+ * 客户端每 pingMs 发一次 ping，staleMs 内没收到任何服务端消息就主动重连；
+ * 服务端 serverIdleMs 内没收到任何客户端消息就断开（手机被系统杀掉时不会发 close 帧）。
+ */
+export const WS_KEEPALIVE = { pingMs: 5_000, staleMs: 8_000, serverIdleMs: 20_000 } as const;
+
+/** 全员准备且在线后自动开局的倒计时 */
+export const AUTO_START_MS = 3_000;
 
 /** 广播给客户端的房间视图：不含撤销栈本体，只含深度。 */
 export interface GameView {
@@ -20,11 +37,36 @@ export interface RoomView {
   rules: RoomRules;
   seats: (PlayerRef | null)[];
   ready: boolean[];
+  /** 各座位是否在线：空座 false，本地玩家恒为 true，设备玩家看是否有活动连接 */
+  online: boolean[];
+  /** 自动开局的时刻（epoch ms）；null 表示未在倒计时 */
+  autoStartAt: number | null;
   game: GameView | null;
   gameNo: number;
 }
 
-export function toRoomView(state: RoomState, seq: number): RoomView {
+/** 各座位在线状态（见 RoomView.online）。 */
+export function seatsOnline(state: RoomState, onlinePlayerIds: ReadonlySet<string>): boolean[] {
+  return state.seats.map((p) => p !== null && (isLocalPlayer(p) || onlinePlayerIds.has(p.id)));
+}
+
+/**
+ * 是否满足自动开局：大厅、满座、全员已准备、设备玩家全部在线，且至少有一名设备玩家
+ * （全是本地玩家时由主控台手动开局）。
+ */
+export function autoStartEligible(state: RoomState, online: boolean[]): boolean {
+  if (state.phase !== "lobby") return false;
+  if (state.seats.some((p) => p === null)) return false;
+  if (state.ready.some((r) => !r) || online.some((o) => !o)) return false;
+  return state.seats.some((p) => p !== null && !isLocalPlayer(p));
+}
+
+export function toRoomView(
+  state: RoomState,
+  seq: number,
+  onlinePlayerIds: ReadonlySet<string>,
+  autoStartAt: number | null,
+): RoomView {
   return {
     code: state.code,
     seq,
@@ -32,6 +74,8 @@ export function toRoomView(state: RoomState, seq: number): RoomView {
     rules: state.rules,
     seats: state.seats,
     ready: state.ready,
+    online: seatsOnline(state, onlinePlayerIds),
+    autoStartAt,
     game: state.game
       ? {
           present: state.game.present,
@@ -81,6 +125,8 @@ export const WS_CLOSE = {
   unauthorized: 4001,
   notFound: 4004,
   dissolved: 4010,
+  /** 服务端空闲超时断开；客户端应重连 */
+  idle: 4008,
 } as const;
 
 const SETTLEMENT_MODES = ["tsumo", "ron", "draw", "abortive", "chombo"] as const;

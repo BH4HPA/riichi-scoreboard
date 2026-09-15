@@ -1,7 +1,9 @@
 import { randomInt } from "node:crypto";
 import {
+  AUTO_START_MS,
   DomainError,
   RulesError,
+  autoStartEligible,
   createRoom,
   dealerOf,
   isLocalPlayer,
@@ -9,6 +11,7 @@ import {
   reduceRoom,
   replay,
   seatOfPlayer,
+  seatsOnline,
   toRoomView,
   validateCommand,
   validateUiIntent,
@@ -50,6 +53,8 @@ export interface LiveRoom {
   clients: Map<string, RoomClient>;
   ui: Map<string, UiState>;
   lastActivity: number;
+  /** 自动开局倒计时；null = 未在倒计时 */
+  autoStart: { at: number; timer: ReturnType<typeof setTimeout> } | null;
 }
 
 export class RoomNotFound extends Error {
@@ -85,6 +90,8 @@ export class RoomRegistry {
     private readonly resultsRepo: ResultsRepo,
     private readonly players: PlayersRepo,
     private readonly now: () => number = Date.now,
+    /** 自动开局倒计时；测试可缩短 */
+    private readonly autoStartMs: number = AUTO_START_MS,
   ) {}
 
   createRoom(rules: RoomRules): LiveRoom {
@@ -101,6 +108,7 @@ export class RoomRegistry {
       clients: new Map(),
       ui: new Map(),
       lastActivity: at,
+      autoStart: null,
     };
     this.rooms.set(code, live);
     return live;
@@ -126,20 +134,51 @@ export class RoomRegistry {
       clients: new Map(),
       ui: new Map(),
       lastActivity: row.updated_at,
+      autoStart: null,
     };
     this.rooms.set(code, live);
     return live;
   }
 
+  /** 房间里有活动连接的玩家 id */
+  private onlineIds(room: LiveRoom): Set<string> {
+    return new Set([...room.clients.values()].map((c) => c.playerId));
+  }
+
   view(room: LiveRoom): RoomView {
-    return toRoomView(room.state, room.seq);
+    return toRoomView(room.state, room.seq, this.onlineIds(room), room.autoStart?.at ?? null);
   }
 
   /** 校验 baseSeq → 形状校验 → 按 actor 补全/鉴权 → reduce → 事务落库 → 广播。 */
   apply(room: LiveRoom, baseSeq: number, rawCommand: unknown, actor: EventActor): RoomEvent {
     if (baseSeq !== room.seq) throw new StaleCommand();
-    const command = this.enrich(room.state, validateCommand(rawCommand), actor);
+    const command = this.enrich(room, validateCommand(rawCommand), actor);
     return this.commit(room, command, actor);
+  }
+
+  /**
+   * 自动开局：条件成立且未在倒计时 → 起 3 s 计时；条件不成立 → 取消。
+   * 每次状态或连接变化后调用；到点时再校验一次，条件变了就不开。
+   */
+  private reconcileAutoStart(room: LiveRoom): void {
+    const eligible = autoStartEligible(room.state, seatsOnline(room.state, this.onlineIds(room)));
+    if (!eligible) {
+      if (room.autoStart) clearTimeout(room.autoStart.timer);
+      room.autoStart = null;
+      return;
+    }
+    if (room.autoStart) return;
+    const timer = setTimeout(() => {
+      room.autoStart = null;
+      if (this.rooms.get(room.code) !== room) return;
+      if (!autoStartEligible(room.state, seatsOnline(room.state, this.onlineIds(room)))) {
+        this.broadcastState(room);
+        return;
+      }
+      this.commit(room, { type: "start", force: false }, SYSTEM_ACTOR);
+    }, this.autoStartMs);
+    timer.unref?.();
+    room.autoStart = { at: this.now() + this.autoStartMs, timer };
   }
 
   private commit(room: LiveRoom, command: Command, actor: EventActor): RoomEvent {
@@ -153,6 +192,7 @@ export class RoomRegistry {
     room.state = next;
     room.seq = event.seq;
     room.lastActivity = event.at;
+    this.reconcileAutoStart(room);
     this.broadcastState(room);
     return event;
   }
@@ -162,6 +202,8 @@ export class RoomRegistry {
    * 否则发起者会先收到断开而拿不到 ack。
    */
   closeRoom(room: LiveRoom): void {
+    if (room.autoStart) clearTimeout(room.autoStart.timer);
+    room.autoStart = null;
     for (const c of room.clients.values()) c.close(WS_CLOSE.dissolved, "dissolved");
     room.clients.clear();
     room.ui.clear();
@@ -170,14 +212,17 @@ export class RoomRegistry {
 
   /**
    * 客户端命令 → 内部命令：入座按 token 填玩家；本地玩家由创建者带入且即已准备；
-   * 座位类命令只能操作自己的座位（本地玩家的座位人人可操作）；牌面交引擎评估。
+   * 座位类命令只能操作自己的座位（本地玩家的座位人人可操作；离线设备玩家的座位任何人可请离）；
+   * 牌面交引擎评估。
    */
-  private enrich(state: RoomState, cmd: ClientCommand, actor: EventActor): Command {
+  private enrich(room: LiveRoom, cmd: ClientCommand, actor: EventActor): Command {
+    const state = room.state;
     // 只看座位快照：本人或本地玩家可操作；不回查玩家表，删档案也不影响历史房间
-    const own = (seat: Seat, what: string) => {
+    const own = (seat: Seat, what: string, allowOffline = false) => {
       const occupant = state.seats[seat];
       if (!occupant) throw new DomainError("empty_seat", "座位为空");
       if (occupant.id === actor.playerId || isLocalPlayer(occupant)) return;
+      if (allowOffline && !this.onlineIds(room).has(occupant.id)) return;
       throw new DomainError("forbidden", `只能${what}自己的座位`);
     };
     switch (cmd.type) {
@@ -194,7 +239,7 @@ export class RoomRegistry {
         return { type: "sit", seat: cmd.seat, player: toPlayerRef(row), ready: true };
       }
       case "leave":
-        own(cmd.seat, "离开");
+        own(cmd.seat, "离开", true);
         return cmd;
       case "setReady":
         own(cmd.seat, "准备");
@@ -239,14 +284,18 @@ export class RoomRegistry {
     room.lastActivity = this.now();
     const row = this.players.byId(client.playerId);
     if (row) this.syncSeat(room, toPlayerRef(row));
-    client.send(JSON.stringify({ type: "state", room: this.view(room) }));
+    // 在线状态变了，所有人都要刷新座位卡
+    this.reconcileAutoStart(room);
+    this.broadcastState(room);
     client.send(JSON.stringify({ type: "ui", intents: this.uiList(room) }));
   }
 
   leave(room: LiveRoom, clientId: string): void {
-    room.clients.delete(clientId);
+    if (!room.clients.delete(clientId)) return;
     if (room.ui.delete(clientId)) this.broadcastUi(room);
     room.lastActivity = this.now();
+    this.reconcileAutoStart(room);
+    this.broadcastState(room);
   }
 
   setUi(room: LiveRoom, client: RoomClient, rawIntent: unknown): void {
@@ -285,6 +334,7 @@ export class RoomRegistry {
     let evicted = 0;
     for (const [code, room] of this.rooms) {
       if (room.clients.size === 0 && room.lastActivity < cutoff) {
+        if (room.autoStart) clearTimeout(room.autoStart.timer);
         this.rooms.delete(code);
         evicted += 1;
       }
