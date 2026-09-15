@@ -74,10 +74,10 @@ def hand_row(rng: random.Random, aspect: float) -> list[Tile]:
     else:
         tiles.append(Tile(rng.choice(FACES), x + 0.5, jitter(rng, 0.03), rot=jitter(rng, 3)))
         x += 1.0
-    # 副露：一半放在手牌行右侧（组间留空），一半放在手牌下方一行（用户实拍习惯）
-    below = n_melds > 0 and rng.random() < 0.5
-    y_meld = (1.1 + rng.uniform(0, 0.5)) * aspect if below else 0.0
-    if below:
+    # 副露：放手牌行右侧（组间留空）、下方一行或上方一行都行（靠横置牌与指示牌区分）
+    where = rng.choices(["right", "below", "above"], weights=[40, 35, 25])[0] if n_melds else "right"
+    y_meld = {"right": 0.0, "below": (1.1 + rng.uniform(0, 0.5)) * aspect, "above": -(1.1 + rng.uniform(0, 0.5)) * aspect}[where]
+    if where != "right":
         x = rng.uniform(0, 4)
     for _ in range(n_melds):
         x += rng.uniform(0.6, 1.6)  # 组间留空
@@ -92,7 +92,8 @@ def hand_row(rng: random.Random, aspect: float) -> list[Tile]:
                 base = rng.choice([f for f in FACES if f[1] != "z" and f[0] in "1234567"])
                 n = int(base[0])
                 group = [f"{n}{base[1]}", f"{n + 1}{base[1]}", f"{n + 2}{base[1]}"]
-        side_idx = rng.randrange(size) if rng.random() < 0.5 else -1
+        ankan = group[0] == "back"
+        side_idx = rng.randrange(size) if not ankan and rng.random() < 0.85 else -1  # 副露约定含一张横置（暗杠除外）
         for i, c in enumerate(group):
             side = i == side_idx and c != "back"
             w = aspect if side else 1.0
@@ -101,16 +102,17 @@ def hand_row(rng: random.Random, aspect: float) -> list[Tile]:
     return tiles
 
 
-def indicator_rows(rng: random.Random, aspect: float, hand_left: float) -> list[Tile]:
-    """手牌上方的指示牌：上行表宝牌、下行里宝。y 为负（向上），单位牌高。"""
+def indicator_rows(rng: random.Random, aspect: float, hand_left: float, above_used: bool) -> list[Tile]:
+    """手牌上方的指示牌：上行表宝牌、下行里宝。y 为负（向上），单位牌高。above_used = 上方那行已放了副露，再往上一行。"""
     tiles: list[Tile] = []
     if rng.random() > 0.8:
         return tiles
     n = rng.choices([1, 2, 3, 4, 5], weights=[55, 25, 12, 5, 3])[0]
     rows = 2 if rng.random() < 0.4 else 1
     x0 = hand_left + rng.uniform(0, 2.0)
+    lift = (1.2 + rng.uniform(0, 0.4)) * aspect if above_used else 0.0
     for r in range(rows):
-        y = -(1.15 + rng.uniform(0, 0.4)) * (rows - r) * aspect  # r=0 最上 = 表宝牌
+        y = -lift - (1.15 + rng.uniform(0, 0.4)) * (rows - r) * aspect  # r=0 最上 = 表宝牌
         x = x0
         for _ in range(n):
             cls = "back" if rng.random() < 0.12 else rng.choice(FACES)
@@ -152,7 +154,7 @@ def build_scene(rng: random.Random, aspect: float) -> list[Tile]:
     tiles = list(hand)
     left = min(t.x for t in hand) - 0.5
     right = max(t.x for t in hand) + 0.5
-    tiles += indicator_rows(rng, aspect, left)
+    tiles += indicator_rows(rng, aspect, left, above_used=any(t.y < -0.5 for t in hand))
     top = min(t.y for t in tiles) - 0.5 * aspect
     if rng.random() < 0.5:
         tiles += river(rng, aspect, left + rng.uniform(0, max(0.5, right - left - 6)), top - aspect * rng.uniform(1.5, 3.5))
