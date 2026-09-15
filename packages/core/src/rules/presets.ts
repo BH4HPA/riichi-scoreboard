@@ -1,5 +1,6 @@
 import type { RoomRules, RulesPreset } from "../types/rules";
 import { MLEAGUE_RULES } from "./mleague";
+import { RulesError, validateRules } from "./validate";
 
 /**
  * 内置预设。数值 2026-09 核实（来源：tenhou.net/man、saikouisen.com 競技規定 2024-12、
@@ -118,3 +119,33 @@ export const BUILTIN_PRESETS: readonly RulesPreset[] = [
     note: "无赤、切上满贯、无 oka；13 番按累计役满（32000）近似四倍满；人和满贯档模型没有，按无；错和走赛事罚分不在对局内。",
   },
 ];
+
+/**
+ * 规则的规范化键：经 validateRules 按固定字段顺序重建后序列化，与键序无关。
+ * 非法规则（编辑器里输入到一半的草稿）返回 null，不抛。
+ */
+export function rulesKey(rules: unknown): string | null {
+  try {
+    return JSON.stringify(validateRules(rules));
+  } catch (err) {
+    if (err instanceof RulesError) return null;
+    throw err;
+  }
+}
+
+const BUILTIN_KEYS = new Map(BUILTIN_PRESETS.map((p) => [p, rulesKey(p.rules)]));
+
+/** 规则与哪个预设完全相同（默认只查内置预设）；都不相同返回 null。 */
+export function findPreset(
+  rules: unknown,
+  presets: readonly RulesPreset[] = BUILTIN_PRESETS,
+): RulesPreset | null {
+  const key = rulesKey(rules);
+  if (key === null) return null;
+  return presets.find((p) => (BUILTIN_KEYS.get(p) ?? rulesKey(p.rules)) === key) ?? null;
+}
+
+/** 房间级展示用：内置预设名，否则「自定义」。 */
+export function presetNameOf(rules: RoomRules): string {
+  return findPreset(rules)?.name ?? "自定义";
+}

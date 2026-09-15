@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Save, Trash2 } from "lucide-react";
 import {
   BUILTIN_PRESETS,
+  findPreset,
   RulesError,
   rulesSummary,
   umaDescription,
@@ -83,14 +84,17 @@ export function RulesEditor({
   const { presets, loadPresets, savePreset, deletePreset } = useSession();
   const notify = useRoomStore((s) => s.notify);
   const [presetName, setPresetName] = useState("");
-  const [selected, setSelected] = useState<string>("mleague");
   useEffect(() => {
     if (editable) loadPresets().catch(() => undefined);
   }, [editable, loadPresets]);
 
+  // 下拉的值由当前规则派生：与哪个预设完全相同就选中它，否则显示「自定义」
   const all = [...BUILTIN_PRESETS, ...presets];
+  const matched = findPreset(value, all);
+  const selected = matched?.id ?? "custom";
+  const options = all.map((p) => ({ value: p.id, label: p.name }));
+  if (!matched) options.push({ value: "custom", label: "自定义" });
   const applyPreset = (id: string) => {
-    setSelected(id);
     const p = all.find((x) => x.id === id);
     if (p) onChange(validateRules(p.rules));
   };
@@ -99,9 +103,8 @@ export function RulesEditor({
     if (!name) return;
     try {
       validateRules(value);
-      const preset = await savePreset(name, value);
+      await savePreset(name, value);
       setPresetName("");
-      setSelected(preset.id);
       notify("info", `已保存预设「${name}」`);
     } catch (err) {
       notify(
@@ -113,7 +116,6 @@ export function RulesEditor({
   const remove = async () => {
     try {
       await deletePreset(selected);
-      setSelected("mleague");
     } catch (err) {
       notify("error", err instanceof ApiError ? err.message : "删除失败");
     }
@@ -128,7 +130,7 @@ export function RulesEditor({
             <Select
               value={selected}
               onValueChange={applyPreset}
-              options={all.map((p) => ({ value: p.id, label: p.name }))}
+              options={options}
               className="flex-1"
             />
             {presets.some((p) => p.id === selected) && (
@@ -154,9 +156,7 @@ export function RulesEditor({
               <Save className="h-4 w-4" /> 保存
             </Button>
           </div>
-          {all.find((p) => p.id === selected)?.note && (
-            <p className="mt-2 text-xs text-muted">{all.find((p) => p.id === selected)!.note}</p>
-          )}
+          {matched?.note && <p className="mt-2 text-xs text-muted">{matched.note}</p>}
           <p className="mt-2 text-xs text-muted">{umaDescription(value)}</p>
         </div>
       ) : (

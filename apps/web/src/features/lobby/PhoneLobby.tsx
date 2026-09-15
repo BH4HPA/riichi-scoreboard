@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Settings2 } from "lucide-react";
-import type { RoomView, Seat } from "@riichi/core";
+import { presetNameOf, type RoomView, type Seat } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Dialog, DialogContent, DialogFooter } from "@/ui/dialog";
 import { useCommand } from "@/ws/useRoom";
@@ -54,7 +54,7 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
       </div>
 
       <div className="rounded-xl border border-border bg-surface p-3">
-        <div className="mb-1.5 text-xs text-muted">房间规则</div>
+        <div className="mb-1.5 text-xs text-muted">房间规则 · {presetNameOf(room.rules)}</div>
         <RulesSummary rules={room.rules} />
       </div>
 

@@ -2,7 +2,13 @@ import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { Button } from "@/ui/button";
 import { BookOpen, History, ScrollText, User, Wifi } from "lucide-react";
-import { DEFAULT_REFERENCE_VIEW, seatNames, seatOfPlayer, type ReferenceView } from "@riichi/core";
+import {
+  DEFAULT_REFERENCE_VIEW,
+  presetNameOf,
+  seatNames,
+  seatOfPlayer,
+  type ReferenceView,
+} from "@riichi/core";
 import { Dialog, DialogContent } from "@/ui/dialog";
 import { ConnectionBadge, Notice } from "@/ui/notice";
 import { useRoomStore } from "@/ws/store";
@@ -159,7 +165,10 @@ function PhoneGame() {
         </DialogContent>
       </Dialog>
       <Dialog open={sheet === "rules"} onOpenChange={closeSheet}>
-        <DialogContent title="房间规则" description="对局进行中，规则已锁定">
+        <DialogContent
+          title="房间规则"
+          description={`${presetNameOf(room.rules)} · 对局进行中，规则已锁定`}
+        >
           <RulesEditor value={room.rules} onChange={() => undefined} editable={false} />
         </DialogContent>
       </Dialog>

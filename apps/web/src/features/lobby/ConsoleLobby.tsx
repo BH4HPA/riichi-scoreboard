@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from "react";
 import { Play, Settings2, Users } from "lucide-react";
-import type { RoomView, Seat } from "@riichi/core";
+import { presetNameOf, type RoomView, type Seat } from "@riichi/core";
 import { Button } from "@/ui/button";
+import { Badge } from "@/ui/controls";
 import { Dialog, DialogContent, DialogFooter } from "@/ui/dialog";
 import { useCommand } from "@/ws/useRoom";
 import { cn } from "@/lib/utils";
@@ -58,7 +59,10 @@ export function ConsoleLobby({
   const rulesCard = (
     <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-border bg-surface p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-base font-semibold">房间规则</h2>
+        <h2 className="flex items-center gap-2 text-base font-semibold">
+          房间规则
+          <Badge tone="outline">{presetNameOf(room.rules)}</Badge>
+        </h2>
         <Button
           variant="outline"
           size="sm"

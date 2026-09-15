@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { umaDescription } from "../format/rules";
 import { buildPointsTable } from "../reference/pointsTable";
-import { BUILTIN_PRESETS } from "./presets";
+import { BUILTIN_PRESETS, findPreset, presetNameOf, rulesKey } from "./presets";
 import { validateRules } from "./validate";
 
 describe("内置预设", () => {
@@ -39,5 +39,38 @@ describe("内置预设", () => {
     expect(rowOf("wrc").manganFrom).toBe(4);
     expect(rowOf("tenhou-houou").manganFrom).toBeNull();
     expect(rowOf("tenhou-houou").cells[3]!.cell.ron).toBe(7700);
+  });
+});
+
+describe("findPreset / presetNameOf", () => {
+  it.each(BUILTIN_PRESETS.map((p) => [p.name, p] as const))("%s 能被找回", (_n, preset) => {
+    expect(findPreset(preset.rules)?.id).toBe(preset.id);
+    expect(presetNameOf(preset.rules)).toBe(preset.name);
+  });
+
+  it("键序打乱、经 JSON 往返后仍匹配", () => {
+    const r = BUILTIN_PRESETS[1]!.rules;
+    const { scoring, ...rest } = r;
+    const shuffled: unknown = JSON.parse(JSON.stringify({ ...rest, scoring }));
+    expect(findPreset(shuffled)?.id).toBe(BUILTIN_PRESETS[1]!.id);
+  });
+
+  it("改动任一字段即为自定义", () => {
+    const r = BUILTIN_PRESETS[0]!.rules;
+    const edited = { ...r, hand: { ...r.hand, kuitan: !r.hand.kuitan } };
+    expect(findPreset(edited)).toBeNull();
+    expect(presetNameOf(edited)).toBe("自定义");
+  });
+
+  it("非法草稿返回 null 而不是抛异常", () => {
+    const r = BUILTIN_PRESETS[0]!.rules;
+    expect(rulesKey({ ...r, final: { ...r.final, startPoints: 2 } })).toBeNull();
+    expect(findPreset({})).toBeNull();
+  });
+
+  it("也可在自定义预设列表里查找", () => {
+    const mine = { id: "u1", name: "我的", rules: BUILTIN_PRESETS[2]!.rules };
+    expect(findPreset(mine.rules, [mine])?.id).toBe("u1");
+    expect(findPreset(mine.rules, [...BUILTIN_PRESETS, mine])?.id).toBe(BUILTIN_PRESETS[2]!.id);
   });
 });

@@ -1,4 +1,4 @@
-import type { RoomRules, UiState } from "@riichi/core";
+import { presetNameOf, type RoomRules, type UiState } from "@riichi/core";
 import { ReferenceSheet } from "@/features/reference/ReferenceSheet";
 import { RulesSummary } from "@/features/rules/RulesEditor";
 import { Badge } from "@/ui/controls";
@@ -40,7 +40,7 @@ export function MirrorOverlay({
     <div className="rounded-xl border border-accent/60 bg-surface p-4 shadow-lg shadow-accent/10">
       <div className="flex items-center gap-2 text-sm text-muted">
         <Badge tone="accent">{who}</Badge>
-        {intent.kind === "rules" && <span>正在查看规则</span>}
+        {intent.kind === "rules" && <span>正在查看规则 · {presetNameOf(rules)}</span>}
         {intent.kind === "adjust" && <span>正在调整场况</span>}
       </div>
       {intent.kind === "rules" && (
