@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { MusicState } from "@riichi/core";
 import { useRoomStore } from "@/ws/store";
 import { musicLabel } from "./label";
+import { loadMusic } from "./loader";
 import { MusicFloat } from "./MusicFloat";
-import { musicUrl } from "./url";
 
 /**
  * 电视端立直音乐：跟随 room.music 播 / 换 / 停。
@@ -22,13 +22,25 @@ export function RiichiMusicPlayer({
 
 function Playing({ music, label }: { music: MusicState; label: string }) {
   const audio = useRef<HTMLAudioElement>(null);
+  const [src, setSrc] = useState<string | null>(null);
   const [blocked, setBlocked] = useState(false);
   const notify = useRoomStore((s) => s.notify);
+
+  useEffect(() => {
+    let active = true;
+    loadMusic(music.track).then(
+      (url) => active && setSrc(url),
+      () => active && notify("error", `立直音乐加载失败：${label}`),
+    );
+    return () => {
+      active = false;
+    };
+  }, [music.track, label, notify]);
 
   // 浏览器要求先有一次用户手势才允许出声：被拒时挂全屏遮罩，点击 / 按键（遥控器）后补播
   const play = useCallback(() => {
     const el = audio.current;
-    if (!el) return;
+    if (!el || !el.src) return;
     el.play().then(
       () => setBlocked(false),
       (err: unknown) => {
@@ -38,8 +50,8 @@ function Playing({ music, label }: { music: MusicState; label: string }) {
   }, []);
 
   useEffect(() => {
-    play();
-  }, [play]);
+    if (src) play();
+  }, [src, play]);
 
   useEffect(() => {
     if (!blocked) return;
@@ -51,11 +63,11 @@ function Playing({ music, label }: { music: MusicState; label: string }) {
     <>
       <audio
         ref={audio}
-        src={musicUrl(music.track)}
+        {...(src ? { src } : {})}
         loop
         preload="auto"
         data-testid="riichi-music"
-        onError={() => notify("error", `立直音乐加载失败：${label}`)}
+        data-track={music.track}
       />
       <MusicFloat label={label} />
       {blocked && (
