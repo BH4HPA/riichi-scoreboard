@@ -42,9 +42,19 @@ QCLOUD_SECRET_ID=… QCLOUD_SECRET_KEY=… ../ci/upload-model.sh runs/v0/weights
 
 `check_onnx.py` 除了形状，还比对 ONNX 元数据里的类顺序与 manifest 是否逐位相同——形状对但顺序错不会报错、只会静默认错牌，这是唯一能机器验证类契约的地方。`upload-model.sh` 先跑这个校验，再上传到 `riichi/models/<新 uuid>.onnx`，最后把 `{id, sha256, imgsz, publishedAt, note}` 写回 manifest 的 `model`；提交并推 `main` 即发布。旧对象不会被覆盖，回滚 = manifest 指回旧 id。
 
-### 3. 自家牌 → v1（微调）
+### 3. 自家牌 → v1（合成 + 微调）
 
-按摆牌约定（见根目录 CLAUDE.md「Photo recognition」）拍 300–500 张放 `data/own/`；另拍 30–50 张放 `data/bench/`，每张配同名 `.hand.json` 作整手牌评估的真值（评估脚本随应用侧一起来）。
+真图不用拍几百张，主力是剪贴合成：
+
+```bash
+uv run scripts/family_check.py runs/v0/weights/best.pt data/family/*.jpg   # 先看 v0 认不认你的牌（每张全家福 38 类各一枚）
+uv run scripts/sprites.py runs/v0/weights/best.pt data/family             # 抠贴图 → data/sprites/<class>/；看 contact_*.jpg 核对，认错的挪目录
+uv run scripts/synth.py --n 5000                                           # 合成 → data/raw/synth/（只进 train）
+uv run scripts/remap.py                                                    # 与公开集合并
+scripts/train.sh v1 model=runs/v0/weights/best.pt epochs=60
+```
+
+要拍的真图：全家福 6–10 张（换光线/角度/背景，每张 38 类各一枚，是贴图来源）；空背景 10–15 张放 `data/backgrounds/`（桌面/桌布/麻将垫的空镜头，**上面不能有牌**，可带风位盒、点棒）；评估集 30–50 张放 `data/bench/`，按裁剪后的样子拍（只有手牌和指示牌），每张配同名 `.hand.json` 真值（评估脚本随应用侧一起来）。另外 20–30 张带牌河的真实全景放 `data/own/`，走下面的预标注流程混进训练集，校正合成与真实的差距。
 
 ```bash
 uv run scripts/prelabel.py runs/v0/weights/best.pt data/own      # → data/own_prelabel.json
@@ -74,7 +84,8 @@ scripts/export.sh runs/v1/weights/best.pt
 ```
 configs/tiles.yaml, label_studio.xml   生成物（gen_classes.py，CI --check）
 configs/remap/<name>.json              来源类名 → canonical 映射（手工维护，入库）
-scripts/                               上面用到的脚本
+scripts/                               上面用到的脚本（sprites.py / synth.py 是合成训练集这条线）
+data/family|backgrounds|sprites        全家福、空背景、抠出的贴图，不入库
 data/raw|merged|own|bench              不入库
 runs/                                  训练产物，不入库
 ```
