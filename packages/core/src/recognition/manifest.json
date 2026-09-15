@@ -40,10 +40,10 @@
     "back"
   ],
   "model": {
-    "id": "12b2722c-cbce-4e9b-9bd1-341280bd0204",
-    "sha256": "08bebb44f5c2400f2984d56faf04d1f1cbf9dc6754c5c1d3b3f677923dda673c",
+    "id": "d1ec564d-e44a-404e-9140-cf9ea22d1366",
+    "sha256": "1b7f3475ff96e22565737a38501a1b08cb71b0353f285c41b09d2fcc0d6afc44",
     "imgsz": 640,
     "publishedAt": "2026-09-15",
-    "note": "v0: public datasets only (hust + riichimahjongdetection + yolo_mahjong), 100 epochs T4"
+    "note": "v1: YOLO11n, 5000 synthetic scenes from family-portrait sprites (7 backgrounds), bench 32/33 with layout rules"
   }
 }
