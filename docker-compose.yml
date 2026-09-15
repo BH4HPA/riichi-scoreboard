@@ -9,6 +9,14 @@ services:
     environment:
       # 前端与后端同源部署时留空；前端另行托管到 COS 时填其 origin，逗号分隔
       CORS_ORIGINS: "${CORS_ORIGINS:-}"
+      # 头像等对象存储：全空 = 本地磁盘（/data/objects）；变量含义见 .env.template
+      QCLOUD_SECRET_ID: "${QCLOUD_SECRET_ID:-}"
+      QCLOUD_SECRET_KEY: "${QCLOUD_SECRET_KEY:-}"
+      QCLOUD_COS_BUCKET: "${QCLOUD_COS_BUCKET:-}"
+      QCLOUD_COS_REGION: "${QCLOUD_COS_REGION:-}"
+      QCLOUD_COS_ENDPOINT: "${QCLOUD_COS_ENDPOINT:-}"
+      QCLOUD_COS_CDN_DOMAIN: "${QCLOUD_COS_CDN_DOMAIN:-}"
+      COS_KEY_PREFIX: "${COS_KEY_PREFIX:-riichi/}"
     volumes:
       - riichi_data:/data
     init: true

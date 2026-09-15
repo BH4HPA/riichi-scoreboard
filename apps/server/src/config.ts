@@ -1,9 +1,10 @@
 import path from "node:path";
+import type { CosConfig } from "./storage/cos";
 
 export interface ServerConfig {
   port: number;
   host: string;
-  /** SQLite 与头像所在目录 */
+  /** SQLite 与本地对象文件所在目录 */
   dataDir: string;
   /** 前端构建产物目录；不存在则不托管静态文件 */
   webDist: string;
@@ -11,6 +12,8 @@ export interface ServerConfig {
   corsOrigins: string[];
   /** 房间闲置多久后从内存卸载（毫秒） */
   roomIdleMs: number;
+  /** 腾讯云 COS；null 表示用本地磁盘 */
+  cos: CosConfig | null;
 }
 
 function intEnv(env: NodeJS.ProcessEnv, key: string, fallback: number): number {
@@ -20,6 +23,33 @@ function intEnv(env: NodeJS.ProcessEnv, key: string, fallback: number): number {
   if (!Number.isInteger(n) || n < 0)
     throw new Error(`环境变量 ${key} 必须是非负整数，当前为 "${raw}"`);
   return n;
+}
+
+const COS_REQUIRED = [
+  "QCLOUD_SECRET_ID",
+  "QCLOUD_SECRET_KEY",
+  "QCLOUD_COS_BUCKET",
+  "QCLOUD_COS_REGION",
+  "QCLOUD_COS_CDN_DOMAIN",
+] as const;
+
+/** 五个核心变量全给 → COS；全空 → 本地；只给一部分视为配置错误。 */
+function cosEnv(env: NodeJS.ProcessEnv): CosConfig | null {
+  const given = COS_REQUIRED.filter((k) => (env[k] ?? "") !== "");
+  if (given.length === 0) return null;
+  if (given.length !== COS_REQUIRED.length) {
+    const missing = COS_REQUIRED.filter((k) => !given.includes(k)).join(", ");
+    throw new Error(`COS 配置不完整，缺少：${missing}`);
+  }
+  return {
+    secretId: env.QCLOUD_SECRET_ID!,
+    secretKey: env.QCLOUD_SECRET_KEY!,
+    bucket: env.QCLOUD_COS_BUCKET!,
+    region: env.QCLOUD_COS_REGION!,
+    endpoint: env.QCLOUD_COS_ENDPOINT || null,
+    cdnDomain: env.QCLOUD_COS_CDN_DOMAIN!,
+    keyPrefix: env.COS_KEY_PREFIX ?? "riichi/",
+  };
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
@@ -34,5 +64,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
       .map((s) => s.trim())
       .filter(Boolean),
     roomIdleMs: intEnv(env, "ROOM_IDLE_MS", 60 * 60 * 1000),
+    cos: cosEnv(env),
   };
 }
