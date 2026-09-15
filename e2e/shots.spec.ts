@@ -24,9 +24,19 @@ test("截图：番符表与主控台", async ({ browser }) => {
   for (let i = 0; i < 4; i++) {
     const p = await phone(browser, code, ["Ray", "小明", "阿花", "老王"][i]!);
     await p.getByTestId(`seat-${i}`).click();
+    if (i === 0) {
+      // 手机大厅：自己已入座 + 三个空座；规则对话框滚到中段时底栏可见
+      await p.getByTestId("seat-0").getByText("Ray").waitFor();
+      await p.screenshot({ path: `${OUT}/phone-lobby.png`, fullPage: true });
+      await p.getByRole("button", { name: "修改规则" }).click();
+      await p.getByRole("dialog").getByText("终局", { exact: true }).scrollIntoViewIfNeeded();
+      await p.screenshot({ path: `${OUT}/phone-rules-dialog.png` });
+      await p.getByRole("button", { name: "取消" }).click();
+    }
     await p.getByRole("button", { name: "准备", exact: true }).click();
     phones.push(p);
   }
+  await tv.screenshot({ path: `${OUT}/tv-lobby-full.png` });
   await tv.getByRole("button", { name: "开局", exact: true }).click();
   await tv.getByTestId("points-0").waitFor();
 
@@ -37,6 +47,18 @@ test("截图：番符表与主控台", async ({ browser }) => {
   await phones[2]!.getByRole("option", { name: "老王" }).click();
   await ron.getByRole("tab", { name: "牌面" }).click();
   const keyboard = ron.getByTestId("tile-keyboard");
+  // 闭牌 + 碰 + 暗杠同框
+  await ron.getByRole("button", { name: "碰", exact: true }).click();
+  await keyboard.getByRole("button", { name: "1索", exact: true }).click();
+  await ron.getByRole("button", { name: "暗杠", exact: true }).click();
+  await keyboard.getByRole("button", { name: "白", exact: true }).click();
+  for (const t of ["2萬", "3萬", "4萬", "5筒", "5筒", "5筒", "7索", "7索"]) {
+    await keyboard.getByRole("button", { name: t, exact: true }).click();
+  }
+  await phones[2]!.screenshot({ path: `${OUT}/phone-ron-melds.png` });
+  await ron.getByRole("button", { name: "清空" }).click();
+  const removeMeld = ron.getByRole("button", { name: "删除副露" });
+  while ((await removeMeld.count()) > 0) await removeMeld.first().click();
   for (const t of [
     "1萬",
     "2萬",
