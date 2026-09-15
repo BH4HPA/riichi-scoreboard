@@ -39,8 +39,10 @@ Yarn workspaces monorepo:
   `storage/ObjectStore`: local disk (served at `/api/objects/*`) or Tencent COS (`QCLOUD_*` env, `riichi/`
   prefix, see `.env.template`). Serves the built web app with SPA fallback.
 - `apps/web` — Vite + React 19 + Tailwind v4 + radix primitives. Routes: `/` landing (device routing:
-  desktop → `/console`, tablet chooses, phone gets QR scan + code input), `/console` (TV), `/r/:code`
-  (phone). Tile images are flat SVGs from mahjong_graphic (`src/assets/tiles`, see NOTICE.md), rendered by
+  desktop → `/console`, tablet chooses, phone gets QR scan + six-cell code input), `/console` (TV: two
+  columns ≥ 1280px, otherwise single column with history drawer + QR dialog), `/r/:code` (phone).
+  Phone settlement dialogs mirror to the TV as a full-screen modal (`features/mirror/SettlementMirror`),
+  carrying the hand only once the engine has evaluated it. Tile images are flat SVGs from mahjong_graphic (`src/assets/tiles`, see NOTICE.md), rendered by
   `features/hand/TileFace`.
 
 Layering rule: entry files only assemble; data/state/render responsibilities are split into directories
@@ -54,7 +56,9 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   red fives are folded to plain fives and counted as `aka_count` only at the engine boundary. Events
   recorded before this change carry `aka: number` instead; replay still works (points come from the
   persisted engine result) but such hands render without red-five marks.
-- `RoomRules` fields and their consumers are documented in `packages/core/src/types/rules.ts`.
+- `RoomRules` fields and their consumers are documented in `packages/core/src/types/rules.ts`. Built-in
+  presets live in `packages/core/src/rules/presets.ts` (M-League default, Majsoul ranked, Tenhou Houou,
+  Saikouisen, WRC); differences the model cannot express are stated in each preset's `note`.
 - Win input has two shapes: `manual` (han/fu) and `hand` (tiles; evaluated server-side; the hand is kept
   in `WinRecord.hand` for history display; also the input shape for the future photo-recognition feature).
 - Room phases: `lobby` → `playing` → `finished` (→ `lobby` via `toLobby`), plus `closed` after `dissolve`
