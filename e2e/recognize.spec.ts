@@ -8,16 +8,25 @@ const DETECTOR = path.join(import.meta.dirname, "fixtures/detector.onnx");
 /** 123m 4筒 赤5筒 6筒 789s 789m 22p，和张 9m：平和 + 赤宝牌 = 2 番 30 符 */
 const CLOSED = [1, 2, 3, 13, 36, 15, 25, 26, 27, 7, 8, 11, 11, 9];
 
-async function phone(browser: Browser, code: string): Promise<Page> {
+type Setup = (page: Page) => Promise<void>;
+
+async function phone(browser: Browser, code: string, setup?: Setup): Promise<Page> {
   const ctx = await browser.newContext({ viewport: { width: 400, height: 800 } });
   const page = await ctx.newPage();
+  await setup?.(page);
   await page.goto(`/r/${code}`);
   await expect(page.getByTestId("seat-0")).toBeVisible();
   return page;
 }
 
-/** 开房、四台手机入座准备、自动开局，返回手机 2 已打开的荣和对话框（放铳者北家、牌面页）。 */
-async function openRonHandTab(browser: Browser): Promise<{ phone: Page; dialog: Locator }> {
+/**
+ * 开房、四台手机入座准备、自动开局，返回手机 2 已打开的荣和对话框（放铳者北家、牌面页）。
+ * setup 在手机 2 进房间之前装路由：进房间就会预热模型，拦截必须先于导航。
+ */
+async function openRonHandTab(
+  browser: Browser,
+  setup?: Setup,
+): Promise<{ phone: Page; dialog: Locator }> {
   const tvCtx = await browser.newContext({ viewport: { width: 1600, height: 900 } });
   const tv = await tvCtx.newPage();
   await tv.goto("/console");
@@ -25,7 +34,7 @@ async function openRonHandTab(browser: Browser): Promise<{ phone: Page; dialog: 
   const NAMES = ["东家", "南家", "西家", "北家"];
   const phones: Page[] = [];
   for (let i = 0; i < 4; i++) {
-    const p = await phone(browser, code);
+    const p = await phone(browser, code, i === 2 ? setup : undefined);
     const nameInput = p.getByLabel("昵称");
     await nameInput.fill(NAMES[i]!);
     await nameInput.press("Enter");
@@ -47,14 +56,16 @@ async function openRonHandTab(browser: Browser): Promise<{ phone: Page; dialog: 
 test("拍照 → 裁剪 → 本机推理填入牌面并自动算番 → 检测框与结算后的真值都回填", async ({
   browser,
 }) => {
-  const { phone: p, dialog } = await openRonHandTab(browser);
-  await p.route("**/riichi/models/*.onnx", (route) =>
-    route.fulfill({ path: DETECTOR, contentType: "application/octet-stream" }),
-  );
   const patches: Record<string, unknown>[] = [];
-  await p.route("**/api/recognitions/*", async (route) => {
-    patches.push(route.request().postDataJSON() as Record<string, unknown>);
-    await route.fulfill({ status: 204 });
+  const { phone: p, dialog } = await openRonHandTab(browser, async (page) => {
+    // 进房间时预热的就是这个假模型（真模型在 CDN，测试不碰网络）
+    await page.route("**/riichi/models/*.onnx", (route) =>
+      route.fulfill({ path: DETECTOR, contentType: "application/octet-stream" }),
+    );
+    await page.route("**/api/recognitions/*", async (route) => {
+      patches.push(route.request().postDataJSON() as Record<string, unknown>);
+      await route.fulfill({ status: 204 });
+    });
   });
 
   await dialog.getByTestId("recognize-file").setInputFiles(FIXTURE);
@@ -88,8 +99,9 @@ test("拍照 → 裁剪 → 本机推理填入牌面并自动算番 → 检测�
 });
 
 test("模型加载失败 → 错误提示、牌面不变，照片仍已上传", async ({ browser }) => {
-  const { phone: p, dialog } = await openRonHandTab(browser);
-  await p.route("**/riichi/models/*.onnx", (route) => route.abort());
+  const { phone: p, dialog } = await openRonHandTab(browser, (page) =>
+    page.route("**/riichi/models/*.onnx", (route) => route.abort()),
+  );
   const uploaded = p.waitForRequest(
     (req) => req.method() === "POST" && /\/api\/recognitions$/.test(req.url()),
   );
