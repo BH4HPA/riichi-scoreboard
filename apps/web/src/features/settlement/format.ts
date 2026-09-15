@@ -1,12 +1,4 @@
-import {
-  formatPoints,
-  isHonor,
-  SEATS,
-  tileNumber,
-  tileSuit,
-  type Seat,
-  type Tile,
-} from "@riichi/core";
+import { formatPoints, SEATS, type Seat } from "@riichi/core";
 
 export const seatsOf = (flags: readonly boolean[]): Seat[] => SEATS.filter((s) => flags[s]);
 
@@ -27,12 +19,4 @@ export const NO_FLAGS = [false, false, false, false];
 
 export function seatOptions(names: string[], exclude: Seat[] = []) {
   return SEATS.map((s) => ({ value: String(s), label: names[s]!, disabled: exclude.includes(s) }));
-}
-
-const HONORS = ["東", "南", "西", "北", "白", "發", "中"];
-const SUIT_LABEL = { m: "萬", p: "筒", s: "索", z: "" } as const;
-
-export function tileLabel(tile: Tile): string {
-  if (isHonor(tile)) return HONORS[tile - 28]!;
-  return `${tileNumber(tile)}${SUIT_LABEL[tileSuit(tile)]}`;
 }

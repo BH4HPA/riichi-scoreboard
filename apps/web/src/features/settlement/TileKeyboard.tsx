@@ -15,8 +15,8 @@ import {
 import { Button } from "@/ui/button";
 import { CheckRow, ChipGroup, Label } from "@/ui/controls";
 import { cn } from "@/lib/utils";
-import { TileFace } from "./TileFace";
-import { tileLabel } from "./format";
+import { TileFace } from "@/features/hand/TileFace";
+import { tileLabel } from "@/features/hand/tileLabel";
 
 type Target = "closed" | "dora" | "ura" | "chi" | "pon" | "kan" | "ankan";
 
