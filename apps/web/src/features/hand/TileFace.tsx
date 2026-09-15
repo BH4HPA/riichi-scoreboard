@@ -83,7 +83,8 @@ export function TileFace({
     <button
       type="button"
       onClick={onClick}
-      className="rounded-[3px] transition-transform active:scale-95"
+      // inline-flex：按钮不再生成行盒，图片底边与不可点击的牌（span）严格同基线
+      className="inline-flex rounded-[3px] transition-transform active:scale-95"
       aria-label={label}
       aria-pressed={selected}
       disabled={dim}

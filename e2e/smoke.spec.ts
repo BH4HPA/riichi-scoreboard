@@ -69,8 +69,19 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await ron.getByRole("combobox").first().click();
   await phones[2]!.getByRole("option", { name: "北家" }).click();
   await ron.getByRole("tab", { name: "牌面" }).click();
-  // 123m 4筒 赤5筒 6筒 789s 789m 22p（和张 9m）：平和 + 赤宝牌 = 2 番 30 符 → 2000
   const keyboard = ron.getByTestId("tile-keyboard");
+  // 闭牌（可点击 button）与副露（不可点击 span）底边对齐
+  await ron.getByRole("button", { name: "碰", exact: true }).click();
+  await keyboard.getByRole("button", { name: "1索", exact: true }).click();
+  await keyboard.getByRole("button", { name: "2萬", exact: true }).click();
+  const handArea = ron.getByTestId("hand-area");
+  const closedBox = (await handArea.getByRole("button", { name: "2萬" }).boundingBox())!;
+  const meldBox = (await handArea.getByRole("img", { name: "1索" }).first().boundingBox())!;
+  expect(Math.abs(closedBox.y + closedBox.height - (meldBox.y + meldBox.height))).toBeLessThan(1);
+  expect(Math.abs(closedBox.height - meldBox.height)).toBeLessThan(1);
+  await handArea.getByRole("button", { name: "删除副露" }).click();
+  await ron.getByRole("button", { name: "清空" }).click();
+  // 123m 4筒 赤5筒 6筒 789s 789m 22p（和张 9m）：平和 + 赤宝牌 = 2 番 30 符 → 2000
   for (const t of [
     "1萬",
     "2萬",

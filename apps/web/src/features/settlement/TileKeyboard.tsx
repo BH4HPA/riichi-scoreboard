@@ -147,6 +147,8 @@ export function TileKeyboard({
   };
 
   const distinctClosed = [...new Set(hand.closed)];
+  // 同码多张时只给最后一张标和张（与 HandStrip 一致）
+  const winIndex = hand.closed.lastIndexOf(hand.winTile);
 
   return (
     <div className="space-y-3">
@@ -175,7 +177,7 @@ export function TileKeyboard({
                 key={`${t}-${i}`}
                 tile={t}
                 size="sm"
-                selected={t === hand.winTile}
+                selected={i === winIndex}
                 onClick={() => removeClosed(i)}
               />
             ))}
