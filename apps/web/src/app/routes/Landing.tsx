@@ -1,46 +1,63 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, Navigate, useSearchParams } from "react-router";
 import { Monitor, Smartphone } from "lucide-react";
+import { deviceKind } from "@/lib/device";
 import { Button } from "@/ui/button";
-import { Input } from "@/ui/controls";
+import { JoinPanel } from "@/features/join/JoinPanel";
 
+/**
+ * 欢迎页按设备分流：桌面直接进主控台（`?stay=1` 可留在本页）；平板二选一；手机直接进加入面板。
+ */
 export function Landing() {
-  const navigate = useNavigate();
-  const [code, setCode] = useState("");
-  const go = () => {
-    const c = code.trim().toUpperCase();
-    if (c.length === 6) navigate(`/r/${c}`);
-  };
+  const [params] = useSearchParams();
+  const kind = deviceKind();
+  const [choice, setChoice] = useState<"join" | null>(null);
+
+  if (kind === "desktop" && params.get("stay") !== "1") return <Navigate to="/console" replace />;
+  const showJoin = kind === "phone" || choice === "join";
+
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 px-6 py-10">
       <div>
         <h1 className="text-2xl font-semibold">立直麻将计分板</h1>
         <p className="mt-1 text-sm text-muted">电视开主控台显示二维码，手机扫码加入并远程计分。</p>
       </div>
-      <Button asChild size="lg" variant="accent" className="justify-start">
-        <Link to="/console">
-          <Monitor className="h-5 w-5" /> 打开主控台（电视 / 电脑）
-        </Link>
-      </Button>
-      <div className="rounded-xl border border-border bg-surface p-4">
-        <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-          <Smartphone className="h-4 w-4" /> 输入房间码加入
-        </div>
-        <div className="flex gap-2">
-          <Input
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            onKeyDown={(e) => e.key === "Enter" && go()}
-            placeholder="6 位房间码"
-            maxLength={6}
-            autoCapitalize="characters"
-            className="tabular tracking-[0.3em] uppercase"
-          />
-          <Button onClick={go} disabled={code.trim().length !== 6}>
-            加入
+      {showJoin ? (
+        <JoinPanel />
+      ) : (
+        <div className="grid gap-3">
+          <Button asChild size="lg" variant="accent" className="h-16 justify-start">
+            <Link to="/console">
+              <Monitor className="h-5 w-5" /> 打开主控台（电视 / 电脑 / 平板）
+            </Link>
+          </Button>
+          <Button
+            size="lg"
+            variant="outline"
+            className="h-16 justify-start"
+            onClick={() => setChoice("join")}
+          >
+            <Smartphone className="h-5 w-5" /> 作为玩家加入房间
           </Button>
         </div>
-      </div>
+      )}
+      {kind !== "phone" && showJoin && (
+        <button
+          type="button"
+          className="text-sm text-muted underline-offset-2 hover:underline"
+          onClick={() => setChoice(null)}
+        >
+          返回选择
+        </button>
+      )}
+      {kind === "phone" && (
+        <p className="text-xs text-muted">
+          想在这台设备上开主控台？
+          <Link to="/console" className="underline">
+            点这里
+          </Link>
+        </p>
+      )}
     </main>
   );
 }

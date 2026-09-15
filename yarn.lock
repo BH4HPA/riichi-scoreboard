@@ -1346,6 +1346,7 @@ __metadata:
     class-variance-authority: "npm:^0.7.1"
     clsx: "npm:^2.1.1"
     lucide-react: "npm:^1.46.0"
+    qr-scanner: "npm:^1.4.2"
     qrcode.react: "npm:^4.2.0"
     react: "npm:^19.3.0"
     react-dom: "npm:^19.3.0"
@@ -1686,6 +1687,13 @@ __metadata:
   dependencies:
     undici-types: "npm:~7.18.0"
   checksum: 10c0/a12196e984cb09ead549651217b4b395961ea011f3a3791a9f78311d70b5f3be343c6fc935376553c06a34c14d963d4f637ad7829837b0c88cf441919f422893
+  languageName: node
+  linkType: hard
+
+"@types/offscreencanvas@npm:^2019.6.4":
+  version: 2019.7.3
+  resolution: "@types/offscreencanvas@npm:2019.7.3"
+  checksum: 10c0/6d1dfae721d321cd2b5435f347a0e53b09f33b2f9e9333396480f592823bc323847b8169f7d251d2285cb93dbc1ba2e30741ac5cf4b1c003d660fd4c24526963
   languageName: node
   linkType: hard
 
@@ -3650,6 +3658,15 @@ __metadata:
   dependencies:
     hookified: "npm:^2.1.1"
   checksum: 10c0/4a39d45492c65a4b9795381acede1bd566028ce9764ead5b41d776b391a898bf0855dd2b59d724a6711fe253ba3cacf7c9a8832887cf9dc6d48a2c5e4997c82d
+  languageName: node
+  linkType: hard
+
+"qr-scanner@npm:^1.4.2":
+  version: 1.4.2
+  resolution: "qr-scanner@npm:1.4.2"
+  dependencies:
+    "@types/offscreencanvas": "npm:^2019.6.4"
+  checksum: 10c0/32ac53d6f5c9045e1464d6b110eb19d3f8865f72276d26f00f6cc1e1d239ce34c799824a3082c775236cf887cf4354b2c292c89a08fd25378ab2c68472346970
   languageName: node
   linkType: hard
 
