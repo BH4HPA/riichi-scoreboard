@@ -98,9 +98,9 @@ describe("RoomRegistry：在线状态、离线座位回收、自动开局", () =
       actorOf(tv),
     );
     registry.apply(room, room.seq, { type: "setReady", seat: 0, ready: true }, actorOf(phones[0]!));
-    expect(last(tv).autoStartAt).toBeNull();
+    expect(last(tv).autoStartIn).toBeNull();
     registry.apply(room, room.seq, { type: "setReady", seat: 1, ready: true }, actorOf(phones[1]!));
-    expect(last(tv).autoStartAt).toBe(now + AUTO_MS);
+    expect(last(tv).autoStartIn).toBe(AUTO_MS);
 
     // 取消准备 → 倒计时取消，到点不开
     registry.apply(
@@ -109,7 +109,7 @@ describe("RoomRegistry：在线状态、离线座位回收、自动开局", () =
       { type: "setReady", seat: 1, ready: false },
       actorOf(phones[1]!),
     );
-    expect(last(tv).autoStartAt).toBeNull();
+    expect(last(tv).autoStartIn).toBeNull();
     vi.advanceTimersByTime(AUTO_MS + 1);
     expect(room.state.phase).toBe("lobby");
 
@@ -117,7 +117,7 @@ describe("RoomRegistry：在线状态、离线座位回收、自动开局", () =
     registry.apply(room, room.seq, { type: "setReady", seat: 1, ready: true }, actorOf(phones[1]!));
     vi.advanceTimersByTime(AUTO_MS + 1);
     expect(room.state.phase).toBe("playing");
-    expect(last(tv).autoStartAt).toBeNull();
+    expect(last(tv).autoStartIn).toBeNull();
   });
 
   it("有设备玩家掉线时不开局；全是本地玩家时不自动开局", () => {
@@ -136,9 +136,9 @@ describe("RoomRegistry：在线状态、离线座位回收、自动开局", () =
       ),
     );
     registry.apply(room, room.seq, { type: "setReady", seat: 0, ready: true }, actorOf(phone));
-    expect(last(tv).autoStartAt).toBe(now + AUTO_MS);
+    expect(last(tv).autoStartIn).toBe(AUTO_MS);
     registry.leave(room, phone.clientId);
-    expect(last(tv).autoStartAt).toBeNull();
+    expect(last(tv).autoStartIn).toBeNull();
     vi.advanceTimersByTime(AUTO_MS + 1);
     expect(room.state.phase).toBe("lobby");
 
@@ -147,6 +147,6 @@ describe("RoomRegistry：在线状态、离线座位回收、自动开局", () =
     const fourth = players.createLocal("戊", tv.playerId, now);
     registry.apply(room, room.seq, { type: "sitLocal", seat: 0, playerId: fourth.id }, actorOf(tv));
     expect(room.state.ready).toEqual([true, true, true, true]);
-    expect(last(tv).autoStartAt).toBeNull();
+    expect(last(tv).autoStartIn).toBeNull();
   });
 });

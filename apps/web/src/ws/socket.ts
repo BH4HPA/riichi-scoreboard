@@ -159,7 +159,11 @@ export class RoomSocket {
         store.set({ playerId: msg.playerId });
         return;
       case "state":
-        store.set({ room: msg.room });
+        store.set({
+          room: msg.room,
+          autoStartDeadline:
+            msg.room.autoStartIn === null ? null : Date.now() + msg.room.autoStartIn,
+        });
         return;
       case "ui":
         store.set({ intents: msg.intents });

@@ -33,8 +33,10 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await expect(tv.getByText("已准备")).toHaveCount(4);
 
   // 全员准备且在线 → 主控台开局按钮显示倒计时 → 3 s 后自动开局
-  await expect(tv.getByRole("button", { name: /开局 ·/ })).toBeVisible();
-  await expect(phones[1]!.getByText(/秒后自动开局/)).toBeVisible();
+  await Promise.all([
+    expect(tv.getByRole("button", { name: /开局 ·/ })).toBeVisible(),
+    expect(phones[1]!.getByText(/秒后自动开局/)).toBeVisible(),
+  ]);
   await expect(tv.getByTestId("points-0")).toHaveText("25,000");
   await expect(phones[0]!.getByTestId("points-0")).toHaveText("25,000");
 
@@ -179,11 +181,11 @@ test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手�
     .click();
   await expect(tv.getByTestId("seat-1")).toContainText("本地乙");
 
-  // 两部手机准备 → 全员准备且在线 → 自动开局（本地玩家入座即准备）
+  // 两部手机准备 → 倒计时开始（本地玩家入座即准备）→ 主控台在倒计时内手动开局
   await phones[0]!.getByRole("button", { name: "准备", exact: true }).click();
   await expect(tv.getByRole("button", { name: /开局 ·/ })).toHaveCount(0);
   await phones[1]!.getByRole("button", { name: "准备", exact: true }).click();
-  await expect(tv.getByRole("button", { name: /开局 ·/ })).toBeVisible();
+  await tv.getByRole("button", { name: /开局 ·/ }).click();
   await expect(tv.getByTestId("points-0")).toHaveText("25,000");
   await expect(phones[1]!.getByTestId("points-1")).toHaveText("25,000");
 

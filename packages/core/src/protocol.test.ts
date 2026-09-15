@@ -40,11 +40,11 @@ describe("autoStartEligible", () => {
 });
 
 describe("toRoomView", () => {
-  it("带在线状态与自动开局时刻", () => {
+  it("带在线状态与自动开局剩余时间", () => {
     const state = lobby([device("a"), null, null, null], [false, false, false, false]);
     const view = toRoomView(state, 3, new Set(["a"]), 1234);
     expect(view.online).toEqual([true, false, false, false]);
-    expect(view.autoStartAt).toBe(1234);
+    expect(view.autoStartIn).toBe(1234);
     expect(view.seq).toBe(3);
   });
 });

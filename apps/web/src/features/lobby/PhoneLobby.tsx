@@ -4,6 +4,7 @@ import { ArrowLeft, Settings2 } from "lucide-react";
 import { presetNameOf, type RoomView, type Seat } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Dialog, DialogContent, DialogFooter } from "@/ui/dialog";
+import { useRoomStore } from "@/ws/store";
 import { useCommand } from "@/ws/useRoom";
 import { ProfileEditor } from "@/features/profile/ProfileEditor";
 import { RulesEditor, RulesSummary } from "@/features/rules/RulesEditor";
@@ -19,7 +20,7 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
   useMirror(rulesOpen, { kind: "rules" }, true);
   const ready = mySeat !== null && room.ready[mySeat] === true;
   const full = room.seats.every((s) => s !== null);
-  const countdown = useCountdown(room.autoStartAt);
+  const countdown = useCountdown(useRoomStore((s) => s.autoStartDeadline));
   // 退出房间：已入座先离座（等 ack），无论成败都回首页；失败的座位由离线回收兜底
   const exit = async () => {
     if (mySeat !== null) await send({ type: "leave", seat: mySeat });

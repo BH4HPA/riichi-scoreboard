@@ -20,9 +20,14 @@ export function useRoomConnection(code: string | null): RoomSocket | null {
     if (!code) return;
     let active = true;
     let sock: RoomSocket | null = null;
-    useRoomStore
-      .getState()
-      .set({ room: null, intents: [], status: "connecting", closedReason: null, notice: null });
+    useRoomStore.getState().set({
+      room: null,
+      intents: [],
+      status: "connecting",
+      closedReason: null,
+      notice: null,
+      autoStartDeadline: null,
+    });
     ensure().then(({ token }) => {
       if (!active) return;
       sock = new RoomSocket(code, token);

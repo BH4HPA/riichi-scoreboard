@@ -146,7 +146,8 @@ export class RoomRegistry {
   }
 
   view(room: LiveRoom): RoomView {
-    return toRoomView(room.state, room.seq, this.onlineIds(room), room.autoStart?.at ?? null);
+    const autoStartIn = room.autoStart ? Math.max(0, room.autoStart.at - this.now()) : null;
+    return toRoomView(room.state, room.seq, this.onlineIds(room), autoStartIn);
   }
 
   /** 校验 baseSeq → 形状校验 → 按 actor 补全/鉴权 → reduce → 事务落库 → 广播。 */
@@ -171,11 +172,17 @@ export class RoomRegistry {
     const timer = setTimeout(() => {
       room.autoStart = null;
       if (this.rooms.get(room.code) !== room) return;
-      if (!autoStartEligible(room.state, seatsOnline(room.state, this.onlineIds(room)))) {
+      try {
+        if (autoStartEligible(room.state, seatsOnline(room.state, this.onlineIds(room)))) {
+          this.commit(room, { type: "start", force: false }, SYSTEM_ACTOR);
+        } else {
+          this.broadcastState(room);
+        }
+      } catch (err) {
+        // 定时器里的异常没有人接，不能让它变成 uncaughtException
+        console.error(`[autostart] room=${room.code}`, err);
         this.broadcastState(room);
-        return;
       }
-      this.commit(room, { type: "start", force: false }, SYSTEM_ACTOR);
     }, this.autoStartMs);
     timer.unref?.();
     room.autoStart = { at: this.now() + this.autoStartMs, timer };
@@ -273,20 +280,24 @@ export class RoomRegistry {
     for (const room of this.rooms.values()) this.syncSeat(room, player);
   }
 
-  private syncSeat(room: LiveRoom, player: PlayerRef): void {
+  /** 返回是否提交了同步事件（提交本身已广播） */
+  private syncSeat(room: LiveRoom, player: PlayerRef): boolean {
     const seat = seatOfPlayer(room.state.seats, player.id);
-    if (seat === null || samePlayer(room.state.seats[seat]!, player)) return;
+    if (seat === null || samePlayer(room.state.seats[seat]!, player)) return false;
     this.commit(room, { type: "syncProfile", seat, player }, SYSTEM_ACTOR);
+    return true;
   }
 
   join(room: LiveRoom, client: RoomClient): void {
     room.clients.set(client.clientId, client);
     room.lastActivity = this.now();
     const row = this.players.byId(client.playerId);
-    if (row) this.syncSeat(room, toPlayerRef(row));
-    // 在线状态变了，所有人都要刷新座位卡
-    this.reconcileAutoStart(room);
-    this.broadcastState(room);
+    const synced = row ? this.syncSeat(room, toPlayerRef(row)) : false;
+    // 在线状态变了，所有人都要刷新座位卡（档案同步已提交并广播过则不再重复）
+    if (!synced) {
+      this.reconcileAutoStart(room);
+      this.broadcastState(room);
+    }
     client.send(JSON.stringify({ type: "ui", intents: this.uiList(room) }));
   }
 

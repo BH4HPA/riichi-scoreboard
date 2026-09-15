@@ -39,8 +39,8 @@ export interface RoomView {
   ready: boolean[];
   /** 各座位是否在线：空座 false，本地玩家恒为 true，设备玩家看是否有活动连接 */
   online: boolean[];
-  /** 自动开局的时刻（epoch ms）；null 表示未在倒计时 */
-  autoStartAt: number | null;
+  /** 距自动开局的剩余毫秒（广播时刻计）；null 表示未在倒计时。用剩余量而非时刻，手机时钟偏差不影响显示 */
+  autoStartIn: number | null;
   game: GameView | null;
   gameNo: number;
 }
@@ -65,7 +65,7 @@ export function toRoomView(
   state: RoomState,
   seq: number,
   onlinePlayerIds: ReadonlySet<string>,
-  autoStartAt: number | null,
+  autoStartIn: number | null,
 ): RoomView {
   return {
     code: state.code,
@@ -75,7 +75,7 @@ export function toRoomView(
     seats: state.seats,
     ready: state.ready,
     online: seatsOnline(state, onlinePlayerIds),
-    autoStartAt,
+    autoStartIn,
     game: state.game
       ? {
           present: state.game.present,

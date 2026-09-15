@@ -4,6 +4,7 @@ import { presetNameOf, type RoomView, type Seat } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Badge } from "@/ui/controls";
 import { Dialog, DialogContent, DialogFooter } from "@/ui/dialog";
+import { useRoomStore } from "@/ws/store";
 import { useCommand } from "@/ws/useRoom";
 import { cn } from "@/lib/utils";
 import { RoomQr, RoomQrDialog } from "@/features/console/RoomQr";
@@ -42,7 +43,7 @@ export function ConsoleLobby({
   }
   const full = room.seats.every((s) => s !== null);
   const allReady = full && room.ready.every(Boolean);
-  const countdown = useCountdown(room.autoStartAt);
+  const countdown = useCountdown(useRoomStore((s) => s.autoStartDeadline));
   const openLocals = (seat: Seat | null) => {
     setLocalSeat(seat);
     setLocalOpen(true);

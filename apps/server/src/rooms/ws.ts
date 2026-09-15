@@ -60,7 +60,13 @@ export function mountWebSocket(app: Hono, upgradeWebSocket: UpgradeWebSocket, de
       let idle: ReturnType<typeof setTimeout> | null = null;
       const touch = (ws: WSContext) => {
         if (idle) clearTimeout(idle);
-        idle = setTimeout(() => ws.close(WS_CLOSE.idle, "idle"), idleMs);
+        idle = setTimeout(() => {
+          // 对端多半已经消失，不等关闭握手（ws 库默认要等 30 s）：先礼貌 close，1 s 后直接掐断
+          ws.close(WS_CLOSE.idle, "idle");
+          const raw = ws.raw as { terminate?: () => void } | undefined;
+          const kill = setTimeout(() => raw?.terminate?.(), 1_000);
+          kill.unref?.();
+        }, idleMs);
         idle.unref?.();
       };
       const untouch = () => {

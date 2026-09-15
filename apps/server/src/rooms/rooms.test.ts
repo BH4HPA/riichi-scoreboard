@@ -19,7 +19,14 @@ beforeAll(async () => {
   const config = { ...loadConfig({}), corsOrigins: [], webDist: "/nonexistent" };
   const shell = new Hono();
   const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app: shell });
-  ctx = createApp({ config, dbFile: ":memory:", upgradeWebSocket, quiet: true });
+  // 这里的用例都手动开局；倒计时拉长，避免与自动开局竞争
+  ctx = createApp({
+    config,
+    dbFile: ":memory:",
+    upgradeWebSocket,
+    quiet: true,
+    timings: { autoStartMs: 60_000 },
+  });
   shell.route("/", ctx.app);
   app = shell;
   await new Promise<void>((resolve) => {
