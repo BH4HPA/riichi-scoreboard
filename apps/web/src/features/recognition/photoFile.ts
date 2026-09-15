@@ -10,9 +10,17 @@ export interface CropRect {
   height: number;
 }
 
-/** 解码照片；`imageOrientation: "from-image"` 让 iOS 竖拍的 EXIF 方向落到像素上。 */
-export function loadPhoto(file: File): Promise<ImageBitmap> {
-  return createImageBitmap(file, { imageOrientation: "from-image" });
+/**
+ * 解码照片；`imageOrientation: "from-image"` 让 iOS 竖拍的 EXIF 方向落到像素上。
+ * 旧浏览器不认这个枚举值会抛 TypeError，退回默认行为（它们本就按 EXIF 方向解码）。
+ */
+export async function loadPhoto(file: File): Promise<ImageBitmap> {
+  try {
+    return await createImageBitmap(file, { imageOrientation: "from-image" });
+  } catch (err) {
+    if (err instanceof TypeError) return createImageBitmap(file);
+    throw err;
+  }
 }
 
 /** 按矩形裁剪并把长边缩到 PHOTO_MAX_EDGE 以内，输出 JPEG 与同尺寸的位图（推理复用，免二次解码）。 */

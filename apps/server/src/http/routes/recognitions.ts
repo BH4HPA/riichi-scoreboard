@@ -1,91 +1,118 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { DomainError, RECOGNITION_MANIFEST, validateRecognitionPatch } from "@riichi/core";
+import { DomainError, validateRecognitionPatch } from "@riichi/core";
 import { requirePlayer, type AuthEnv } from "../../auth/deviceToken";
 import type { PlayersRepo } from "../../db/players";
 import type { RecognitionsRepo } from "../../db/recognitions";
 import { RecognizerBusy, type ServerRecognizer } from "../../recognition/recognizer";
 import type { ObjectStore } from "../../storage";
-import { PHOTO_MAX_BYTES, PhotoError, savePhoto } from "../photos";
+import { PHOTO_MAX_BYTES, PhotoError, savePhoto, validatePhoto } from "../photos";
 
 interface Deps {
   players: PlayersRepo;
   recognitions: RecognitionsRepo;
   store: ObjectStore;
   recognizer: ServerRecognizer | null;
-  now?: () => number;
+  /** 当前发布的模型 id；null = 未发布，拒收照片 */
+  modelId: string | null;
 }
 
 const PATCH_MAX_BYTES = 64 * 1024;
-/** 每玩家每小时的照片上传上限（照片进对象存储，防刷） */
+/** 每玩家每小时的照片上传上限；注册是免费的，所以再加一层全局总量兜底（照片进对象存储永久保存） */
 export const UPLOADS_PER_HOUR = 60;
+export const UPLOADS_PER_HOUR_GLOBAL = 600;
+const HOUR = 60 * 60 * 1000;
 
-/** 滑动窗口计数：playerId → 最近一小时内的上传时间戳。 */
-class UploadLimiter {
+/** 滑动窗口计数：playerId → 最近一小时内的上传时间戳；另有全局窗口。 */
+export class UploadLimiter {
   private readonly hits = new Map<string, number[]>();
+  private global: number[] = [];
 
   allow(playerId: string, now: number): boolean {
-    const since = now - 60 * 60 * 1000;
+    const since = now - HOUR;
+    if (this.hits.size > 1000) this.sweep(since);
+    this.global = this.global.filter((t) => t > since);
     const recent = (this.hits.get(playerId) ?? []).filter((t) => t > since);
-    if (recent.length >= UPLOADS_PER_HOUR) {
+    if (recent.length >= UPLOADS_PER_HOUR || this.global.length >= UPLOADS_PER_HOUR_GLOBAL) {
       this.hits.set(playerId, recent);
       return false;
     }
     recent.push(now);
+    this.global.push(now);
     this.hits.set(playerId, recent);
     return true;
   }
+
+  private sweep(since: number): void {
+    for (const [id, ts] of this.hits) {
+      if (!ts.some((t) => t > since)) this.hits.delete(id);
+    }
+  }
 }
+
+const tooLarge = (max: string) =>
+  bodyLimit({
+    maxSize: max === "photo" ? PHOTO_MAX_BYTES : PATCH_MAX_BYTES,
+    onError: (c) => c.json({ error: "too_large", message: "请求体过大" }, 413),
+  });
 
 /**
  * 识别记录：
- * - POST /            原始 JPEG 体 → 存照片 + 建记录 → 201 {id, result}；`?infer=1` 由服务器引擎识别（未启用 → 503，不落库）
- * - PATCH /:id        手机端回填 {engine, ms, detections, recognized}，结算后回填 {corrected}
+ * - POST /            原始 JPEG 体 → 存照片 + 建记录 → 201 {id, result}；`?infer=1` 由服务器引擎识别
+ *                     （未启用 → 503 不落库；引擎忙 → 201 且 result 为 null，手机复用记录做本机推理）
+ * - PATCH /:id        手机端回填 {engine, modelId, ms, detections, recognized}，结算后回填 {corrected}
  */
 export function recognitionRoutes(deps: Deps): Hono {
-  const now = deps.now ?? Date.now;
+  const now = Date.now;
   const limiter = new UploadLimiter();
   const app = new Hono();
   const authed = new Hono<AuthEnv>();
   authed.use("*", requirePlayer(deps.players));
 
-  authed.post("/", bodyLimit({ maxSize: PHOTO_MAX_BYTES }), async (c) => {
+  authed.post("/", tooLarge("photo"), async (c) => {
     const infer = c.req.query("infer") === "1";
+    if (!deps.modelId) return c.json({ error: "no_model", message: "尚未发布识别模型" }, 409);
     if (infer && !deps.recognizer?.ready()) {
       return c.json({ error: "recognition_unavailable", message: "服务器识别未启用" }, 503);
     }
     const player = c.get("player");
     const t = now();
-    if (!limiter.allow(player.id, t)) {
-      return c.json({ error: "too_many", message: "识别次数过多，请稍后再试" }, 429);
-    }
     const bytes = new Uint8Array(await c.req.arrayBuffer());
-    let key: string;
     try {
-      key = await savePhoto(deps.store, player.id, bytes, t);
+      validatePhoto(bytes);
     } catch (err) {
       if (err instanceof PhotoError) return c.json({ error: err.code, message: err.message }, 400);
       throw err;
     }
-    const id = deps.recognitions.create(player.id, key, RECOGNITION_MANIFEST.model?.id ?? "", t);
+    if (!limiter.allow(player.id, t)) {
+      return c.json({ error: "too_many", message: "识别次数过多，请稍后再试" }, 429);
+    }
+    const key = await savePhoto(deps.store, player.id, bytes, t);
+    const id = deps.recognitions.create(player.id, key, deps.modelId, t);
     if (!infer) return c.json({ id, result: null }, 201);
     try {
       const result = await deps.recognizer!.recognize(bytes);
       deps.recognitions.patch(
         id,
         player.id,
-        { engine: "server", ms: result.ms, detections: result.detections, recognized: result.hand },
+        {
+          engine: "server",
+          modelId: result.modelId,
+          ms: result.ms,
+          detections: result.detections,
+          recognized: result.hand,
+        },
         now(),
       );
       return c.json({ id, result }, 201);
     } catch (err) {
-      if (err instanceof RecognizerBusy)
-        return c.json({ error: "too_busy", message: err.message }, 429);
+      // 引擎忙：照片与记录已落库，让手机复用这条记录做本机推理，不必再传一次
+      if (err instanceof RecognizerBusy) return c.json({ id, result: null }, 201);
       throw err;
     }
   });
 
-  authed.patch("/:id", bodyLimit({ maxSize: PATCH_MAX_BYTES }), async (c) => {
+  authed.patch("/:id", tooLarge("patch"), async (c) => {
     const body: unknown = await c.req.json().catch(() => null);
     let patch;
     try {

@@ -52,6 +52,8 @@ export interface RecognitionCreated {
 /** PATCH /api/recognitions/:id：字段全可选，按给出的合并。 */
 export interface RecognitionPatch {
   engine?: RecognitionEngine;
+  /** 手机端实际使用的模型（前端打包的 manifest 可能与服务端不同版本） */
+  modelId?: string;
   ms?: number;
   detections?: Detection[];
   recognized?: RecognizedHand;

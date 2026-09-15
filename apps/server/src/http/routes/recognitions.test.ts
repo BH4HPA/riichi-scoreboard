@@ -7,6 +7,7 @@ import { createApp } from "../../app";
 import { loadConfig } from "../../config";
 import type { RecognitionRow } from "../../db/recognitions";
 import { PHOTO_MAX_BYTES } from "../photos";
+import { UPLOADS_PER_HOUR, UploadLimiter } from "./recognitions";
 
 /** 最小合法 JPEG 头（只需通过魔数嗅探） */
 const JPEG = new Uint8Array([
@@ -103,10 +104,44 @@ describe("POST /api/recognitions", () => {
     ).toBe(before);
   });
 
-  it("超过 2MB → 413（HTTPException 透传，不再变成 500）", async () => {
+  it("超过 2MB → 413 JSON（HTTPException 透传，不再变成 500）", async () => {
     const big = new Uint8Array(PHOTO_MAX_BYTES + 1);
     big.set(JPEG);
-    expect((await post(big)).status).toBe(413);
+    const res = await post(big);
+    expect(res.status).toBe(413);
+    expect(((await res.json()) as { error: string }).error).toBe("too_large");
+  });
+
+  it("未发布模型 → 409，不落库", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "riichi-rec3-"));
+    const app3 = createApp({
+      config: { ...loadConfig({}), dataDir: dir, corsOrigins: [], webDist: "/nonexistent" },
+      dbFile: ":memory:",
+      quiet: true,
+      modelId: null,
+    });
+    const tok = await register(app3.app);
+    const res = await app3.app.request("/api/recognitions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${tok}` },
+      body: JPEG,
+    });
+    expect(res.status).toBe(409);
+    expect(app3.db.prepare("SELECT COUNT(*) AS n FROM recognitions").get()).toEqual({ n: 0 });
+    app3.db.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("限流：每人每小时 60 次，全局 600 次；坏照片不计入", () => {
+    const l = new UploadLimiter();
+    const t0 = 1_000_000;
+    for (let i = 0; i < UPLOADS_PER_HOUR; i++) expect(l.allow("a", t0 + i)).toBe(true);
+    expect(l.allow("a", t0 + 100)).toBe(false);
+    expect(l.allow("a", t0 + 60 * 60 * 1000 + 1)).toBe(true); // 一小时后窗口滑出
+    const g = new UploadLimiter();
+    for (let p = 0; p < 10; p++)
+      for (let i = 0; i < UPLOADS_PER_HOUR; i++) expect(g.allow(`p${p}`, t0)).toBe(true);
+    expect(g.allow("fresh", t0)).toBe(false);
   });
 
   it("注入的服务器引擎：?infer=1 → 201 带结果，记录写入 engine=server", async () => {
@@ -146,6 +181,7 @@ describe("PATCH /api/recognitions/:id", () => {
     const { id } = (await (await post(JPEG)).json()) as { id: string };
     const res = await patch(id, {
       engine: "browser",
+      modelId: "12b2722c-cbce-4e9b-9bd1-341280bd0204",
       ms: 812,
       detections: [{ cls: 3, conf: 0.9, box: [1, 2, 3, 4] }],
       recognized: { closed: [1, 2], melds: [], winTile: 2, doraIndicators: [], uraIndicators: [] },
@@ -154,6 +190,7 @@ describe("PATCH /api/recognitions/:id", () => {
     expect((await patch(id, { corrected: HAND })).status).toBe(204);
     const r = row(id)!;
     expect(r.engine).toBe("browser");
+    expect(r.model_id).toBe("12b2722c-cbce-4e9b-9bd1-341280bd0204");
     expect(JSON.parse(r.recognized!).winTile).toBe(2);
     expect(JSON.parse(r.corrected!).winTile).toBe(9);
     expect((await patch(id, { ms: 1 }, other)).status).toBe(404);

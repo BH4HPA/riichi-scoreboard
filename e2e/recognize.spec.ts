@@ -113,7 +113,8 @@ test("本机引擎：模型加载失败 → 错误提示、牌面不变，照片
   await expect(confirmCrop).toBeEnabled();
   await confirmCrop.click();
 
-  await expect(p.getByText(/^识别失败：/)).toBeVisible({ timeout: 20_000 });
+  // 模型下载被拦掉时才会走到这里：说明本地的 wasm 运行时已加载成功
+  await expect(p.getByText(/^识别失败：.*fetch/i)).toBeVisible({ timeout: 20_000 });
   await uploaded;
   await expect(dialog.getByTestId("hand-area").getByRole("button")).toHaveCount(0);
   await expect(dialog.getByTestId("recognize-button")).toBeEnabled();

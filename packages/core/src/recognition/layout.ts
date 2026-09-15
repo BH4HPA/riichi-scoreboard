@@ -13,6 +13,7 @@ import type {
  * - 副露 3/4 张且含一张横置，或 牌背-X-X-牌背 的暗杠；放在手牌行右侧、下方或上方都行。
  * - 指示牌在手牌行上方，不含横置与牌背，每行 ≤5 张；两行时上表下里，一行全表。
  * - 照片已由用户裁剪，只含手牌 / 副露 / 指示牌；多出来的行只报警告。
+ * 前提：detections 的 cls 已在类目录范围内（decodeNmsOutput / validate 都保证）。
  * 不抛错：能拼多少拼多少，问题写进 warnings，交编辑器让用户改。
  */
 export interface LayoutOptions {
@@ -38,6 +39,9 @@ export interface LayoutResult {
   warnings: RecognitionWarning[];
 }
 
+const MAX_MELDS = 4;
+const MAX_INDICATORS = 5;
+
 interface Item {
   det: Detection;
   /** null = 牌背 */
@@ -58,6 +62,12 @@ function median(values: number[]): number {
   if (values.length === 0) return 0;
   const s = [...values].sort((a, b) => a - b);
   return s[Math.floor(s.length / 2)]!;
+}
+
+/** 主轴：正放的牌是竖长的；照片里多数框「宽 > 高」说明手机竖拍没转，交换坐标按列读。 */
+function isPortrait(dets: readonly Detection[]): boolean {
+  const wide = dets.filter((d) => d.box[2] - d.box[0] > d.box[3] - d.box[1]).length;
+  return wide > dets.length - wide;
 }
 
 function toItems(dets: readonly Detection[], swap: boolean, sideAspect: number): Item[] {
@@ -97,17 +107,6 @@ function splitGroups(row: Item[], gap: number): Item[][] {
   return groups;
 }
 
-/** 主轴：分别按 y 与按 x 聚类，哪个方向的最大簇更大就用哪个；竖拍时交换坐标。 */
-function pickSwap(dets: readonly Detection[], opts: LayoutOptions): boolean {
-  const byRow = toItems(dets, false, opts.sideAspect);
-  const byCol = toItems(dets, true, opts.sideAspect);
-  const largest = (items: Item[]) =>
-    Math.max(
-      ...clusterRows(items, opts.rowGap * median(items.map((i) => i.h))).map((r) => r.length),
-    );
-  return largest(byCol) > largest(byRow);
-}
-
 function isAnkan(g: Item[]): boolean {
   return g.length === 4 && g[0]!.tile === null && g[3]!.tile === null;
 }
@@ -116,8 +115,8 @@ function isMeldCandidate(g: Item[]): boolean {
   return (g.length === 3 || g.length === 4) && (g.some((i) => i.side) || isAnkan(g));
 }
 
-function isClosedCandidate(g: Item[]): boolean {
-  return g.length % 3 === 2;
+function isCleanRow(items: Item[]): boolean {
+  return items.length <= MAX_INDICATORS && items.every((i) => !i.side && i.tile !== null);
 }
 
 export function layoutHand(
@@ -142,7 +141,8 @@ export function layoutHand(
   const low = detections.filter((d) => d.conf < opts.lowConf).length;
   if (low > 0) warn("low_conf", `${low} 张牌置信度较低，请核对`);
 
-  const items = toItems(detections, pickSwap(detections, opts), opts.sideAspect);
+  const swap = isPortrait(detections);
+  const items = toItems(detections, swap, opts.sideAspect);
   const upright = items.filter((i) => !i.side);
   const medH = median((upright.length ? upright : items).map((i) => i.h));
   const medW = median((upright.length ? upright : items).map((i) => i.w));
@@ -151,38 +151,34 @@ export function layoutHand(
     groups: splitGroups(r, opts.groupGap * medW),
   }));
 
-  // 暗牌组：最大的 3n+2 组，平手取最下面的行；没有就退而取最大的组
-  let closedGroup: Item[] | null = null;
-  let handRow: Row | null = null;
-  for (const row of rows) {
-    for (const g of row.groups) {
-      if (!isClosedCandidate(g)) continue;
-      if (
-        !closedGroup ||
-        g.length > closedGroup.length ||
-        (g.length === closedGroup.length && row.cy > handRow!.cy)
-      ) {
-        closedGroup = g;
-        handRow = row;
-      }
-    }
-  }
-  if (!closedGroup || !handRow) {
+  // 暗牌组：优先「3n+2 张且含横置的和张」（两张暗牌配四杠时，5 张的指示牌行也是 3n+2，靠横置区分），
+  // 其次最大的非副露组（漏检把暗牌切碎时，不让两张的指示牌行冒充暗牌）；同级取最大、再取最下面的行
+  const pick = (ok: (g: Item[]) => boolean): [Item[], Row] | null => {
+    let best: [Item[], Row] | null = null;
     for (const row of rows) {
       for (const g of row.groups) {
-        if (isMeldCandidate(g)) continue;
-        if (!closedGroup || g.length > closedGroup.length) {
-          closedGroup = g;
-          handRow = row;
-        }
+        if (isMeldCandidate(g) || !ok(g)) continue;
+        if (
+          !best ||
+          g.length > best[0].length ||
+          (g.length === best[0].length && row.cy > best[1].cy)
+        )
+          best = [g, row];
       }
     }
-    if (!closedGroup || !handRow) {
-      closedGroup = rows[rows.length - 1]!.groups[0]!;
-      handRow = rows[rows.length - 1]!;
-    }
-    warn("bad_group", `暗牌组应为 3n+2 张，实际 ${closedGroup.length} 张`);
+    return best;
+  };
+  const closedPick =
+    pick((g) => g.length % 3 === 2 && g.some((i) => i.side && i.tile !== null)) ?? pick(() => true);
+  let closedGroup: Item[];
+  let handRow: Row;
+  if (closedPick) [closedGroup, handRow] = closedPick;
+  else {
+    handRow = rows[rows.length - 1]!;
+    closedGroup = handRow.groups[0]!;
   }
+  if (closedGroup.length % 3 !== 2)
+    warn("bad_group", `暗牌组应为 3n+2 张，实际 ${closedGroup.length} 张`);
 
   // 暗牌 + 和张
   const closedTiles = closedGroup.filter((i) => i.tile !== null);
@@ -208,6 +204,10 @@ export function layoutHand(
     for (const g of row.groups) {
       if (g === closedGroup || !isMeldCandidate(g)) continue;
       consumed.add(g);
+      if (melds.length >= MAX_MELDS) {
+        warn("bad_group", "副露超过 4 组，多出的已忽略");
+        continue;
+      }
       if (isAnkan(g)) {
         const [a, b] = [g[1]!, g[2]!];
         if (a.tile === null || b.tile === null) {
@@ -232,27 +232,34 @@ export function layoutHand(
     }
   }
 
-  // 指示牌行：手牌行上方、剩余的组不含横置/牌背且 ≤5 张的行；最近两行上表下里
-  const indicatorRows: Item[][] = [];
-  let extra = 0;
-  for (const row of rows) {
-    const rest = row.groups.filter((g) => !consumed.has(g));
-    if (rest.length === 0) continue;
-    const tiles = rest.flat().sort((a, b) => a.cx - b.cx);
-    const above = row.cy < handRow.cy - 0.5 * medH;
-    const clean = tiles.every((i) => !i.side && i.tile !== null);
-    if (above && clean && tiles.length <= 5) indicatorRows.push(tiles);
-    else extra += tiles.length;
-  }
+  // 指示牌行：手牌行之外、剩余的组不含横置/牌背且 ≤5 张的行。横拍只看上方；竖拍分不清哪边是「上」，
+  // 两侧都收集、取有干净行的那一侧（两侧都有取行数多的）。离手牌近的是里宝，远的是表宝牌。
+  const leftover = rows
+    .map((row) => ({ row, tiles: row.groups.filter((g) => !consumed.has(g)).flat() }))
+    .filter(({ tiles }) => tiles.length > 0);
+  const gapToHand = 0.5 * medH;
+  const sideOf = (r: Row) =>
+    r.cy < handRow.cy - gapToHand ? -1 : r.cy > handRow.cy + gapToHand ? 1 : 0;
+  const candidates = (dir: -1 | 1) =>
+    leftover
+      .filter(({ row, tiles }) => sideOf(row) === dir && isCleanRow(tiles))
+      .map(({ row, tiles }) => ({
+        dist: Math.abs(row.cy - handRow.cy),
+        tiles: [...tiles].sort((a, b) => a.cx - b.cx),
+      }))
+      .sort((a, b) => a.dist - b.dist);
+  const up = candidates(-1);
+  const down = swap ? candidates(1) : [];
+  const indicatorRows = (down.length > up.length ? down : up).map((c) => c.tiles);
+  const used = new Set(indicatorRows.slice(0, 2).flat());
+  const extra = leftover.reduce((n, { tiles }) => n + tiles.filter((t) => !used.has(t)).length, 0);
   if (extra > 0) warn("extra_rows", `有 ${extra} 张牌不在手牌、副露或指示牌的位置，已忽略`);
-  indicatorRows.sort((a, b) => b[0]!.cy - a[0]!.cy); // 离手牌近的在前
   let doraIndicators: Tile[] = [];
   let uraIndicators: Tile[] = [];
   if (indicatorRows.length === 1) doraIndicators = indicatorRows[0]!.map((i) => i.tile!);
   else if (indicatorRows.length >= 2) {
     uraIndicators = indicatorRows[0]!.map((i) => i.tile!);
     doraIndicators = indicatorRows[1]!.map((i) => i.tile!);
-    if (indicatorRows.length > 2) warn("extra_rows", "指示牌超过两行，只取最近的两行");
   }
   if (uraIndicators.length > doraIndicators.length) {
     warn("too_many_dora", "里宝指示牌多于表宝牌，已截断");

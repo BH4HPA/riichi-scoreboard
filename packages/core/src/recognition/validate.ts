@@ -71,6 +71,10 @@ export function validateRecognitionPatch(v: unknown): RecognitionPatch {
     if (v.engine !== "browser" && v.engine !== "server") bad("引擎无效");
     patch.engine = v.engine as RecognitionEngine;
   }
+  if (v.modelId !== undefined) {
+    if (typeof v.modelId !== "string" || !/^[0-9a-f-]{36}$/.test(v.modelId)) bad("模型 id 无效");
+    patch.modelId = v.modelId;
+  }
   if (v.ms !== undefined) {
     const ms = finite(v.ms, "耗时");
     if (ms < 0 || !Number.isInteger(ms)) bad("耗时无效");

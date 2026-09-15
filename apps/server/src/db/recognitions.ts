@@ -30,13 +30,6 @@ export class RecognitionsRepo {
     return id;
   }
 
-  get(id: string): RecognitionRow | null {
-    return (
-      (this.db.prepare("SELECT * FROM recognitions WHERE id = ?").get(id) as
-        RecognitionRow | undefined) ?? null
-    );
-  }
-
   /** 只更新给出的字段；不是本人的记录视为不存在。 */
   patch(id: string, playerId: string, patch: RecognitionPatch, now: number): boolean {
     const sets: string[] = [];
@@ -46,6 +39,7 @@ export class RecognitionsRepo {
       args.push(value);
     };
     if (patch.engine !== undefined) set("engine", patch.engine);
+    if (patch.modelId !== undefined) set("model_id", patch.modelId);
     if (patch.ms !== undefined) set("ms", patch.ms);
     if (patch.detections !== undefined) set("detections", JSON.stringify(patch.detections));
     if (patch.recognized !== undefined) set("recognized", JSON.stringify(patch.recognized));

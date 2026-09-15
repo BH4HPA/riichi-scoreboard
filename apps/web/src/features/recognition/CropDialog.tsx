@@ -3,6 +3,7 @@ import Cropper, { type Area } from "react-easy-crop";
 import { Button } from "@/ui/button";
 import { ChipGroup } from "@/ui/controls";
 import { Dialog, DialogContent, DialogFooter } from "@/ui/dialog";
+import { useRoomStore } from "@/ws/store";
 import { cropPhoto, loadPhoto } from "./photoFile";
 
 /** 裁剪框比例：手牌一行 + 上方指示牌约 3:1；副露放上下时更接近 2:1 或 4:3 */
@@ -65,15 +66,20 @@ function CropBody({
   const [bitmap, setBitmap] = useState<ImageBitmap | null>(null);
   useEffect(() => {
     let cancelled = false;
+    let loaded: ImageBitmap | null = null;
     loadPhoto(file)
       .then((b) => {
+        loaded = b;
         if (!cancelled) setBitmap(b);
       })
       .catch(() => {
-        if (!cancelled) onCancelRef.current();
+        if (cancelled) return;
+        useRoomStore.getState().notify("error", "无法读取这张照片");
+        onCancelRef.current();
       });
     return () => {
       cancelled = true;
+      loaded?.close();
     };
   }, [file]);
 

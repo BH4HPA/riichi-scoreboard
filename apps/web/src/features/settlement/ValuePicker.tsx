@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
   scoreTier,
   TIER_LABELS,
@@ -10,8 +10,12 @@ import {
 import { ChipGroup, Label, Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/controls";
 import { useSocket } from "@/ws/useRoom";
 import { CommandError } from "@/ws/socket";
-import { CameraButton } from "@/features/recognition/CameraButton";
 import { TileKeyboard } from "./TileKeyboard";
+
+/** 拍照识别（裁剪库、布局规则）只在打开牌面页时才加载，主包不带 */
+const CameraButton = lazy(() =>
+  import("@/features/recognition/CameraButton").then((m) => ({ default: m.CameraButton })),
+);
 import { isHandComplete, type ValueDraft } from "./valueDraft";
 
 const HAN_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((n) => ({
@@ -136,7 +140,9 @@ export function ValuePicker({
         </div>
       </TabsContent>
       <TabsContent value="hand" className="mt-3 space-y-3">
-        <CameraButton draft={draft} onChange={onChange} rules={rules} />
+        <Suspense fallback={null}>
+          <CameraButton draft={draft} onChange={onChange} rules={rules} />
+        </Suspense>
         <TileKeyboard
           hand={draft.hand}
           onChange={(hand) => onChange((d) => ({ ...d, hand, evaluated: null }))}

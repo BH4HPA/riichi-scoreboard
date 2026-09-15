@@ -6,7 +6,7 @@ import type { RecognitionResult } from "@riichi/core";
  */
 export interface ServerRecognizer {
   ready(): boolean;
-  /** 输入裁剪后的 JPEG；忙时可抛 RecognizerBusy → 429 */
+  /** 输入裁剪后的 JPEG；忙时可抛 RecognizerBusy → 路由回 201 且 result 为 null，由手机本机推理 */
   recognize(jpeg: Uint8Array): Promise<RecognitionResult>;
 }
 

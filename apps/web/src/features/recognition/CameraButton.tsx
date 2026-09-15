@@ -7,7 +7,7 @@ import { Button } from "@/ui/button";
 import { ChipGroup } from "@/ui/controls";
 import { useRoomStore } from "@/ws/store";
 import { applyRecognized } from "./applyRecognized";
-import { CropDialog } from "./CropDialog";
+import { CropDialog, type CroppedPhoto } from "./CropDialog";
 import { readEnginePref, writeEnginePref } from "./enginePref";
 import { recognizePhoto, type RecognizePhase } from "./recognize";
 
@@ -42,7 +42,6 @@ export function CameraButton({
   rules: RoomRules;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const idRef = useRef<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [engine, setEngine] = useState<RecognitionEngine>(readEnginePref);
   const [phase, setPhase] = useState<RecognizePhase | null>(null);
@@ -56,33 +55,38 @@ export function CameraButton({
     writeEnginePref(e);
   };
 
-  const run = async (photo: { blob: Blob; bitmap: ImageBitmap }) => {
+  const run = async (photo: CroppedPhoto) => {
     setFile(null);
     setThumb(URL.createObjectURL(photo.blob));
-    idRef.current = null;
+    const key = crypto.randomUUID();
+    let id: string | null = null;
     const notify = useRoomStore.getState().notify;
     try {
       const { token } = await useSession.getState().ensure();
-      const result = await recognizePhoto(photo, engine, token, {
+      const result = await recognizePhoto(key, photo, engine, token, {
         onPhase: setPhase,
-        onId: (id) => {
-          idRef.current = id;
-          onChange((d) => (d.recognition ? { ...d, recognition: { ...d.recognition, id } } : d));
+        onId: (got) => {
+          id = got;
+          // 结果已灌入且是同一次运行时补上 id；否则由下面灌入时带上
+          onChange((d) =>
+            d.recognition?.key === key ? { ...d, recognition: { ...d.recognition, id: got } } : d,
+          );
         },
         onFallback: () => notify("info", "服务器识别未启用，已改用本机识别"),
       });
       onChange((d) => {
-        const next = applyRecognized(d, result, rules);
-        return { ...next, recognition: { ...next.recognition!, id: idRef.current } };
+        const next = applyRecognized(d, result, rules, key);
+        return { ...next, recognition: { ...next.recognition!, id } };
       });
     } catch (err) {
       notify("error", err instanceof Error ? `识别失败：${err.message}` : "识别失败");
     } finally {
+      photo.bitmap.close();
       setPhase(null);
     }
   };
 
-  const rec = draft.mode === "hand" ? draft.recognition : null;
+  const rec = draft.recognition;
   return (
     <div className="space-y-2 rounded-lg border border-border p-2.5" data-testid="recognize">
       <div className="flex flex-wrap items-center gap-2">

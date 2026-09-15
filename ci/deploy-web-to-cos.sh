@@ -44,3 +44,13 @@ coscmd "${CONFIG_ARGS[@]}"
 
 echo "Syncing $DIST_DIR -> cos://$BUCKET/"
 coscmd -c "$CONF" upload -rs --delete -f "$DIST_DIR/" /
+
+# 带哈希的资源可以永久缓存（CDN 默认规则只给 1 小时；14 MB 的 onnxruntime wasm 每次重下代价太大）；
+# .wasm 显式标 application/wasm，否则浏览器不能流式编译、ORT 会回退并再拉一遍整文件。
+IMMUTABLE='"Cache-Control":"public, max-age=31536000, immutable"'
+echo "Setting long cache on assets/"
+coscmd -c "$CONF" upload -rf -H "{$IMMUTABLE}" "$DIST_DIR/assets/" /assets/ </dev/null
+for wasm in "$DIST_DIR"/assets/*.wasm; do
+  [[ -f "$wasm" ]] || continue
+  coscmd -c "$CONF" upload -f -H "{\"Content-Type\":\"application/wasm\",$IMMUTABLE}" "$wasm" "/assets/$(basename "$wasm")" </dev/null
+done

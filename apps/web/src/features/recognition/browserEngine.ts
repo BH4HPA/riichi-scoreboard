@@ -5,7 +5,7 @@ import {
   RECOGNITION_MANIFEST,
   type RecognitionResult,
 } from "@riichi/core";
-import { loadSession, runDetector } from "./ort";
+import { loadDetector, runDetector } from "./ort";
 import { toModelInput } from "./preprocess";
 
 export type BrowserPhase = "loading-model" | "running";
@@ -18,11 +18,11 @@ export async function recognizeInBrowser(
   const model = RECOGNITION_MANIFEST.model;
   if (!model) throw new Error("尚未发布识别模型");
   onPhase?.("loading-model");
-  const session = await loadSession(model.id);
+  const detector = await loadDetector(model.id);
   onPhase?.("running");
   const t0 = performance.now();
   const { data, geom } = toModelInput(bitmap, model.imgsz);
-  const output = await runDetector(session, data, model.imgsz);
+  const output = await runDetector(detector, data, model.imgsz);
   const detections = decodeNmsOutput(output, geom, RECOGNITION_CLASSES.length);
   const { hand, warnings } = layoutHand(detections);
   return {

@@ -1,6 +1,6 @@
-/** 曲库对象所在的公网地址；对象名 = manifest 里的 uuid（上传见 ci/upload-music.sh，两处前缀须一致）。 */
-const MUSIC_BASE_URL = "https://static.bitego.net/riichi/music";
+import { STATIC_BASE_URL } from "@/lib/staticUrl";
 
+/** 曲库对象地址；对象名 = manifest 里的 uuid（上传见 ci/upload-music.sh）。 */
 export function musicUrl(id: string): string {
-  return `${MUSIC_BASE_URL}/${id}.mp3`;
+  return `${STATIC_BASE_URL}/music/${id}.mp3`;
 }

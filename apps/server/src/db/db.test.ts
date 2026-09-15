@@ -2,7 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { MIGRATIONS, migrate, schemaVersion } from "./index";
 import { PlayersRepo } from "./players";
-import { RecognitionsRepo } from "./recognitions";
+import { RecognitionsRepo, type RecognitionRow } from "./recognitions";
 
 describe("数据库迁移", () => {
   it("新库直接迁到最新版本", () => {
@@ -47,13 +47,15 @@ describe("数据库迁移", () => {
     migrate(db);
     const repo = new RecognitionsRepo(db);
     const id = repo.create("p1", "hands/p1/x.jpg", "model-1", 100);
-    expect(repo.get(id)).toMatchObject({ player_id: "p1", engine: null, detections: null });
+    const get = () =>
+      db.prepare("SELECT * FROM recognitions WHERE id = ?").get(id) as unknown as RecognitionRow;
+    expect(get()).toMatchObject({ player_id: "p1", engine: null, detections: null });
     const detections = [
       { cls: 3, conf: 0.9, box: [1, 2, 3, 4] as [number, number, number, number] },
     ];
     expect(repo.patch(id, "p1", { engine: "browser", ms: 812, detections }, 200)).toBe(true);
     expect(repo.patch(id, "someone-else", { ms: 1 }, 300)).toBe(false);
-    const row = repo.get(id)!;
+    const row = get();
     expect(row.engine).toBe("browser");
     expect(row.ms).toBe(812);
     expect(JSON.parse(row.detections!)).toEqual(detections);

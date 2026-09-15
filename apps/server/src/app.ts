@@ -6,6 +6,7 @@ import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
 import type { UpgradeWebSocket } from "hono/ws";
+import { RECOGNITION_MANIFEST } from "@riichi/core";
 import type { ServerConfig } from "./config";
 import { openDatabase, type Database } from "./db";
 import { PlayersRepo } from "./db/players";
@@ -42,6 +43,8 @@ export interface CreateAppOptions {
   quiet?: boolean;
   /** 服务器端识别引擎；不给则 `?infer=1` 一律 503 */
   recognizer?: ServerRecognizer | null;
+  /** 测试用：覆盖当前发布的模型 id（默认取 core manifest） */
+  modelId?: string | null;
 }
 
 const OBJECT_TYPES: Record<string, string> = {
@@ -78,6 +81,7 @@ export function createApp({
   timings,
   quiet = false,
   recognizer = null,
+  modelId = RECOGNITION_MANIFEST.model?.id ?? null,
 }: CreateAppOptions): AppContext {
   const db = openDatabase(dbFile ?? path.join(config.dataDir, "riichi.sqlite"));
   const players = new PlayersRepo(db);
@@ -112,7 +116,10 @@ export function createApp({
   app.route("/api/me/locals", localRoutes({ players, results, registry, store }));
   app.route("/api/me", meRoutes({ players, presets, results, registry, store }));
   app.route("/api/rooms", roomRoutes({ registry, players }));
-  app.route("/api/recognitions", recognitionRoutes({ players, recognitions, store, recognizer }));
+  app.route(
+    "/api/recognitions",
+    recognitionRoutes({ players, recognitions, store, recognizer, modelId }),
+  );
   if (local) mountLocalObjects(app, local);
   app.notFound((c) => c.json({ error: "not_found", message: "接口不存在" }, 404));
   app.onError((err, c) => {

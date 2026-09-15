@@ -8,8 +8,9 @@ import {
 } from "@riichi/core";
 import type { ValueDraft } from "@/features/settlement/valueDraft";
 
-/** 草稿里挂的识别信息：记录 id（上传完成后才有）、引擎、耗时、提示。 */
+/** 草稿里挂的识别信息：本次运行的 key（等上传用）、记录 id（上传完成后才有）、引擎、耗时、提示。 */
 export interface DraftRecognition {
+  key: string;
   id: string | null;
   engine: RecognitionEngine;
   ms: number;
@@ -24,6 +25,7 @@ export function applyRecognized(
   draft: ValueDraft,
   result: RecognitionResult,
   rules: RoomRules,
+  key: string,
 ): ValueDraft {
   const fold = (t: number) => (rules.hand.akaCount === 0 && isAka(t) ? baseTile(t) : t);
   const warnings = [...result.warnings];
@@ -36,16 +38,17 @@ export function applyRecognized(
       message: `当前规则最多 ${maxDora} 张宝牌指示牌，已截断`,
     });
   }
-  const riichi = draft.hand.riichi || draft.hand.doubleRiichi;
+  // 里宝只有立直者才翻：照片里有里宝指示牌就是立直的证据，直接勾上
+  let riichi = draft.hand.riichi;
   let uraIndicators = result.hand.uraIndicators.map(fold).slice(0, doraIndicators.length);
-  if (uraIndicators.length > 0 && (!riichi || !rules.hand.uraDora)) {
-    uraIndicators = [];
-    warnings.push({
-      code: "extra_rows",
-      message: rules.hand.uraDora
-        ? "认出了里宝指示牌，勾选立直后再补"
-        : "当前规则无里宝，已忽略里宝指示牌",
-    });
+  if (uraIndicators.length > 0) {
+    if (!rules.hand.uraDora) {
+      uraIndicators = [];
+      warnings.push({ code: "extra_rows", message: "当前规则无里宝，已忽略里宝指示牌" });
+    } else if (!riichi && !draft.hand.doubleRiichi) {
+      riichi = true;
+      warnings.push({ code: "extra_rows", message: "认出了里宝指示牌，已勾选立直" });
+    }
   }
   return {
     ...draft,
@@ -57,8 +60,9 @@ export function applyRecognized(
       winTile: fold(result.hand.winTile),
       doraIndicators,
       uraIndicators,
+      riichi,
     },
     evaluated: null,
-    recognition: { id: null, engine: result.engine, ms: result.ms, warnings },
+    recognition: { key, id: null, engine: result.engine, ms: result.ms, warnings },
   };
 }
