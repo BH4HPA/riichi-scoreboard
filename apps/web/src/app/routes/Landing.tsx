@@ -20,7 +20,7 @@ export function Landing() {
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 px-6 py-10">
       <div>
         <h1 className="text-2xl font-semibold">立直麻将计分板</h1>
-        <p className="mt-1 text-sm text-muted">电视开主控台显示二维码，手机扫码加入并远程计分。</p>
+        <p className="mt-1 text-sm text-muted">扫描主控台二维码或者输入房间码，加入远程控制。</p>
       </div>
       {showJoin ? (
         <JoinPanel />
