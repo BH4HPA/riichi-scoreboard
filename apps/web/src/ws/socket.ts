@@ -10,6 +10,7 @@ import {
 } from "@riichi/core";
 import { wsUrl } from "@/api/client";
 import { newId } from "@/lib/utils";
+import { HEARTBEAT_MS, isStale } from "./heartbeat";
 import { useRoomStore } from "./store";
 
 export class CommandError extends Error {
@@ -33,7 +34,10 @@ type Pending =
   | { kind: "command"; resolve: (seq: number) => void; reject: (e: CommandError) => void }
   | { kind: "evaluate"; resolve: (r: EvaluatedHand) => void; reject: (e: CommandError) => void };
 
-/** 房间 WebSocket：自动重连、命令带 baseSeq、评估请求、镜像意图（按来源合并，取最近打开的）。 */
+/**
+ * 房间 WebSocket：自动重连、命令带 baseSeq、评估请求、镜像意图（按来源合并，取最近打开的）。
+ * 保活：5 s 心跳 + 回包看门狗（CDN 会静默回收空闲连接，见 heartbeat.ts）；页面回前台时立即重连。
+ */
 export class RoomSocket {
   private ws: WebSocket | null = null;
   private readonly pending = new Map<string, Pending>();
@@ -42,11 +46,23 @@ export class RoomSocket {
   private readonly intents = new Map<string, { intent: UiIntent; at: number }>();
   private lastSent = "";
   private heartbeat: ReturnType<typeof setInterval> | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastSeenAt = 0;
+  private readonly onVisible = () => {
+    if (document.visibilityState !== "visible" || this.closedByUser) return;
+    const state = this.ws?.readyState;
+    if (state === WebSocket.OPEN || state === WebSocket.CONNECTING) return;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    this.connect();
+  };
 
   constructor(
     private readonly code: string,
     private readonly token: string,
-  ) {}
+  ) {
+    document.addEventListener("visibilitychange", this.onVisible);
+  }
 
   connect(): void {
     this.closedByUser = false;
@@ -59,10 +75,15 @@ export class RoomSocket {
       useRoomStore.getState().set({ status: "open" });
       this.lastSent = "";
       this.flushUi();
-      this.heartbeat = setInterval(() => this.raw({ type: "ping" }), 25_000);
+      this.lastSeenAt = Date.now();
+      this.heartbeat = setInterval(() => {
+        if (isStale(this.lastSeenAt, Date.now())) this.dropAndReconnect(ws);
+        else this.raw({ type: "ping" });
+      }, HEARTBEAT_MS);
     };
     ws.onmessage = (evt) => {
       if (this.ws !== ws) return;
+      this.lastSeenAt = Date.now();
       let msg: ServerMessage;
       try {
         msg = JSON.parse(String(evt.data)) as ServerMessage;
@@ -73,11 +94,7 @@ export class RoomSocket {
     };
     ws.onclose = (evt) => {
       if (this.ws !== ws) return;
-      if (this.heartbeat) clearInterval(this.heartbeat);
-      this.heartbeat = null;
-      for (const p of this.pending.values())
-        p.reject(new CommandError("disconnected", "连接已断开"));
-      this.pending.clear();
+      this.teardown();
       const reason = TERMINAL_CLOSE[evt.code];
       if (this.closedByUser || reason) {
         useRoomStore.getState().set({ status: "closed", closedReason: reason ?? null });
@@ -86,7 +103,8 @@ export class RoomSocket {
       const delay = Math.min(1000 * 2 ** this.retry, 10_000);
       this.retry += 1;
       useRoomStore.getState().set({ status: "reconnecting" });
-      setTimeout(() => {
+      this.reconnectTimer = setTimeout(() => {
+        this.reconnectTimer = null;
         if (!this.closedByUser && this.ws === ws) this.connect();
       }, delay);
     };
@@ -97,10 +115,35 @@ export class RoomSocket {
 
   close(): void {
     this.closedByUser = true;
+    document.removeEventListener("visibilitychange", this.onVisible);
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
     const ws = this.ws;
     this.ws = null;
+    this.teardown();
     ws?.close();
     useRoomStore.getState().set({ status: "closed" });
+  }
+
+  /** 停心跳、拒绝在途请求；连接本身由调用方处理。 */
+  private teardown(): void {
+    if (this.heartbeat) clearInterval(this.heartbeat);
+    this.heartbeat = null;
+    for (const p of this.pending.values()) p.reject(new CommandError("disconnected", "连接已断开"));
+    this.pending.clear();
+  }
+
+  /**
+   * 看门狗判定连接已死：不等浏览器的关闭握手（对端已消失时 onclose 可能很久才来），
+   * 直接丢弃这条连接并立刻重连；旧连接的 onclose 之后到达时因 this.ws 已变而被忽略。
+   */
+  private dropAndReconnect(ws: WebSocket): void {
+    if (this.ws !== ws) return;
+    this.teardown();
+    this.ws = null;
+    ws.close();
+    useRoomStore.getState().set({ status: "reconnecting" });
+    this.connect();
   }
 
   private raw(msg: ClientMessage): boolean {

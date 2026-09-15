@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { createMiddleware } from "hono/factory";
 import { logger } from "hono/logger";
 import type { UpgradeWebSocket } from "hono/ws";
 import type { ServerConfig } from "./config";
@@ -79,6 +80,13 @@ export function createApp({
 
   const app = new Hono();
   if (!quiet) app.use("/api/*", logger());
+  // 线上经 CDN 回源：接口响应一律禁止缓存，否则带 token 的 /api/me 会串号
+  const noStore = createMiddleware(async (c, next) => {
+    await next();
+    c.header("Cache-Control", "no-store");
+  });
+  app.use("/api/*", noStore);
+  app.use("/health", noStore);
   if (config.corsOrigins.length > 0) {
     app.use(
       "/api/*",
