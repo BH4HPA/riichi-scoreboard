@@ -32,6 +32,8 @@ docker compose up -d --build   # 单容器，:8787，数据卷 /data（SQLite + 
 - 仓库 secrets：`QCLOUD_SECRET_ID` / `QCLOUD_SECRET_KEY`（COS 上传 + CDN 刷新）、`QCLOUD_DOCKER_USERNAME` / `QCLOUD_DOCKER_PASSWORD`（CCR）、`DEPLOY_SSH_HOST` / `DEPLOY_SSH_KEY` / `DEPLOY_KNOWN_HOSTS`（部署机）。桶名、域名、镜像名等常量写在工作流的 `env` 里。
 - 腾讯云 CDN 对约 10 秒无数据的 WebSocket 会静默回收，客户端每 5 秒发心跳、8 秒无回包即重连，接口响应带 `Cache-Control: no-store`；CDN 侧接口域名仍应配置为不缓存。
 
+立直音乐：手机操作栏「对局中」一节选曲并按「立直」，电视循环播放（右下角浮窗显示谁在放哪首，点结算键即停）。曲库是 `packages/core/src/music/manifest.json`（`id` = 桶内对象名 uuid，`title` = 展示名，`file` = 本地原文件名），音频固定从 `https://static.bitego.net/riichi/music/<id>.mp3` 播放，服务端与前端都不需要额外配置。加曲：manifest 追加一条（`uuidgen` 生成 id）→ `QCLOUD_SECRET_ID=… QCLOUD_SECRET_KEY=… QCLOUD_COS_BUCKET=… QCLOUD_COS_REGION=… ci/upload-music.sh <放原文件的目录>` → 推 `main`。
+
 头像等用户文件默认落在 `DATA_DIR/objects`，由服务端在 `/api/objects/*` 托管；配置 `QCLOUD_*` 五项变量后改为直传腾讯云 COS（桶内 `riichi/` 前缀，URL 走 CDN 域名），变量清单见 `.env.template`。数据库结构按 `user_version` 自动迁移，升级镜像无需手工处理；从 v1 数据升级时头像字段会被清空（旧的 `DATA_DIR/avatars` 目录不再使用，可手动删除），玩家重新上传即可。
 
 ## 结构

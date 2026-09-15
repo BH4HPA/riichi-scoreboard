@@ -341,10 +341,11 @@ export class RoomRegistry {
       if (room.state.phase !== "playing" || !game || game.status === "finished") {
         throw new DomainError("no_game", "对局未在进行中");
       }
+      // 连接上的 name 是建立连接时的快照，改过昵称后会过期；按下时取档案里的最新名字
       room.music = {
         track,
         seat: seatOfPlayer(room.state.seats, client.playerId),
-        name: client.name,
+        name: this.players.byId(client.playerId)?.name ?? client.name,
         at: this.now(),
       };
     } else if (room.music === null) {
