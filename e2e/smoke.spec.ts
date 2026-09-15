@@ -49,6 +49,13 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   );
   await expect(tv.getByTestId("music-float")).toContainText("南家立直 · ");
   await expect(phones[3]!.getByText(/南家立直 · /)).toBeVisible();
+  // 他人再按 → 换曲：手机 2 选另一首后按下，电视 src 变化、浮窗换人
+  const firstSrc = await tv.getByTestId("riichi-music").getAttribute("src");
+  await phones[2]!.getByRole("button", { name: /^立直音乐：/ }).click();
+  await phones[2]!.getByRole("button", { name: "凌云", exact: true }).click();
+  await phones[2]!.getByRole("button", { name: "立直", exact: true }).click();
+  await expect(tv.getByTestId("music-float")).toContainText("西家立直 · 凌云");
+  expect(await tv.getByTestId("riichi-music").getAttribute("src")).not.toBe(firstSrc);
 
   // 手机 0（庄家）自摸 3 番 30 符 → 2000 all
   await phones[0]!.getByRole("button", { name: "自摸", exact: true }).click();

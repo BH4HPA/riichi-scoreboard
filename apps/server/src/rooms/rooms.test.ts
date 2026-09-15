@@ -345,11 +345,11 @@ describe("rooms end-to-end", () => {
     const trackB = MUSIC_TRACKS[1]!.id;
     phones[0]!.send({ type: "music", track: trackA });
     const playing = await tv.waitState((r) => r.music?.track === trackA);
-    expect(playing.music).toMatchObject({ seat: 0, name: "东" });
+    expect(playing.music).toMatchObject({ seat: 0 });
     phones[1]!.send({ type: "music", track: trackB });
     const replaced = await phones[2]!.waitState((r) => r.music?.track === trackB);
     expect(replaced.music?.seat).toBe(1);
-    expect(replaced.music!.at).toBeGreaterThanOrEqual(playing.music!.at);
+    expect(replaced.music!.at).toBeGreaterThan(playing.music!.at);
     const late = new Client(room.code, console_.token);
     await late.open();
     expect((await late.waitState(() => true)).music?.track).toBe(trackB);

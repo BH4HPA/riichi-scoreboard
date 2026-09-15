@@ -3,6 +3,7 @@ import { Check, RefreshCcw, Redo2, Undo2 } from "lucide-react";
 import type { GameView, RoomRules, Seat } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Tip } from "@/ui/controls";
+import { useRoomStore } from "@/ws/store";
 import { useCommand, useSocket } from "@/ws/useRoom";
 import { RiichiSection } from "@/features/music/RiichiSection";
 import { TsumoDialog, RonDialog } from "./WinDialogs";
@@ -38,14 +39,15 @@ export function ControlPanel({
 }) {
   const send = useCommand();
   const socket = useSocket();
+  const musicPlaying = useRoomStore((s) => s.room?.music != null);
   const [dialog, setDialog] = useState<DialogKey>(null);
   const present = game.present;
   const finished = present.status === "finished";
   const openOf = (key: DialogKey) => (open: boolean) => setDialog(open ? key : null);
   const shared = { game: present, names, rules, mirror };
-  // 点任意结算键即让电视停掉立直音乐（服务端未在播放时忽略），弹窗取消也不恢复
+  // 点任意结算键即让电视停掉立直音乐，弹窗取消也不恢复
   const openSettlement = (key: DialogKey) => {
-    socket.music(null);
+    if (musicPlaying) socket.music(null);
     setDialog(key);
   };
 

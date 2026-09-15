@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Play } from "lucide-react";
-import { MUSIC_TRACKS } from "@riichi/core";
+import { MUSIC_TRACKS, seatNames } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { useRoomStore } from "@/ws/store";
 import { useSocket } from "@/ws/useRoom";
@@ -13,7 +13,7 @@ import { useMusicPrefs } from "./useMusicPrefs";
 export function RiichiSection({ disabled, size }: { disabled: boolean; size: "sm" | "md" | "lg" }) {
   const socket = useSocket();
   const notify = useRoomStore((s) => s.notify);
-  const music = useRoomStore((s) => s.room?.music ?? null);
+  const room = useRoomStore((s) => s.room);
   const [prefs, update] = useMusicPrefs();
   const ordered = useMemo(() => orderTracks(MUSIC_TRACKS, prefs), [prefs]);
   const [value, setValue] = useState<string | null>(() => defaultTrack(ordered, prefs));
@@ -27,6 +27,7 @@ export function RiichiSection({ disabled, size }: { disabled: boolean; size: "sm
     if (!socket.music(value)) return notify("error", "连接已断开");
     update((p) => withPick(p, value));
   };
+  const music = room?.music ?? null;
 
   return (
     <section>
@@ -37,7 +38,9 @@ export function RiichiSection({ disabled, size }: { disabled: boolean; size: "sm
           <Play className="h-4 w-4" fill="currentColor" /> 立直
         </Button>
       </div>
-      {music && <p className="mt-1.5 text-xs text-muted">▶ {musicLabel(music)}</p>}
+      {music && room && (
+        <p className="mt-1.5 text-xs text-muted">▶ {musicLabel(music, seatNames(room))}</p>
+      )}
     </section>
   );
 }

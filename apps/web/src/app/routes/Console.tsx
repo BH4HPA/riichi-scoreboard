@@ -58,7 +58,7 @@ export function Console() {
             wide={wide}
           />
         )}
-        <RiichiMusicPlayer music={room.music} />
+        <RiichiMusicPlayer music={room.music} names={seatNames(room)} />
         <Notice />
       </div>
     </SocketContext.Provider>

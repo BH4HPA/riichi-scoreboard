@@ -1,13 +1,10 @@
 import { useState } from "react";
 import { Play } from "lucide-react";
-import type { MusicState } from "@riichi/core";
 import { cn } from "@/lib/utils";
-import { musicLabel } from "./label";
 
 /** 电视右下角吸附浮窗：展开显示谁立直、放哪首；点击收起为小圆标，再点展开。 */
-export function MusicFloat({ music }: { music: MusicState }) {
+export function MusicFloat({ label }: { label: string }) {
   const [collapsed, setCollapsed] = useState(false);
-  const label = musicLabel(music);
   return (
     <button
       type="button"

@@ -79,9 +79,11 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   the system actor; any change that breaks the condition cancels it. Four locals never auto-start.
 - Deployed split-hosted: `WEB_DIST=` (empty) disables the SPA in the server image; app paths then 302 to
   the first `CORS_ORIGINS` entry.
-- Riichi music: `RoomView.music` (`{track, seat, name, at}`) is memory-only room state like `online`; the
-  phone sends `{type:"music", track: id | null}`, the TV plays `musicUrl(id)` from the static bucket and
-  shows a float badge. The server clears it after any command in `STOPS_MUSIC` (settlement, adjust,
-  endGame/newGame/toLobby/start/dissolve); settlement buttons also send `track: null` on click. Catalog =
-  `packages/core/src/music/manifest.json` (uuid object names; upload with `ci/upload-music.sh`). Phone
-  keeps `riichi.music.prefs` in localStorage (last pick, per-track use counts drive the order).
+- Riichi music: `RoomView.music` (`{track, seat, at}`) is memory-only room state like `online`; a client
+  sends `{type:"music", track: id | null}` (the section lives in the shared `ControlPanel`, so the console
+  can press it for local players with `seat: null`), the TV plays the track from the static bucket
+  (`features/music/url.ts`) and shows a float badge; the name is derived from the seat snapshot. The
+  server clears it after any command in `STOPS_MUSIC` (settlement, adjust, redo, endGame/newGame/toLobby/
+  start/dissolve); settlement buttons also send `track: null` on click while playing. Catalog =
+  `packages/core/src/music/manifest.json` (lowercase uuid object names; upload with `ci/upload-music.sh`).
+  Phone keeps `riichi.music.prefs` in localStorage (last pick, per-track use counts drive the order).

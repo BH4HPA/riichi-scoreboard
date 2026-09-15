@@ -48,15 +48,20 @@ export interface RoomView {
   gameNo: number;
 }
 
-/** 谁按下了立直、放哪首：track 为曲库 id；seat 为 null 表示按下者没有座位（如主控台代按）。 */
+/**
+ * 谁按下了立直、放哪首：track 为曲库 id；seat 为 null 表示按下者没有座位（主控台代按）。
+ * 名字由客户端按座位快照派生，不进协议；at 单调递增，客户端用它区分「同曲重按」。
+ */
 export interface MusicState {
   track: string;
   seat: Seat | null;
-  name: string;
   at: number;
 }
 
-/** 提交后应停止立直音乐的命令：这一局结束或对局阶段变化。穷举，新增命令时必须表态。 */
+/**
+ * 提交后应停止立直音乐的命令：这一局结束或对局阶段变化。穷举，新增命令时必须表态。
+ * redo 等于再提交一次结算所以停；undo 回到这一局，不停。
+ */
 export const STOPS_MUSIC: Record<Command["type"], boolean> = {
   tsumo: true,
   ron: true,
@@ -75,7 +80,7 @@ export const STOPS_MUSIC: Record<Command["type"], boolean> = {
   setReady: false,
   syncProfile: false,
   undo: false,
-  redo: false,
+  redo: true,
 };
 
 /** 校验客户端发来的立直音乐请求：null = 停止；否则必须是曲库里的 id。 */

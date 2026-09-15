@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Play, Square } from "lucide-react";
-import { musicUrl, type MusicTrack } from "@riichi/core";
+import type { MusicTrack } from "@riichi/core";
 import { Dialog, DialogContent } from "@/ui/dialog";
 import { cn } from "@/lib/utils";
+import { musicUrl } from "./url";
 
 const TRIGGER_HEIGHT = { sm: "h-8 text-xs", md: "h-10 text-sm", lg: "h-12 text-base" } as const;
 
@@ -25,14 +26,21 @@ export function TrackPicker({
   const [previewing, setPreviewing] = useState<string | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
 
+  // pause() 不会中止下载；清 src 再 load() 才释放，手机流量下连点几首不会并行拉多个 mp3
+  const release = (el: HTMLAudioElement | null) => {
+    if (!el) return;
+    el.pause();
+    el.removeAttribute("src");
+    el.load();
+  };
   const stopPreview = () => {
-    audio.current?.pause();
+    release(audio.current);
     audio.current = null;
     setPreviewing(null);
   };
   const preview = (id: string) => {
     if (previewing === id) return stopPreview();
-    audio.current?.pause();
+    release(audio.current);
     const el = new Audio(musicUrl(id));
     el.onended = () => audio.current === el && stopPreview();
     el.onerror = () => audio.current === el && stopPreview();
@@ -44,7 +52,7 @@ export function TrackPicker({
     if (!next) stopPreview();
     setOpen(next);
   };
-  useEffect(() => () => audio.current?.pause(), []);
+  useEffect(() => () => release(audio.current), []);
 
   const selected = tracks.find((t) => t.id === value) ?? null;
   return (
@@ -53,7 +61,7 @@ export function TrackPicker({
         type="button"
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label="选择立直音乐"
+        aria-label={`立直音乐：${selected?.title ?? "未选择"}`}
         onClick={() => setOpen(true)}
         className={cn(
           "flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 outline-none focus-visible:border-accent",

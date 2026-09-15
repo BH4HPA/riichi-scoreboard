@@ -14,9 +14,11 @@ export function readPrefs(): MusicPrefs {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return EMPTY_PREFS;
-    const v = JSON.parse(raw) as Partial<MusicPrefs>;
+    const v = JSON.parse(raw) as Partial<MusicPrefs> | null;
+    if (typeof v !== "object" || v === null) return EMPTY_PREFS;
     const counts: Record<string, number> = {};
-    for (const [id, n] of Object.entries(v.counts ?? {})) {
+    const rawCounts = typeof v.counts === "object" && v.counts !== null ? v.counts : {};
+    for (const [id, n] of Object.entries(rawCounts)) {
       if (typeof n === "number" && Number.isInteger(n) && n > 0) counts[id] = n;
     }
     return { last: typeof v.last === "string" ? v.last : null, counts };

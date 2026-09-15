@@ -337,16 +337,12 @@ export class RoomRegistry {
   setMusic(room: LiveRoom, client: RoomClient, rawTrack: unknown): void {
     const track = validateMusicTrack(rawTrack);
     if (track !== null) {
-      const game = room.state.game?.present;
-      if (room.state.phase !== "playing" || !game || game.status === "finished") {
-        throw new DomainError("no_game", "对局未在进行中");
-      }
-      // 连接上的 name 是建立连接时的快照，改过昵称后会过期；按下时取档案里的最新名字
+      if (room.state.phase !== "playing") throw new DomainError("no_game", "对局未在进行中");
+      // at 严格递增：同一毫秒内连按两次也要让客户端看到变化（同曲重按从头播）
       room.music = {
         track,
         seat: seatOfPlayer(room.state.seats, client.playerId),
-        name: this.players.byId(client.playerId)?.name ?? client.name,
-        at: this.now(),
+        at: Math.max(this.now(), (room.music?.at ?? 0) + 1),
       };
     } else if (room.music === null) {
       return;

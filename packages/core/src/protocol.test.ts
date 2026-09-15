@@ -49,7 +49,7 @@ describe("autoStartEligible", () => {
 describe("toRoomView", () => {
   it("带在线状态与自动开局剩余时间", () => {
     const state = lobby([device("a"), null, null, null], [false, false, false, false]);
-    const music = { track: MUSIC_TRACKS[0]!.id, seat: 0 as const, name: "a", at: 1 };
+    const music = { track: MUSIC_TRACKS[0]!.id, seat: 0 as const, at: 1 };
     const view = toRoomView(state, 3, new Set(["a"]), 1234, music);
     expect(view.online).toEqual([true, false, false, false]);
     expect(view.autoStartIn).toBe(1234);
@@ -66,9 +66,10 @@ describe("立直音乐", () => {
       expect(() => validateMusicTrack(bad)).toThrow(/曲目不存在/);
     }
   });
-  it("STOPS_MUSIC：结算与进程类停，座位与撤销类不停", () => {
+  it("STOPS_MUSIC：结算、进程类与 redo 停；座位类与 undo 不停", () => {
     expect(STOPS_MUSIC.tsumo).toBe(true);
     expect(STOPS_MUSIC.start).toBe(true);
+    expect(STOPS_MUSIC.redo).toBe(true);
     expect(STOPS_MUSIC.undo).toBe(false);
     expect(STOPS_MUSIC.setReady).toBe(false);
   });

@@ -1,15 +1,11 @@
-import { useCallback, useState } from "react";
+import { useEffect, useState } from "react";
 import { readPrefs, writePrefs, type MusicPrefs } from "./prefs";
 
-/** 本地偏好：读一次，每次更新写穿到 localStorage。 */
+/** 本地偏好：挂载时读一次，之后每次变化写回 localStorage。 */
 export function useMusicPrefs(): [MusicPrefs, (next: (prev: MusicPrefs) => MusicPrefs) => void] {
   const [prefs, setPrefs] = useState<MusicPrefs>(readPrefs);
-  const update = useCallback((next: (prev: MusicPrefs) => MusicPrefs) => {
-    setPrefs((prev) => {
-      const value = next(prev);
-      writePrefs(value);
-      return value;
-    });
-  }, []);
-  return [prefs, update];
+  useEffect(() => {
+    writePrefs(prefs);
+  }, [prefs]);
+  return [prefs, setPrefs];
 }

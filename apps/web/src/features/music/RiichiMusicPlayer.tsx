@@ -1,19 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { musicUrl, type MusicState } from "@riichi/core";
+import type { MusicState } from "@riichi/core";
 import { useRoomStore } from "@/ws/store";
 import { musicLabel } from "./label";
 import { MusicFloat } from "./MusicFloat";
+import { musicUrl } from "./url";
 
 /**
  * 电视端立直音乐：跟随 room.music 播 / 换 / 停。
  * 为空即整体卸载（停止且不会留下 src="" 的假错误）；`at` 变化即重挂（换曲与同曲重按都从头播）。
  */
-export function RiichiMusicPlayer({ music }: { music: MusicState | null }) {
+export function RiichiMusicPlayer({
+  music,
+  names,
+}: {
+  music: MusicState | null;
+  names: readonly string[];
+}) {
   if (!music) return null;
-  return <Playing key={music.at} music={music} />;
+  return <Playing key={music.at} music={music} label={musicLabel(music, names)} />;
 }
 
-function Playing({ music }: { music: MusicState }) {
+function Playing({ music, label }: { music: MusicState; label: string }) {
   const audio = useRef<HTMLAudioElement>(null);
   const [blocked, setBlocked] = useState(false);
   const notify = useRoomStore((s) => s.notify);
@@ -48,9 +55,9 @@ function Playing({ music }: { music: MusicState }) {
         loop
         preload="auto"
         data-testid="riichi-music"
-        onError={() => notify("error", `立直音乐加载失败：${musicLabel(music)}`)}
+        onError={() => notify("error", `立直音乐加载失败：${label}`)}
       />
-      <MusicFloat music={music} />
+      <MusicFloat label={label} />
       {blocked && (
         <button
           type="button"
