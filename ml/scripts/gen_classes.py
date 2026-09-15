@@ -19,7 +19,8 @@ def render() -> dict[Path, str]:
     return {
         ML / "configs/tiles.yaml": (
             "# 由 scripts/gen_classes.py 生成，勿手改；类 id 顺序 = packages/core/src/recognition/manifest.json\n"
-            "path: ../data/merged\n"
+            "# path 相对当前目录解析（ultralytics 不相对本文件），scripts/train.sh 已 cd 到 ml/\n"
+            "path: data/merged\n"
             "train: images/train\n"
             "val: images/val\n"
             f"names:\n{names}\n"

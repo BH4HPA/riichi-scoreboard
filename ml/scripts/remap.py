@@ -9,8 +9,9 @@
 首次遇到没有映射文件的来源，会按别名表猜一份写到 configs/remap/<name>.json，
 未能猜出的项填 null 并退出（返回码 2），请人工补全后重跑。
 
-合并规则：所有来源汇总后按来源分层、固定种子抽 10% 作 val；文件名加 <name>__ 前缀避免撞名。
-每次运行先清空 data/merged。
+划分规则：来源自带 train/valid(val)/test 目录的（Roboflow 导出，train 里常有同一原图的增强副本）沿用其划分，
+valid 与 test 都进 val，避免副本跨 train/val 泄漏抬高 mAP；没有划分的来源（Label Studio 导出）按固定种子抽
+10% 作 val。文件名加 <name>__ 前缀避免撞名。每次运行先清空 data/merged。
 用法：uv run scripts/remap.py [--val-ratio 0.1] [--seed 42]"""
 
 import argparse
@@ -50,10 +51,12 @@ def guess(source: str) -> str | None:
     m = re.fullmatch(r"([mps])([0-9])", key)  # m1 / p5
     if m:
         return f"{m.group(2)}{m.group(1)}"
-    m = re.fullmatch(r"([1-9])(man|wan|pin|sou|sou?)", key)  # 1man / 5pin / 3sou
-    if m:
-        return f"{m.group(1)}{ {'man': 'm', 'wan': 'm', 'pin': 'p', 'sou': 's', 'so': 's'}[m.group(2)] }"
-    m = re.fullmatch(r"(aka|red)?5([mps])(r|red|aka)?", key)  # 5mr / aka5p / red5s
+    suits = {"man": "m", "wan": "m", "pin": "p", "sou": "s", "so": "s"}
+    m = re.fullmatch(r"([1-9])(man|wan|pin|sou|so)", key) or re.fullmatch(r"(?:(man|wan|pin|sou|so))([1-9])", key)
+    if m:  # 1man / 5pin / 3sou / sou7 / man5
+        n, s = (m.group(1), m.group(2)) if m.group(1).isdigit() else (m.group(2), m.group(1))
+        return f"{n}{suits[s]}"
+    m = re.fullmatch(r"(aka|red|r)?5([mps])(r|red|aka)?", key)  # 5mr / aka5p / red5s / r5m
     if m and (m.group(1) or m.group(3)):
         return f"0{m.group(2)}"
     return ALIASES.get(key)
@@ -72,7 +75,8 @@ def source_classes(src: Path) -> list[str]:
     raise SystemExit(f"{src}: neither data.yaml nor classes.txt")
 
 
-def load_or_draft_remap(name: str, classes: list[str], canonical: list[str]) -> dict[str, str | None]:
+def load_remap(name: str, classes: list[str], canonical: list[str]) -> dict[str, str | None] | None:
+    """已有映射文件则校验并返回；没有则起草一份并返回 None（调用方汇总后统一退出）。"""
     path = REMAP_DIR / f"{name}.json"
     if path.exists():
         remap = json.loads(path.read_text(encoding="utf-8"))
@@ -85,34 +89,39 @@ def load_or_draft_remap(name: str, classes: list[str], canonical: list[str]) -> 
     REMAP_DIR.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(remap, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     unresolved = [c for c, v in remap.items() if v is None]
-    print(f"drafted {path} ({len(classes)} classes, {len(unresolved)} unresolved: {unresolved})")
-    if unresolved:
-        print("fill the null entries (or keep null to drop that class) and rerun", file=sys.stderr)
-        sys.exit(2)
-    return remap
+    print(f"drafted {path.relative_to(ML)} ({len(classes)} classes, unresolved: {unresolved})")
+    return None
 
 
-def collect(src: Path) -> list[tuple[Path, Path]]:
+SPLIT_DIRS = {"train": "train", "valid": "val", "val": "val", "test": "val"}
+
+
+def collect(src: Path) -> list[tuple[Path, Path, str | None]]:
+    """(图片, 标签, 来源自带的划分 train/val 或 None)。"""
     pairs = []
     for img in src.rglob("*"):
         if img.suffix.lower() not in IMAGE_SUFFIXES or img.parent.name != "images":
             continue
         label = img.parent.parent / "labels" / f"{img.stem}.txt"
-        if label.exists():
-            pairs.append((img, label))
+        if not label.exists():
+            continue
+        split = next((SPLIT_DIRS[p.name] for p in img.parents if p.name in SPLIT_DIRS), None)
+        pairs.append((img, label, split))
     return pairs
 
 
-def convert_label(text: str, id_map: dict[int, int | None]) -> str:
+def convert_label(text: str, id_map: dict[int, int | None], where: Path) -> str:
     out = []
-    for line in text.splitlines():
+    for n, line in enumerate(text.splitlines(), 1):
         parts = line.split()
-        if len(parts) < 5:
+        if not parts:
             continue
+        if len(parts) != 5:
+            raise SystemExit(f"{where}:{n}: expected `cls cx cy w h`, got {len(parts)} columns (segmentation labels?)")
         target = id_map.get(int(parts[0]))
         if target is None:
             continue
-        out.append(" ".join([str(target), *parts[1:5]]))
+        out.append(" ".join([str(target), *parts[1:]]))
     return "\n".join(out) + ("\n" if out else "")
 
 
@@ -128,16 +137,23 @@ def main() -> int:
         print(f"no sources under {RAW}", file=sys.stderr)
         return 1
 
-    plan: dict[str, tuple[dict[int, int | None], list[tuple[Path, Path]]]] = {}
+    plan: dict[str, tuple[dict[int, int | None], list[tuple[Path, Path, str | None]]]] = {}
+    drafted = False
     for src in sources:
         classes = source_classes(src)
-        remap = load_or_draft_remap(src.name, classes, canonical)
+        remap = load_remap(src.name, classes, canonical)
+        if remap is None:
+            drafted = True
+            continue
         id_map = {i: (canonical.index(remap[c]) if remap[c] is not None else None) for i, c in enumerate(classes)}
         pairs = collect(src)
         if not pairs:
             print(f"{src.name}: no image/label pairs", file=sys.stderr)
             return 1
         plan[src.name] = (id_map, pairs)
+    if drafted:
+        print("fill the null entries in configs/remap/*.json (keep null to drop that class) and rerun", file=sys.stderr)
+        return 2
 
     if MERGED.exists():
         shutil.rmtree(MERGED)
@@ -149,17 +165,20 @@ def main() -> int:
     counts = {c: 0 for c in canonical}
     for name, (id_map, pairs) in plan.items():
         pairs = sorted(pairs)
-        rng.shuffle(pairs)
-        n_val = max(1, round(len(pairs) * args.val_ratio))
-        for i, (img, label) in enumerate(pairs):
-            split = "val" if i < n_val else "train"
+        own_split = all(split is not None for _, _, split in pairs)
+        if not own_split:
+            rng.shuffle(pairs)
+        n_val = 0 if own_split else (max(1, round(len(pairs) * args.val_ratio)) if len(pairs) >= 2 else 0)
+        for i, (img, label, split) in enumerate(pairs):
+            split = split if own_split else ("val" if i < n_val else "train")
+            n_val += split == "val" and own_split
             stem = f"{name}__{img.stem}"
             shutil.copy2(img, MERGED / "images" / split / f"{stem}{img.suffix.lower()}")
-            converted = convert_label(label.read_text(encoding="utf-8"), id_map)
+            converted = convert_label(label.read_text(encoding="utf-8"), id_map, label)
             (MERGED / "labels" / split / f"{stem}.txt").write_text(converted, encoding="utf-8")
             for line in converted.splitlines():
                 counts[canonical[int(line.split()[0])]] += 1
-        print(f"{name}: {len(pairs)} images ({n_val} val)")
+        print(f"{name}: {len(pairs)} images, {n_val} val ({'own split' if own_split else 'random split'})")
 
     empty = [c for c, n in counts.items() if n == 0]
     print("boxes per class:", json.dumps(counts, ensure_ascii=False))

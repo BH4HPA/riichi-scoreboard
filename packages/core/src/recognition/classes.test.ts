@@ -43,6 +43,6 @@ describe("recognition classes", () => {
     expect(model.id).toMatch(UUID);
     expect(model.sha256).toMatch(/^[0-9a-f]{64}$/);
     expect(model.imgsz).toBe(640);
-    expect(model.trainedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(model.publishedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });

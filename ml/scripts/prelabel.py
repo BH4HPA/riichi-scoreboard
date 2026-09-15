@@ -24,10 +24,16 @@ def main() -> int:
     args = ap.parse_args()
 
     images_dir = Path(args.images).resolve()
+    if not images_dir.is_dir():
+        print(f"not a directory: {images_dir}", file=sys.stderr)
+        return 1
     try:
         rel_root = images_dir.relative_to(DATA)
     except ValueError:
         print(f"{images_dir} must live under {DATA}", file=sys.stderr)
+        return 1
+    if rel_root == Path("."):
+        print("pass a subdirectory of ml/data (e.g. data/own), not data/ itself", file=sys.stderr)
         return 1
     files = sorted(p for p in images_dir.iterdir() if p.suffix.lower() in IMAGE_SUFFIXES)
     if not files:

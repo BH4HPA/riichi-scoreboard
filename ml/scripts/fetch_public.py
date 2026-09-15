@@ -9,11 +9,12 @@ import sys
 from pathlib import Path
 
 DATASETS = {
-    # name: (workspace, project)  —— name 也是 configs/remap/<name>.json 的文件名
-    "riichimahjongdetection": ("riichimahjongdetection", "riichi-mahjong-detection"),
-    "mahjong_yolo": ("test-wmo8i", "mahjong_yolo"),
-    "yolo_mahjong": ("yolo-qshla", "yolo_mahjong"),
-    "hust": ("hust-xq5rx", "riichi-mahjong"),
+    # name: (workspace, project)  —— name 也是 configs/remap/<name>.json 的文件名。
+    # 页面 = https://universe.roboflow.com/<workspace>/<project>（2026-09 核对过存在；许可以页面为准）
+    "riichimahjongdetection": ("riichimahjongdetection", "riichi-mahjong-detection"),  # ~424 张，CC BY 4.0
+    "mahjong_yolo": ("test-wmo8i", "mahjong_yolo"),  # ~4.5k 张
+    "yolo_mahjong": ("yolo-qshla", "yolo_mahjong"),  # ~1.7k 张
+    "hust": ("hust-xq5rx", "riichi-mahjong"),  # ~256 张
 }
 
 RAW = Path(__file__).resolve().parent.parent / "data/raw"
