@@ -138,8 +138,7 @@ export function ConsoleLobby({
       <section className="flex min-h-0 flex-1 flex-col gap-4">
         <div>
           {wide && (
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">座位</h2>
+            <div className="mb-2 flex justify-end">
               <Button variant="ghost" size="sm" onClick={() => openLocals(null)}>
                 <Users className="h-4 w-4" /> 本地玩家
               </Button>
