@@ -58,20 +58,17 @@ export function JoinPanel() {
         <div className="mb-3 flex items-center gap-2 text-sm font-medium">
           <Smartphone className="h-4 w-4" /> 输入房间码
         </div>
-        {/* key 变化让抖动动画每次都重新播放 */}
-        <div key={shakeKey}>
-          <CodeInput
-            value={code}
-            onChange={(c) => {
-              setCode(c);
-              setError(null);
-            }}
-            onComplete={check}
-            shaking={shakeKey > 0 && error !== null}
-            invalid={error !== null}
-            disabled={checking}
-          />
-        </div>
+        <CodeInput
+          value={code}
+          onChange={(c) => {
+            setCode(c);
+            setError(null);
+          }}
+          onComplete={check}
+          shakeKey={shakeKey}
+          invalid={error !== null}
+          disabled={checking}
+        />
         {(error || checking) && (
           <p
             className={error ? "mt-2 text-sm text-neg" : "mt-2 text-xs text-muted"}

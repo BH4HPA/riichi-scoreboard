@@ -85,7 +85,9 @@ export function PointsGrid({
                 <span data-testid={`points-${seat}`}>{formatPoints(game.points[seat]!)}</span>
               </span>
               <div className="flex flex-col items-end gap-1">
-                <Badge tone={tone}>第 {ranks[seat]} 名</Badge>
+                <Badge tone={tone} size={tv ? "md" : "sm"}>
+                  第 {ranks[seat]} 名
+                </Badge>
                 <span className={cn("text-xs tabular", diff >= 0 ? "text-pos" : "text-neg")}>
                   {formatDiff(diff)}
                 </span>

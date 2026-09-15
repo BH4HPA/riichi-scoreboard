@@ -2,7 +2,7 @@ import type { RoomRules, RulesPreset } from "../types/rules";
 import { MLEAGUE_RULES } from "./mleague";
 
 /**
- * 内置预设。数值 2026-09-15 核实（来源：tenhou.net/man、saikouisen.com 競技規定 2024-12、
+ * 内置预设。数值 2026-09 核实（来源：tenhou.net/man、saikouisen.com 競技規定 2024-12、
  * WRC Rules 2025、game8/nya wiki 的雀魂条目）。只收录现有 RoomRules 能完整表达的规则集；
  * 表达不了的差异写在 note 里，不伪装成官方值。
  */
@@ -37,7 +37,7 @@ function withRules(base: RoomRules, patch: RulesPatch): RoomRules {
 /** 雀魂 段位场·四人南（各「之间」对局内规则相同，段位 pt 属于赛季积分，不在此处）。 */
 export const MAJSOUL_RANKED_RULES: RoomRules = withRules(MLEAGUE_RULES, {
   scoring: { kiriageMangan: false, kazoeYakuman: true, doubleYakuman: true },
-  hand: { nagashiMangan: true },
+  hand: { nagashiMangan: true, kokushiAnkanChankan: true },
   win: { multiRon: "triple" },
   progress: {
     tobi: { enabled: true, threshold: "below0", bonus: 0 },
@@ -66,10 +66,9 @@ export const TENHOU_HOUOU_RULES: RoomRules = withRules(MLEAGUE_RULES, {
   final: { startPoints: 25000, returnPoints: 30000, uma: [20, 10, -10, -20], tieRule: "seat" },
 });
 
-/** 最高位战 通常规则（2024-12 競技規定）。 */
+/** 最高位战 通常规则（2024-12 競技規定；赤各 1 枚，无赤的是 Classic 规则）。 */
 export const SAIKOUISEN_RULES: RoomRules = withRules(MLEAGUE_RULES, {
   scoring: { kiriageMangan: true, kazoeYakuman: false, pao: false },
-  hand: { akaCount: 0 },
   final: {
     startPoints: 30000,
     returnPoints: 30000,
@@ -98,7 +97,7 @@ export const BUILTIN_PRESETS: readonly RulesPreset[] = [
     id: "majsoul-ranked",
     name: "雀魂 段位场·四人南",
     rules: MAJSOUL_RANKED_RULES,
-    note: "25000 起 25000 返、马 15/5、三响、击飞、西入；段位 pt 属赛季积分，不含在内。",
+    note: "25000 起 25000 返、精算顺位马 15/5/-5/-15、三响、击飞、西入、国士可抢暗杠；各之间的段位 pt 是赛季积分，不含在内。",
   },
   {
     id: "tenhou-houou",
@@ -110,12 +109,12 @@ export const BUILTIN_PRESETS: readonly RulesPreset[] = [
     id: "saikouisen",
     name: "最高位战 通常规则",
     rules: SAIKOUISEN_RULES,
-    note: "无赤、无包牌、11 番以上三倍满；错和 -20P 无法表达，按无罚符。",
+    note: "赤 3、无包牌、11 番以上三倍满、30000 起返；错和 -20P（终局分）无法表达，按无罚符。",
   },
   {
     id: "wrc",
     name: "WRC 2025",
     rules: WRC_RULES,
-    note: "无赤、切上满贯；13 番按累计役满（32000）近似四倍满；人和满贯无此档，按无。",
+    note: "无赤、切上满贯、无 oka；13 番按累计役满（32000）近似四倍满；人和满贯档模型没有，按无；错和走赛事罚分不在对局内。",
   },
 ];

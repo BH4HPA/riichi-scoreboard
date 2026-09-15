@@ -18,7 +18,7 @@ export function CodeInput({
   value,
   onChange,
   onComplete,
-  shaking = false,
+  shakeKey = 0,
   invalid = false,
   disabled = false,
 }: {
@@ -26,14 +26,20 @@ export function CodeInput({
   onChange: (code: string) => void;
   /** 输满 6 位时触发（每次达到 6 位都触发一次） */
   onComplete: (code: string) => void;
-  shaking?: boolean;
+  /** 每次递增触发一次抖动（不重挂载，保持焦点与键盘） */
+  shakeKey?: number;
   invalid?: boolean;
+  /** 校验中：只读但保持焦点 */
   disabled?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [focused, setFocused] = useState(false);
+  // 抖动：shakeKey 变化时加类，动画结束移除；不重挂载 input，键盘不会收起
+  const [shakingFor, setShakingFor] = useState(0);
+  const shaking = shakeKey > 0 && shakingFor !== shakeKey;
 
   const commit = (next: string) => {
+    if (next === value) return; // 已满 6 位再敲键：值不变，不重复校验
     onChange(next);
     if (next.length === LENGTH) onComplete(next);
   };
@@ -54,6 +60,7 @@ export function CodeInput({
     <div
       className={cn("relative", shaking && "animate-shake")}
       onClick={() => inputRef.current?.focus()}
+      onAnimationEnd={() => setShakingFor(shakeKey)}
     >
       <div className="grid grid-cols-6 gap-2" aria-hidden>
         {Array.from({ length: LENGTH }, (_, i) => {
@@ -81,7 +88,7 @@ export function CodeInput({
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         onSelect={caretToEnd}
-        disabled={disabled}
+        readOnly={disabled}
         autoCapitalize="characters"
         autoComplete="off"
         autoCorrect="off"

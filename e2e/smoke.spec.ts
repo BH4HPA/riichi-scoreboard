@@ -93,7 +93,7 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await expect(ron.getByText("赤宝牌 1 番")).toBeVisible();
   // 电视全屏镜像：和牌者、牌面、番符、役种
   await expect(tv.getByText("正在录入荣和结算")).toBeVisible();
-  await expect(tv.getByText("2 番 30 符").first()).toBeVisible();
+  await expect(tv.getByText("2 番 30 符", { exact: true })).toBeVisible();
   await expect(tv.getByRole("img", { name: "赤5筒" })).toBeVisible();
   await expect(tv.getByText("赤宝牌 1 番")).toBeVisible();
   await ron.getByRole("button", { name: "确认荣和" }).click();

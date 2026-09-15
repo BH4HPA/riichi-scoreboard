@@ -169,7 +169,7 @@ export function TileKeyboard({
           className="mt-1 flex min-h-12 flex-wrap items-end gap-y-1.5 rounded-lg border border-dashed border-border p-1.5"
           data-testid="hand-area"
         >
-          <div className="flex items-end gap-px">
+          <div className="flex flex-wrap items-end gap-px">
             {hand.closed.map((t, i) => (
               <TileFace
                 key={`${t}-${i}`}
@@ -255,7 +255,7 @@ export function TileKeyboard({
 
       <div>
         <Label>和张</Label>
-        <div className="mt-1 flex min-h-9 flex-wrap gap-1" role="radiogroup" aria-label="和张">
+        <div className="mt-1 flex min-h-9 flex-wrap gap-1" role="group" aria-label="和张">
           {distinctClosed.map((t) => (
             <TileFace
               key={t}

@@ -30,7 +30,8 @@ describe("内置预设", () => {
     expect(byId["majsoul-ranked"]!.win.multiRon).toBe("triple");
     expect(byId["tenhou-houou"]!.final.uma).toEqual([20, 10, -10, -20]);
     expect(byId["tenhou-houou"]!.scoring.kiriageMangan).toBe(false);
-    expect(byId["saikouisen"]!.hand.akaCount).toBe(0);
+    expect(byId["saikouisen"]!.hand.akaCount).toBe(3);
+    expect(byId["wrc"]!.hand.akaCount).toBe(0);
     expect(byId["saikouisen"]!.scoring.pao).toBe(false);
     expect(byId["wrc"]!.scoring.kazoeYakuman).toBe(true);
     // 30 符 4 番：切上开 → 满贯块；关 → 7700

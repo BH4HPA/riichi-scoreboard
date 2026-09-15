@@ -23,10 +23,11 @@ export function SubTabs({
           type="button"
           role="tab"
           aria-selected={o.value === value}
-          disabled={!onChange}
+          aria-disabled={!onChange}
+          tabIndex={onChange ? 0 : -1}
           onClick={() => onChange?.(o.value)}
           className={cn(
-            "whitespace-nowrap rounded-md border px-2.5 py-1 text-center font-medium transition-colors disabled:cursor-default",
+            "whitespace-nowrap rounded-md border px-2.5 py-1 text-center font-medium transition-colors aria-disabled:cursor-default",
             tv ? "flex-1 text-base" : "flex-none text-sm",
             o.value === value
               ? "border-accent bg-accent/10 text-accent"
