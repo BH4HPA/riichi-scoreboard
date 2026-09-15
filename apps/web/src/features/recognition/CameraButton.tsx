@@ -21,9 +21,8 @@ const ENGINE_LABELS: Record<RecognitionEngine, string> = {
   server: "服务器识别",
 };
 
-const PHASE_TEXT: Record<RecognizePhase, string> = {
+const PHASE_TEXT: Record<Exclude<RecognizePhase, "loading-model">, string> = {
   uploading: "识别中…",
-  "loading-model": "首次使用，加载模型中…",
   running: "识别中…",
   server: "服务器识别中…",
 };
@@ -45,6 +44,7 @@ export function CameraButton({
   const [file, setFile] = useState<File | null>(null);
   const [engine, setEngine] = useState<RecognitionEngine>(readEnginePref);
   const [phase, setPhase] = useState<RecognizePhase | null>(null);
+  const [progress, setProgress] = useState(0);
   const [thumb, setThumb] = useState<string | null>(null);
   useEffect(() => () => void (thumb && URL.revokeObjectURL(thumb)), [thumb]);
 
@@ -58,13 +58,16 @@ export function CameraButton({
   const run = async (photo: CroppedPhoto) => {
     setFile(null);
     setThumb(URL.createObjectURL(photo.blob));
-    const key = crypto.randomUUID();
+    // 不用 crypto.randomUUID：它只在安全上下文可用，开发机是 HTTP
+    const key = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
     let id: string | null = null;
     const notify = useRoomStore.getState().notify;
     try {
       const { token } = await useSession.getState().ensure();
+      setProgress(0);
       const result = await recognizePhoto(key, photo, engine, token, {
         onPhase: setPhase,
+        onProgress: setProgress,
         onId: (got) => {
           id = got;
           // 结果已灌入且是同一次运行时补上 id；否则由下面灌入时带上
@@ -118,12 +121,22 @@ export function CameraButton({
         }}
       />
       <div className="text-xs text-muted" aria-live="polite" data-testid="recognize-status">
-        {phase
-          ? PHASE_TEXT[phase]
-          : rec
-            ? `${ENGINE_LABELS[rec.engine]} · ${rec.ms} ms`
-            : "拍下手牌、副露和宝牌指示牌，裁掉牌河，自动填入下方牌面"}
+        {phase === "loading-model"
+          ? `首次使用，下载模型与运行时 ${Math.round(progress * 100)}%（约 25 MB，之后走缓存）`
+          : phase
+            ? PHASE_TEXT[phase]
+            : rec
+              ? `${ENGINE_LABELS[rec.engine]} · ${rec.ms} ms`
+              : "拍下手牌、副露和宝牌指示牌，裁掉牌河，自动填入下方牌面"}
       </div>
+      {phase === "loading-model" && (
+        <div className="h-1 w-full overflow-hidden rounded bg-surface-2">
+          <div
+            className="h-full bg-accent transition-[width]"
+            style={{ width: `${Math.round(progress * 100)}%` }}
+          />
+        </div>
+      )}
       {rec && rec.warnings.length > 0 && (
         <ul className="space-y-0.5 text-xs text-neg">
           {rec.warnings.map((w, i) => (

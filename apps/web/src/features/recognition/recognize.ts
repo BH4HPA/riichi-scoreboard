@@ -8,6 +8,8 @@ export type RecognizePhase = "uploading" | BrowserPhase | "server";
 
 export interface RecognizeHooks {
   onPhase?: (phase: RecognizePhase) => void;
+  /** 首次加载模型与运行时的下载进度 0–1 */
+  onProgress?: (fraction: number) => void;
   /** 上传完成，拿到记录 id（与推理并行，可能先于或晚于结果） */
   onId?: (id: string) => void;
   /** 服务器引擎不可用，已改用本机 */
@@ -54,7 +56,11 @@ export async function recognizePhoto(
     uploads.set(key, upload);
     upload.catch(() => uploads.delete(key));
   }
-  const result = await recognizeInBrowser(photo.bitmap, (p) => hooks.onPhase?.(p));
+  const result = await recognizeInBrowser(
+    photo.bitmap,
+    (p) => hooks.onPhase?.(p),
+    (f) => hooks.onProgress?.(f),
+  );
   void upload
     .then((id) =>
       patchRecognition(

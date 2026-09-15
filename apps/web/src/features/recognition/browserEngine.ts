@@ -5,20 +5,21 @@ import {
   RECOGNITION_MANIFEST,
   type RecognitionResult,
 } from "@riichi/core";
-import { loadDetector, runDetector } from "./ort";
+import { loadDetector, runDetector, type LoadProgress } from "./ort";
 import { toModelInput } from "./preprocess";
 
 export type BrowserPhase = "loading-model" | "running";
 
-/** 本机推理：加载模型（首次含下载）→ 预处理 → 推理 → 解码 → 布局。ms 只算后三步。 */
+/** 本机推理：加载模型（首次含下载，进度经 onProgress）→ 预处理 → 推理 → 解码 → 布局。ms 只算后三步。 */
 export async function recognizeInBrowser(
   bitmap: ImageBitmap,
   onPhase?: (phase: BrowserPhase) => void,
+  onProgress?: LoadProgress,
 ): Promise<RecognitionResult> {
   const model = RECOGNITION_MANIFEST.model;
   if (!model) throw new Error("尚未发布识别模型");
   onPhase?.("loading-model");
-  const detector = await loadDetector(model.id);
+  const detector = await loadDetector(model.id, onProgress);
   onPhase?.("running");
   const t0 = performance.now();
   const { data, geom } = toModelInput(bitmap, model.imgsz);

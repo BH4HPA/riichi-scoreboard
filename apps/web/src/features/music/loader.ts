@@ -1,3 +1,4 @@
+import { fetchBytes } from "@/lib/fetchProgress";
 import { musicUrl } from "./url";
 
 type Listener = (progress: number) => void;
@@ -44,30 +45,14 @@ async function fetchBlobUrl(url: string, onProgress: Listener): Promise<string> 
   for (let attempt = 0; ; attempt++) {
     try {
       onProgress(0);
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await readWithProgress(res, onProgress);
+      const { bytes, type } = await fetchBytes(url, (loaded, total) =>
+        onProgress(total ? Math.min(loaded / total, 0.999) : 0),
+      );
       onProgress(1);
-      return URL.createObjectURL(blob);
+      return URL.createObjectURL(new Blob([bytes as BlobPart], { type: type ?? "audio/mpeg" }));
     } catch (err) {
       if (attempt >= RETRIES) throw err;
       await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
     }
   }
-}
-
-async function readWithProgress(res: Response, onProgress: Listener): Promise<Blob> {
-  const total = Number(res.headers.get("content-length")) || 0;
-  if (!res.body || !total) return res.blob();
-  const reader = res.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let loaded = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    loaded += value.length;
-    onProgress(Math.min(loaded / total, 0.999));
-  }
-  return new Blob(chunks as BlobPart[], { type: res.headers.get("content-type") ?? "audio/mpeg" });
 }
