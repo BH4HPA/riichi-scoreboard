@@ -64,7 +64,7 @@ export function SeatCards({
               data-testid={`seat-${seat}`}
               className={cn(cardClass, "hover:border-accent/60")}
               onClick={() => onPick(seat)}
-              aria-label="点击入座"
+              aria-label={`${WIND_LABELS[seat]}家 点击入座`}
             >
               {wind}
               <AvatarSlot tv={tv} />
@@ -82,7 +82,7 @@ export function SeatCards({
               data-testid={`seat-${seat}`}
               className={cardClass}
               onClick={() => onLeave(seat)}
-              aria-label={`${p.name} 离座`}
+              aria-label={`${WIND_LABELS[seat]}家 ${p.name}${ready[seat] ? "（已准备）" : ""} 离座`}
             >
               {wind}
               <Avatar name={p.name} src={p.avatar} size={tv ? "lg" : "md"} />

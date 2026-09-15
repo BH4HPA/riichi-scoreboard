@@ -124,7 +124,7 @@ export const BUILTIN_PRESETS: readonly RulesPreset[] = [
  * 规则的规范化键：经 validateRules 按固定字段顺序重建后序列化，与键序无关。
  * 非法规则（编辑器里输入到一半的草稿）返回 null，不抛。
  */
-export function rulesKey(rules: unknown): string | null {
+function rulesKey(rules: unknown): string | null {
   try {
     return JSON.stringify(validateRules(rules));
   } catch (err) {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { umaDescription } from "../format/rules";
 import { buildPointsTable } from "../reference/pointsTable";
-import { BUILTIN_PRESETS, findPreset, presetNameOf, rulesKey } from "./presets";
+import { BUILTIN_PRESETS, findPreset, presetNameOf } from "./presets";
 import { validateRules } from "./validate";
 
 describe("内置预设", () => {
@@ -50,8 +50,17 @@ describe("findPreset / presetNameOf", () => {
 
   it("键序打乱、经 JSON 往返后仍匹配", () => {
     const r = BUILTIN_PRESETS[1]!.rules;
-    const { scoring, ...rest } = r;
-    const shuffled: unknown = JSON.parse(JSON.stringify({ ...rest, scoring }));
+    const { scoring, final, ...rest } = r;
+    const { uma, ...finalRest } = final;
+    const { akaCount, ...handRest } = r.hand;
+    const shuffled: unknown = JSON.parse(
+      JSON.stringify({
+        ...rest,
+        hand: { ...handRest, akaCount },
+        final: { ...finalRest, uma },
+        scoring,
+      }),
+    );
     expect(findPreset(shuffled)?.id).toBe(BUILTIN_PRESETS[1]!.id);
   });
 
@@ -64,7 +73,7 @@ describe("findPreset / presetNameOf", () => {
 
   it("非法草稿返回 null 而不是抛异常", () => {
     const r = BUILTIN_PRESETS[0]!.rules;
-    expect(rulesKey({ ...r, final: { ...r.final, startPoints: 2 } })).toBeNull();
+    expect(findPreset({ ...r, final: { ...r.final, startPoints: 2 } })).toBeNull();
     expect(findPreset({})).toBeNull();
   });
 

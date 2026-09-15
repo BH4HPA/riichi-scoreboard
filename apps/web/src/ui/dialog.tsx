@@ -59,7 +59,10 @@ export function DialogContent({
   );
 }
 
-/** 底部操作栏：贴在滚动区底部，长表单滚到中段时按钮依然可见。 */
+/**
+ * 底部操作栏：贴在滚动区底部，长表单滚到中段时按钮依然可见。
+ * 负外边距必须与上面滚动区的 `px-4 py-3` 一致，才能贴边且不产生横向滚动。
+ */
 export function DialogFooter({ className, ...props }: ComponentProps<"div">) {
   return (
     <div

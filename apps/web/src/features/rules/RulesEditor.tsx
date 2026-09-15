@@ -88,12 +88,16 @@ export function RulesEditor({
     if (editable) loadPresets().catch(() => undefined);
   }, [editable, loadPresets]);
 
-  // 下拉的值由当前规则派生：与哪个预设完全相同就选中它，否则显示「自定义」
+  // 下拉的值由当前规则派生：与哪个预设完全相同就选中它，否则显示「自定义」。
+  // 我的预设优先匹配：把内置规则另存为自己的预设后，选中的应是那份可删除的副本。
   const all = [...BUILTIN_PRESETS, ...presets];
-  const matched = findPreset(value, all);
+  const matched = findPreset(value, [...presets, ...BUILTIN_PRESETS]);
   const selected = matched?.id ?? "custom";
-  const options = all.map((p) => ({ value: p.id, label: p.name }));
-  if (!matched) options.push({ value: "custom", label: "自定义" });
+  const options: Array<{ value: string; label: string; disabled?: boolean }> = all.map((p) => ({
+    value: p.id,
+    label: p.name,
+  }));
+  if (!matched) options.push({ value: "custom", label: "自定义", disabled: true });
   const applyPreset = (id: string) => {
     const p = all.find((x) => x.id === id);
     if (p) onChange(validateRules(p.rules));

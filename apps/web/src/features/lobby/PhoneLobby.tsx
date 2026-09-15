@@ -41,9 +41,7 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
       </div>
 
       <div>
-        <h2 className="mb-2 text-sm font-medium text-muted">
-          {mySeat === null ? "选择座位" : "座位"}
-        </h2>
+        {mySeat === null && <h2 className="mb-2 text-sm font-medium text-muted">选择座位</h2>}
         <SeatCards
           seats={room.seats}
           ready={room.ready}

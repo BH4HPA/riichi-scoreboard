@@ -154,7 +154,7 @@ test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手�
   // 手机点自己的座位卡即离座，再点回去
   await expect(phones[1]!.getByTestId("seat-3")).toHaveAccessibleName(/离座$/);
   await phones[1]!.getByTestId("seat-3").click();
-  await expect(phones[1]!.getByTestId("seat-3")).toHaveAccessibleName("点击入座");
+  await expect(phones[1]!.getByTestId("seat-3")).toHaveAccessibleName(/点击入座$/);
   await phones[1]!.getByTestId("seat-3").click();
   await phones[1]!.getByRole("button", { name: "准备", exact: true }).click();
   await expect(tv.getByText("已准备")).toHaveCount(4);
