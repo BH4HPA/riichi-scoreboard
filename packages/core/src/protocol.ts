@@ -50,12 +50,21 @@ export type UiIntent =
       deltas: number[] | null;
       summary: string | null;
     }
-  | { kind: "reference"; tab: "yaku" | "fu" | "points" }
+  | { kind: "reference"; tab: ReferenceTab; sub: string }
   | { kind: "rules" }
   | { kind: "adjust" };
 
+export type ReferenceTab = "yaku" | "points";
+/** 番符表二级页：役种页按 YAKU_PAGES.key；点数页为 ko / oya / fu */
+export interface ReferenceView {
+  tab: ReferenceTab;
+  sub: string;
+}
+export const DEFAULT_REFERENCE_VIEW: ReferenceView = { tab: "yaku", sub: "1" };
+
 const SETTLEMENT_MODES = ["tsumo", "ron", "draw", "abortive", "chombo"] as const;
-const REFERENCE_TABS = ["yaku", "fu", "points"] as const;
+const REFERENCE_TABS = ["yaku", "points"] as const;
+const SUB_MAX = 16;
 const SUMMARY_MAX = 200;
 
 /** 校验并规范化客户端发来的镜像意图；形状不对即抛 DomainError。 */
@@ -70,9 +79,12 @@ export function validateUiIntent(input: unknown): UiIntent {
     case "rules":
     case "adjust":
       return { kind: v.kind };
-    case "reference":
-      if (!REFERENCE_TABS.includes(v.tab as (typeof REFERENCE_TABS)[number])) return bad();
-      return { kind: "reference", tab: v.tab as (typeof REFERENCE_TABS)[number] };
+    case "reference": {
+      if (!REFERENCE_TABS.includes(v.tab as ReferenceTab)) return bad();
+      if (typeof v.sub !== "string" || v.sub.length > SUB_MAX || !/^[a-z0-9]*$/.test(v.sub))
+        return bad();
+      return { kind: "reference", tab: v.tab as ReferenceTab, sub: v.sub };
+    }
     case "settlement": {
       if (!SETTLEMENT_MODES.includes(v.mode as (typeof SETTLEMENT_MODES)[number])) return bad();
       const deltas = v.deltas;

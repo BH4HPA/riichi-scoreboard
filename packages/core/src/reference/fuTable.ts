@@ -1,50 +1,55 @@
-/** 符数计算表（速查展示用）。 */
-export interface FuRule {
+import { TILE } from "../types/tiles";
+
+/** 符数计算公式（按「底符 + 面子 + 雀头 + 听牌形 + 和牌状态」分段展示）。 */
+export interface FuLine {
   item: string;
   fu: string;
   note?: string;
 }
 
-export const FU_BASE: FuRule[] = [
-  { item: "副底", fu: "20" },
-  { item: "门清荣和", fu: "+10" },
-  { item: "自摸", fu: "+2", note: "平和自摸不加符" },
-  { item: "七对子", fu: "25 固定", note: "不再加符" },
-  { item: "平和自摸", fu: "20 固定" },
-  { item: "副露平和形荣和", fu: "30 固定", note: "副露无役牌顺子手荣和按 30 符" },
-];
+export const FU_BASE: FuLine = { item: "固定计算", fu: "+20" };
 
-export const FU_MELDS: Array<{
+export interface FuMeldRow {
   item: string;
-  closedSimple: number;
-  openSimple: number;
-  closedTerminal: number;
-  openTerminal: number;
-}> = [
-  { item: "刻子", closedSimple: 4, openSimple: 2, closedTerminal: 8, openTerminal: 4 },
-  { item: "杠子", closedSimple: 16, openSimple: 8, closedTerminal: 32, openTerminal: 16 },
+  /** 中张牌 */
+  simple: number;
+  /** 幺九牌（含字牌） */
+  terminal: number;
+}
+
+export const FU_MELDS: FuMeldRow[] = [
+  { item: "明刻", simple: 2, terminal: 4 },
+  { item: "暗刻", simple: 4, terminal: 8 },
+  { item: "明杠", simple: 8, terminal: 16 },
+  { item: "暗杠", simple: 16, terminal: 32 },
 ];
 
-export const FU_PAIR: FuRule[] = [
-  { item: "役牌雀头", fu: "+2", note: "自风/场风/三元牌" },
-  { item: "连风雀头", fu: "+2 或 +4", note: "M-League 按 +4" },
-  { item: "非役牌雀头", fu: "0" },
+/** 面子表头示例牌：中张 5 筒、幺九 1 万 */
+export const FU_MELD_SAMPLES = { simple: TILE.P5, terminal: TILE.M1 } as const;
+
+export const FU_PAIR: FuLine[] = [
+  { item: "门风", fu: "+2" },
+  { item: "场风", fu: "+2" },
+  { item: "连风", fu: "+4", note: "本计分板引擎按 +4 计算" },
+  { item: "三元牌", fu: "+2" },
 ];
 
-export const FU_WAIT: FuRule[] = [
-  { item: "两面听", fu: "0" },
-  { item: "双碰听", fu: "0" },
-  { item: "边张听", fu: "+2" },
-  { item: "嵌张听", fu: "+2" },
-  { item: "单骑听", fu: "+2" },
+export const FU_WAIT: FuLine[] = [
+  { item: "单骑听牌", fu: "+2" },
+  { item: "坎张听牌", fu: "+2" },
+  { item: "边张听牌", fu: "+2" },
 ];
 
-export const FU_NOTES = [
-  "合计后向上取整到 10 符（25 符例外）。",
-  "基本点 = 符 × 2^(番+2)，满贯以上按固定基本点。",
-  "闲家荣和 = 基本点 × 4，庄家荣和 = 基本点 × 6，均向上取整到百；自摸时庄家付 2 倍、闲家付 1 倍基本点。",
+export const FU_STATE: FuLine[] = [
+  { item: "自摸", fu: "+2", note: "无平和役种时" },
+  { item: "荣和", fu: "+10", note: "门前状态时" },
 ];
 
-/** 点数速查表的行：番 × 符 → 闲家荣和 / 庄家荣和 / 闲家自摸 / 庄家自摸 */
-export const POINT_TABLE_FU = [20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110] as const;
-export const POINT_TABLE_HAN = [1, 2, 3, 4] as const;
+export const FU_ROUNDING =
+  "以上计算结果向上取整至 10 位进位，即为最终符数（如计算结果为 32，最终符数为 40 符）。";
+
+export const FU_SPECIALS = [
+  "平和役种 + 门前自摸和牌，最终结果固定为 20 符。",
+  "七对子役种（无论荣和/自摸），最终结果固定为 25 符。",
+  "副露和牌不足 30 符时，最终结果固定为 30 符。",
+];

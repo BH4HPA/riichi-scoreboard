@@ -99,9 +99,9 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
     tv.getByText("闲家 西家 荣和 北家 2 番 30 符，共 2,000 点，共收入 2,000 点。"),
   ).toBeVisible();
   // 历史记录展示牌面：和张 9萬 单独标出，赤5筒 出现在手牌里，役种 chips
-  const historyRow = tv.getByRole("row").filter({ hasText: "西家 荣和 北家" });
-  await expect(historyRow.getByRole("img", { name: "赤5筒" })).toBeVisible();
-  await expect(historyRow.getByText("平和 1 番")).toBeVisible();
+  const historyTable = tv.getByRole("table").filter({ hasText: "西家 荣和 北家" });
+  await expect(historyTable.getByRole("img", { name: "赤5筒" })).toBeVisible();
+  await expect(historyTable.getByText("平和 1 番")).toBeVisible();
 
   await tvCtx.close();
 });

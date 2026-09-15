@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams } from "react-router";
 import { BookOpen, History, ScrollText, User, Wifi } from "lucide-react";
-import { seatNames, seatOfPlayer } from "@riichi/core";
+import { DEFAULT_REFERENCE_VIEW, seatNames, seatOfPlayer, type ReferenceView } from "@riichi/core";
 import { Dialog, DialogContent } from "@/ui/dialog";
 import { ConnectionBadge, Notice } from "@/ui/notice";
 import { useRoomStore } from "@/ws/store";
@@ -13,7 +13,7 @@ import { DiffMatrix } from "@/features/scoreboard/DiffMatrix";
 import { HistoryList } from "@/features/history/HistoryTable";
 import { FinalPanel } from "@/features/final/FinalPanel";
 import { ControlPanel } from "@/features/settlement/ControlPanel";
-import { ReferenceSheet, type ReferenceTab } from "@/features/reference/ReferenceSheet";
+import { ReferenceSheet } from "@/features/reference/ReferenceSheet";
 import { RulesEditor } from "@/features/rules/RulesEditor";
 import { ProfileEditor, StatsPanel } from "@/features/profile/ProfileEditor";
 import { useMirror } from "@/features/settlement/useMirror";
@@ -67,8 +67,8 @@ function PhoneGame() {
   const room = useRoomStore((s) => s.room)!;
   const playerId = useRoomStore((s) => s.playerId);
   const [sheet, setSheet] = useState<Sheet>(null);
-  const [refTab, setRefTab] = useState<ReferenceTab>("yaku");
-  useMirror(sheet === "reference", { kind: "reference", tab: refTab }, true);
+  const [refView, setRefView] = useState<ReferenceView>(DEFAULT_REFERENCE_VIEW);
+  useMirror(sheet === "reference", { kind: "reference", ...refView }, true);
   useMirror(sheet === "rules", { kind: "rules" }, true);
   const game = room.game!;
   const names = seatNames(room);
@@ -135,8 +135,8 @@ function PhoneGame() {
         </DialogContent>
       </Dialog>
       <Dialog open={sheet === "reference"} onOpenChange={closeSheet}>
-        <DialogContent title="番符表" description="打开时电视会同步显示">
-          <ReferenceSheet rules={room.rules} tab={refTab} onTabChange={setRefTab} />
+        <DialogContent title="番符表" description="打开时电视会同步显示" className="sm:max-w-2xl">
+          <ReferenceSheet rules={room.rules} view={refView} onViewChange={setRefView} />
         </DialogContent>
       </Dialog>
       <Dialog open={sheet === "rules"} onOpenChange={closeSheet}>

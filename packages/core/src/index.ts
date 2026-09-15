@@ -17,6 +17,8 @@ export * from "./format/round";
 export * from "./format/describe";
 export * from "./format/rules";
 export * from "./hand/options";
+export * from "./reference/notation";
 export * from "./reference/yakuTable";
 export * from "./reference/fuTable";
+export * from "./reference/pointsTable";
 export * from "./protocol";

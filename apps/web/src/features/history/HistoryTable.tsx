@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import {
   describeEntry,
   ENTRY_KIND_LABELS,
@@ -5,20 +6,30 @@ import {
   roundLabel,
   SEATS,
   type HistoryEntry,
+  type WinRecord,
 } from "@riichi/core";
 import { Badge } from "@/ui/controls";
 import { cn, formatTime } from "@/lib/utils";
 import { HandStrip, IndicatorRow, YakuChips } from "@/features/hand/HandStrip";
 import type { TileSize } from "@/features/hand/TileFace";
 
-/** 牌面形态录入的和牌：手牌 + 指示牌 + 役种。 */
-function WinHands({ entry, size }: { entry: HistoryEntry; size: TileSize }) {
-  if (entry.kind !== "tsumo" && entry.kind !== "ron") return null;
+/** 牌面形态录入的和牌记录（番符快选的和牌 hand 为 null，不展示）。 */
+function winHands(entry: HistoryEntry): WinRecord[] {
+  if (entry.kind !== "tsumo" && entry.kind !== "ron") return [];
   const wins = entry.kind === "tsumo" ? [entry.win] : entry.wins;
-  const shown = wins.filter((w) => w.hand !== null);
+  return wins.filter((w) => w.hand !== null);
+}
+
+function winHandsCount(entry: HistoryEntry): number {
+  return winHands(entry).length;
+}
+
+/** 手牌 + 指示牌 + 役种。 */
+function WinHands({ entry, size }: { entry: HistoryEntry; size: TileSize }) {
+  const shown = winHands(entry);
   if (shown.length === 0) return null;
   return (
-    <div className="mt-1.5 space-y-2">
+    <div className="mt-1 space-y-2">
       {shown.map((w) => (
         <div key={w.winner} className="space-y-1">
           {shown.length > 1 && (
@@ -80,28 +91,39 @@ export function HistoryTable({ history, tv = false }: { history: HistoryEntry[];
           </tr>
         </thead>
         <tbody>
-          {history.map((entry) => (
-            <tr key={entry.seq} className="border-t border-border align-top">
-              <td className="px-2 py-2">
-                <div className="flex items-center gap-1.5">
-                  <span className="tabular">{roundLabel(entry.kyoku, entry.honba)}</span>
-                  <Badge tone="outline">{ENTRY_KIND_LABELS[entry.kind]}</Badge>
-                </div>
-                <div className="text-[11px] text-muted">{formatTime(entry.at)}</div>
-              </td>
-              <td className="px-2 py-2">{entry.names[entry.dealer]}</td>
-              <td className="px-2 py-2 text-muted">
-                {entry.riichi.length ? entry.riichi.map((s) => entry.names[s]).join("、") : "无"}
-              </td>
-              <td className="px-2 py-2">
-                <DeltaCells entry={entry} />
-              </td>
-              <td className="px-2 py-2 text-muted">
-                {describeEntry(entry)}
-                <WinHands entry={entry} size={tv ? "sm" : "xs"} />
-              </td>
-            </tr>
-          ))}
+          {history.map((entry) => {
+            const hasHands = winHandsCount(entry) > 0;
+            return (
+              <Fragment key={entry.seq}>
+                <tr className={cn("border-t border-border align-top", hasHands && "border-b-0")}>
+                  <td className="px-2 py-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="tabular">{roundLabel(entry.kyoku, entry.honba)}</span>
+                      <Badge tone="outline">{ENTRY_KIND_LABELS[entry.kind]}</Badge>
+                    </div>
+                    <div className="text-[11px] text-muted">{formatTime(entry.at)}</div>
+                  </td>
+                  <td className="px-2 py-2">{entry.names[entry.dealer]}</td>
+                  <td className="px-2 py-2 text-muted">
+                    {entry.riichi.length
+                      ? entry.riichi.map((s) => entry.names[s]).join("、")
+                      : "无"}
+                  </td>
+                  <td className="px-2 py-2">
+                    <DeltaCells entry={entry} />
+                  </td>
+                  <td className="px-2 py-2 text-muted">{describeEntry(entry)}</td>
+                </tr>
+                {hasHands && (
+                  <tr>
+                    <td colSpan={5} className="px-2 pb-2">
+                      <WinHands entry={entry} size={tv ? "sm" : "xs"} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>

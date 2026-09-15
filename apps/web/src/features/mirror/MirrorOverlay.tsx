@@ -33,7 +33,7 @@ export function MirrorOverlay({
         <div className="mb-3 flex items-center gap-2 text-sm text-muted">
           <Badge tone="accent">{who}</Badge> 正在查看番符表
         </div>
-        <ReferenceSheet rules={rules} tab={intent.tab} tv />
+        <ReferenceSheet rules={rules} view={{ tab: intent.tab, sub: intent.sub }} tv />
       </div>
     );
   }

@@ -154,7 +154,6 @@ export function TileKeyboard({
   };
 
   const distinctClosed = [...new Set(hand.closed)];
-  const keys: Tile[] = akaEnabled ? [...ALL_TILES, ...AKA_TILES] : [...ALL_TILES];
 
   return (
     <div className="space-y-3">
@@ -243,9 +242,23 @@ export function TileKeyboard({
       </div>
 
       <div className="grid grid-cols-9 justify-items-center gap-1" data-testid="tile-keyboard">
-        {keys.map((t) => (
+        {ALL_TILES.map((t) => (
           <TileFace key={t} tile={t} size="sm" dim={disabledOnKeyboard(t)} onClick={() => tap(t)} />
         ))}
+        {akaEnabled && (
+          <>
+            <span className="col-span-2" aria-hidden />
+            {AKA_TILES.map((t) => (
+              <TileFace
+                key={t}
+                tile={t}
+                size="sm"
+                dim={disabledOnKeyboard(t)}
+                onClick={() => tap(t)}
+              />
+            ))}
+          </>
+        )}
       </div>
 
       <div>
