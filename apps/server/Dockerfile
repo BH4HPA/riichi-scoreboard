@@ -20,5 +20,5 @@ COPY --from=build /app/node_modules/riichi-rs-node ./node_modules/riichi-rs-node
 COPY --from=build /app/apps/server/dist ./server
 COPY --from=build /app/apps/web/dist ./web
 EXPOSE 8787
-HEALTHCHECK --interval=15s --timeout=3s --retries=5 CMD wget -qO- http://127.0.0.1:8787/health || exit 1
+HEALTHCHECK --interval=15s --timeout=3s --retries=5 CMD wget -qO- -Y off http://127.0.0.1:8787/health || exit 1
 CMD ["node", "server/index.js"]
