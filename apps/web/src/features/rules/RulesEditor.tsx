@@ -154,6 +154,9 @@ export function RulesEditor({
               <Save className="h-4 w-4" /> 保存
             </Button>
           </div>
+          {all.find((p) => p.id === selected)?.note && (
+            <p className="mt-2 text-xs text-muted">{all.find((p) => p.id === selected)!.note}</p>
+          )}
           <p className="mt-2 text-xs text-muted">{umaDescription(value)}</p>
         </div>
       ) : (

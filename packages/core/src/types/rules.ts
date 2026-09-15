@@ -74,4 +74,6 @@ export interface RulesPreset {
   id: string;
   name: string;
   rules: RoomRules;
+  /** 内置预设的一行说明（来源、与官方规则的已知差异） */
+  note?: string;
 }

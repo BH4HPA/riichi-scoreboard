@@ -1,4 +1,4 @@
-import type { RoomRules, RulesPreset } from "../types/rules";
+import type { RoomRules } from "../types/rules";
 
 /** M-League 规定（2026-09 核实）。 */
 export const MLEAGUE_RULES: RoomRules = {
@@ -42,11 +42,3 @@ export const MLEAGUE_RULES: RoomRules = {
     leftoverKyotaku: "top",
   },
 };
-
-export const MLEAGUE_PRESET: RulesPreset = {
-  id: "mleague",
-  name: "M-League",
-  rules: MLEAGUE_RULES,
-};
-
-export const BUILTIN_PRESETS: readonly RulesPreset[] = [MLEAGUE_PRESET];
