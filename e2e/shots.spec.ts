@@ -62,6 +62,7 @@ test("截图：番符表与主控台", async ({ browser }) => {
   await tv.screenshot({ path: `${OUT}/tv-mirror-settlement.png` });
   await ron.getByRole("button", { name: "确认荣和" }).click();
   await tv.getByTestId("points-2").filter({ hasText: "27,000" }).waitFor();
+  await tv.getByText("正在录入荣和结算").waitFor({ state: "detached" });
   await tv.screenshot({ path: `${OUT}/tv-game.png` });
 
   // 番符表：手机打开，电视镜像

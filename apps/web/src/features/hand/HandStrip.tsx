@@ -32,7 +32,8 @@ export function HandStrip({
     <div
       className={cn(
         "flex items-end gap-x-3 gap-y-1",
-        wrap ? "flex-wrap" : "w-max flex-nowrap",
+        // 不换行时留出右侧与上下内边距，避免和张的选中框被滚动容器裁掉
+        wrap ? "flex-wrap" : "w-max flex-nowrap py-0.5 pr-1",
         className,
       )}
     >
