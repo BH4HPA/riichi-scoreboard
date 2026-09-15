@@ -34,6 +34,10 @@ export function meRoutes(deps: Deps): Hono {
     const body = (await c.req.json().catch(() => ({}))) as { name?: unknown };
     const name = cleanName(body.name) ?? "玩家";
     const row = deps.players.create(name, Date.now());
+    // 新身份从哪来：定位"同一部手机换了身份"时对照 origin / referer / UA
+    console.log(
+      `[register] ${row.id} origin=${c.req.header("origin") ?? "-"} referer=${c.req.header("referer") ?? "-"} ua=${c.req.header("user-agent") ?? "-"}`,
+    );
     return c.json({ token: row.token, player: toPlayerRef(row) }, 201);
   });
 
