@@ -23,7 +23,7 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
     const nameInput = p.locator('input[maxlength="12"]').first();
     await nameInput.fill(NAMES[i]!);
     await nameInput.press("Enter");
-    await p.getByTestId(`seat-${i}`).click();
+    await p.getByTestId(`seat-${i}`).getByRole("button", { name: "点击入座" }).click();
     await expect(p.getByTestId(`seat-${i}`)).toContainText(NAMES[i]!);
     await expect(p.getByRole("button", { name: "准备", exact: true })).toBeVisible();
     await p.getByRole("button", { name: "准备", exact: true }).click();
@@ -103,5 +103,54 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await expect(historyTable.getByRole("img", { name: "赤5筒" })).toBeVisible();
   await expect(historyTable.getByText("平和 1 番")).toBeVisible();
 
+  await tvCtx.close();
+});
+
+test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手机可让本地玩家离座", async ({ browser }) => {
+  const tvCtx = await browser.newContext({ viewport: { width: 1600, height: 900 } });
+  const tv = await tvCtx.newPage();
+  await tv.goto("/console"); // 新的浏览器上下文没有保存的房间码，会自动新建房间
+  const code = (await tv.getByTestId("room-code").textContent())?.trim() ?? "";
+
+  // 东家：新建并入座；南家：再建一个
+  for (const [seat, name] of [
+    [0, "本地甲"],
+    [1, "本地乙"],
+  ] as const) {
+    await tv.getByTestId(`seat-${seat}`).getByRole("button", { name: "添加本地玩家" }).click();
+    const dlg = tv.getByRole("dialog");
+    await dlg.getByLabel("新建本地玩家").fill(name);
+    await dlg.getByRole("button", { name: "创建并入座" }).click();
+    await expect(tv.getByTestId(`seat-${seat}`)).toContainText(name);
+    await expect(tv.getByTestId(`seat-${seat}`)).toContainText("已准备");
+    await expect(tv.getByTestId(`seat-${seat}`)).toContainText("本地");
+  }
+
+  const phones: Page[] = [];
+  for (const i of [2, 3]) {
+    const p = await phone(browser, code);
+    await p.getByTestId(`seat-${i}`).getByRole("button", { name: "点击入座" }).click();
+    await p.getByRole("button", { name: "准备", exact: true }).click();
+    await expect(p.getByRole("button", { name: "取消准备" })).toBeVisible();
+    phones.push(p);
+  }
+  await expect(tv.getByText("已准备")).toHaveCount(4);
+  // 手机端也能看到本地玩家已入座，并可让其离座（人人管理员）
+  await expect(phones[0]!.getByTestId("seat-0")).toContainText("本地甲");
+  await tv.getByTestId("seat-1").getByRole("button", { name: "本地乙 离座" }).click();
+  await expect(tv.getByTestId("seat-1")).toContainText("等待加入");
+  // 从已有列表再次入座
+  await tv.getByTestId("seat-1").getByRole("button", { name: "添加本地玩家" }).click();
+  await tv
+    .getByRole("dialog")
+    .getByRole("listitem")
+    .filter({ has: tv.getByRole("button", { name: "删除 本地乙" }) })
+    .getByRole("button", { name: "入座" })
+    .click();
+  await expect(tv.getByTestId("seat-1")).toContainText("本地乙");
+
+  await tv.getByRole("button", { name: "开局", exact: true }).click();
+  await expect(tv.getByTestId("points-0")).toHaveText("25,000");
+  await expect(phones[1]!.getByTestId("points-1")).toHaveText("25,000");
   await tvCtx.close();
 });

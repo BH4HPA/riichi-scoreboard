@@ -10,6 +10,7 @@ import { PlayersRepo } from "./db/players";
 import { PresetsRepo } from "./db/presets";
 import { ResultsRepo } from "./db/results";
 import { RoomsRepo } from "./db/rooms";
+import { localRoutes } from "./http/routes/locals";
 import { meRoutes } from "./http/routes/me";
 import { roomRoutes } from "./http/routes/rooms";
 import { mountStatic } from "./http/static";
@@ -89,6 +90,7 @@ export function createApp({
     db.prepare("SELECT 1").get();
     return c.json({ ok: true });
   });
+  app.route("/api/me/locals", localRoutes({ players, results, registry, store }));
   app.route("/api/me", meRoutes({ players, presets, results, registry, store }));
   app.route("/api/rooms", roomRoutes({ registry, players }));
   if (local) mountLocalObjects(app, local);

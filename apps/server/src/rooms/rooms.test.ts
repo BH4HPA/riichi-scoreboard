@@ -356,4 +356,112 @@ describe("rooms end-to-end", () => {
     tv.close();
     phones.slice(0, 3).forEach((p) => p.close());
   });
+
+  it("本地玩家：主控台创建并带入座位（即已准备）；他人可离座；非创建者不能入座/改档案", async () => {
+    const console_ = await register("主控台");
+    const phone = await register("手机");
+    const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
+    const created = await app.request("/api/rooms", {
+      method: "POST",
+      headers: auth(console_.token),
+    });
+    const { room } = (await created.json()) as { room: RoomView };
+
+    // REST：创建 + 列表
+    const add = await app.request("/api/me/locals", {
+      method: "POST",
+      headers: { ...auth(console_.token), "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "小明" }),
+    });
+    expect(add.status).toBe(201);
+    const { local } = (await add.json()) as { local: { id: string; name: string; games: number } };
+    expect(local).toMatchObject({ name: "小明", games: 0 });
+    const list = (await (
+      await app.request("/api/me/locals", { headers: auth(console_.token) })
+    ).json()) as { locals: Array<{ id: string }> };
+    expect(list.locals.map((l) => l.id)).toEqual([local.id]);
+    // 别的设备看不到、改不了
+    const other = await app.request(`/api/me/locals/${local.id}`, {
+      method: "PATCH",
+      headers: { ...auth(phone.token), "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "冒充" }),
+    });
+    expect(other.status).toBe(404);
+
+    const tv = new Client(room.code, console_.token);
+    const ph = new Client(room.code, phone.token);
+    await Promise.all([tv.open(), ph.open()]);
+    await tv.waitState(() => true);
+    await ph.waitState(() => true);
+
+    // 非创建者不能带本地玩家入座
+    ph.send({
+      type: "command",
+      id: "x",
+      baseSeq: 0,
+      command: { type: "sitLocal", seat: 0, playerId: local.id },
+    });
+    expect(await ph.outcome()).toMatchObject({ type: "error", code: "forbidden" });
+    // 主控台带入 → 入座即已准备
+    tv.send({
+      type: "command",
+      id: "sl",
+      baseSeq: 0,
+      command: { type: "sitLocal", seat: 0, playerId: local.id },
+    });
+    let seq = (await tv.until("ack")).seq;
+    let state = await tv.waitState((r) => r.seats[0] !== null);
+    expect(state.seats[0]).toMatchObject({ id: local.id, name: "小明" });
+    expect(state.ready[0]).toBe(true);
+    // 客户端自报 ready 被剥离：设备玩家入座后仍未准备
+    ph.send({
+      type: "command",
+      id: "sit",
+      baseSeq: seq,
+      command: { type: "sit", seat: 1, ready: true } as never,
+    });
+    seq = (await ph.until("ack")).seq;
+    state = await ph.waitState((r) => r.seats[1] !== null);
+    expect(state.ready[1]).toBe(false);
+    // 手机可以让本地玩家离座（人人管理员），但不能动别的设备玩家
+    ph.send({ type: "command", id: "lv", baseSeq: seq, command: { type: "leave", seat: 0 } });
+    seq = (await ph.until("ack")).seq;
+    state = await ph.waitState((r) => r.seats[0] === null);
+    expect(state.seats[0]).toBeNull();
+    // 改名同步进房间：先重新带入
+    tv.send({
+      type: "command",
+      id: "sl2",
+      baseSeq: seq,
+      command: { type: "sitLocal", seat: 0, playerId: local.id },
+    });
+    await tv.until("ack");
+    const renamed = await app.request(`/api/me/locals/${local.id}`, {
+      method: "PATCH",
+      headers: { ...auth(console_.token), "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "小明2" }),
+    });
+    expect(renamed.status).toBe(200);
+    state = await tv.waitState((r) => r.seats[0]?.name === "小明2");
+    expect(state.seats[0]?.name).toBe("小明2");
+    // 删除档案：204；再删 404
+    expect(
+      (
+        await app.request(`/api/me/locals/${local.id}`, {
+          method: "DELETE",
+          headers: auth(console_.token),
+        })
+      ).status,
+    ).toBe(204);
+    expect(
+      (
+        await app.request(`/api/me/locals/${local.id}`, {
+          method: "DELETE",
+          headers: auth(console_.token),
+        })
+      ).status,
+    ).toBe(404);
+    tv.close();
+    ph.close();
+  });
 });

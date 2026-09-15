@@ -102,6 +102,11 @@ export function validateCommand(input: unknown): ClientCommand {
       };
     case "sit":
       return { type: "sit", seat: seat(input.seat, "座位") };
+    case "sitLocal": {
+      if (typeof input.playerId !== "string" || !/^[a-f0-9]{1,32}$/.test(input.playerId))
+        bad("本地玩家 id 无效");
+      return { type: "sitLocal", seat: seat(input.seat, "座位"), playerId: input.playerId };
+    }
     case "leave":
       return { type: "leave", seat: seat(input.seat, "座位") };
     case "setReady":

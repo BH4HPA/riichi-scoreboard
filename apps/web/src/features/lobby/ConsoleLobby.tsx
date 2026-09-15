@@ -1,20 +1,52 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Play, Settings2 } from "lucide-react";
-import type { RoomView } from "@riichi/core";
+import { Play, Settings2, Users } from "lucide-react";
+import type { RoomView, Seat } from "@riichi/core";
+import { useSession } from "@/api/session";
 import { Button } from "@/ui/button";
 import { Dialog, DialogContent, DialogFooter } from "@/ui/dialog";
 import { useCommand } from "@/ws/useRoom";
 import { RulesEditor } from "@/features/rules/RulesEditor";
+import { LocalPlayerDialog } from "./LocalPlayerDialog";
+import { localsApi } from "./localsApi";
 import { SeatCards } from "./SeatCards";
+
+/** 本设备创建的本地玩家 id 列表（对话框关闭后刷新，用于座位卡上的标记与离座按钮）。 */
+function useLocalIds(refreshKey: number): string[] {
+  const ensure = useSession((s) => s.ensure);
+  const [ids, setIds] = useState<string[]>([]);
+  useEffect(() => {
+    let active = true;
+    ensure()
+      .then(({ token }) => localsApi.list(token))
+      .then((list) => active && setIds(list.map((l) => l.id)))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [ensure, refreshKey]);
+  return ids;
+}
 
 export function ConsoleLobby({ room, onNewRoom }: { room: RoomView; onNewRoom: () => void }) {
   const send = useCommand();
   const [rulesOpen, setRulesOpen] = useState(false);
   const [draft, setDraft] = useState(room.rules);
+  const [localSeat, setLocalSeat] = useState<Seat | null>(null);
+  const [localOpen, setLocalOpen] = useState(false);
+  const [localsVersion, setLocalsVersion] = useState(0);
+  const localIds = useLocalIds(localsVersion);
   const full = room.seats.every((s) => s !== null);
   const allReady = full && room.ready.every(Boolean);
   const url = `${window.location.origin}/r/${room.code}`;
+  const openLocals = (seat: Seat | null) => {
+    setLocalSeat(seat);
+    setLocalOpen(true);
+  };
+  const closeLocals = (open: boolean) => {
+    setLocalOpen(open);
+    if (!open) setLocalsVersion((v) => v + 1);
+  };
 
   return (
     <div className="grid h-dvh grid-cols-[minmax(320px,2fr)_3fr] gap-8 p-8">
@@ -34,8 +66,21 @@ export function ConsoleLobby({ room, onNewRoom }: { room: RoomView; onNewRoom: (
 
       <section className="flex min-h-0 flex-col gap-6">
         <div>
-          <h2 className="mb-3 text-lg font-semibold">座位</h2>
-          <SeatCards seats={room.seats} ready={room.ready} mySeat={null} tv />
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">座位</h2>
+            <Button variant="ghost" size="sm" onClick={() => openLocals(null)}>
+              <Users className="h-4 w-4" /> 本地玩家
+            </Button>
+          </div>
+          <SeatCards
+            seats={room.seats}
+            ready={room.ready}
+            mySeat={null}
+            localIds={localIds}
+            onAddLocal={openLocals}
+            onLeave={(seat) => send({ type: "leave", seat })}
+            tv
+          />
         </div>
         <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-border bg-surface p-4">
           <div className="mb-3 flex items-center justify-between">
@@ -82,6 +127,14 @@ export function ConsoleLobby({ room, onNewRoom }: { room: RoomView; onNewRoom: (
           </Button>
         </div>
       </section>
+
+      <LocalPlayerDialog
+        seat={localSeat}
+        open={localOpen}
+        onOpenChange={closeLocals}
+        seatedIds={room.seats.flatMap((s) => (s ? [s.id] : []))}
+        onSit={(seat, playerId) => send({ type: "sitLocal", seat, playerId })}
+      />
 
       <Dialog open={rulesOpen} onOpenChange={setRulesOpen}>
         <DialogContent

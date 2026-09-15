@@ -140,18 +140,30 @@ export class RoomRegistry {
     return event;
   }
 
-  /** 客户端命令 → 内部命令：入座按 token 填玩家；座位类命令只能操作自己的座位；牌面交引擎评估。 */
+  /**
+   * 客户端命令 → 内部命令：入座按 token 填玩家；本地玩家由创建者带入且即已准备；
+   * 座位类命令只能操作自己的座位（本地玩家的座位人人可操作）；牌面交引擎评估。
+   */
   private enrich(state: RoomState, cmd: ClientCommand, actor: EventActor): Command {
     const own = (seat: Seat, what: string) => {
-      if (state.seats[seat]?.id !== actor.playerId) {
-        throw new DomainError("forbidden", `只能${what}自己的座位`);
-      }
+      const occupant = state.seats[seat];
+      if (!occupant) throw new DomainError("empty_seat", "座位为空");
+      if (occupant.id === actor.playerId) return;
+      if (this.players.byId(occupant.id)?.kind === "local") return;
+      throw new DomainError("forbidden", `只能${what}自己的座位`);
     };
     switch (cmd.type) {
       case "sit": {
         const row = actor.playerId ? this.players.byId(actor.playerId) : null;
         if (!row) throw new DomainError("unauthorized", "需要先注册设备");
         return { type: "sit", seat: cmd.seat, player: toPlayerRef(row) };
+      }
+      case "sitLocal": {
+        const row = this.players.byId(cmd.playerId);
+        if (!row || row.kind !== "local" || row.created_by !== actor.playerId) {
+          throw new DomainError("forbidden", "只能安排本设备创建的本地玩家入座");
+        }
+        return { type: "sit", seat: cmd.seat, player: toPlayerRef(row), ready: true };
       }
       case "leave":
         own(cmd.seat, "离开");

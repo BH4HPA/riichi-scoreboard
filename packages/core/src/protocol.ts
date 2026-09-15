@@ -116,6 +116,12 @@ export interface UiState {
   at: number;
 }
 
+/** 主控台管理的本地玩家（REST DTO）。 */
+export interface LocalPlayerView extends PlayerRef {
+  /** 已完成对局数 */
+  games: number;
+}
+
 export interface PlayerStats {
   games: number;
   averageRank: number | null;

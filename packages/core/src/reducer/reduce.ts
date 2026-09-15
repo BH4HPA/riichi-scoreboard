@@ -44,8 +44,8 @@ function applyLobbyCommand(room: RoomState, cmd: LobbyCommand): RoomState {
       if (seats[cmd.seat]) throw new DomainError("seat_taken", "该座位已有人");
       seats[cmd.seat] = cmd.player;
       const ready = [...room.ready];
-      ready[cmd.seat] = false;
       if (existing !== -1) ready[existing] = false;
+      ready[cmd.seat] = cmd.ready ?? false;
       return { ...room, seats, ready };
     }
     case "leave": {

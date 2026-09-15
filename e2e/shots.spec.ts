@@ -23,7 +23,7 @@ test("截图：番符表与主控台", async ({ browser }) => {
   const phones: Page[] = [];
   for (let i = 0; i < 4; i++) {
     const p = await phone(browser, code, ["Ray", "小明", "阿花", "老王"][i]!);
-    await p.getByTestId(`seat-${i}`).click();
+    await p.getByTestId(`seat-${i}`).getByRole("button", { name: "点击入座" }).click();
     await p.getByRole("button", { name: "准备", exact: true }).click();
     phones.push(p);
   }

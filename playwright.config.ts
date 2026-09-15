@@ -11,6 +11,7 @@ export default defineConfig({
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
     trace: "retain-on-failure",
+    actionTimeout: 10_000,
   },
   webServer: {
     command: `yarn workspace @riichi/web build && PORT=${PORT} DATA_DIR=.e2e-data yarn workspace @riichi/server exec tsx src/index.ts`,

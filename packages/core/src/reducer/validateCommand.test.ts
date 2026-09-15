@@ -32,10 +32,18 @@ function playingRoom(): RoomState {
 
 describe("validateCommand", () => {
   it("接受合法命令并剥离多余字段", () => {
-    expect(validateCommand({ type: "sit", seat: 2, player: { id: "x" } })).toEqual({
+    expect(validateCommand({ type: "sit", seat: 2, player: { id: "x" }, ready: true })).toEqual({
       type: "sit",
       seat: 2,
     });
+    expect(validateCommand({ type: "sitLocal", seat: 1, playerId: "abc123" })).toEqual({
+      type: "sitLocal",
+      seat: 1,
+      playerId: "abc123",
+    });
+    expect(() => validateCommand({ type: "sitLocal", seat: 1, playerId: "../x" })).toThrow(
+      /本地玩家/,
+    );
     expect(validateCommand({ type: "tsumo", winner: 0, value: manual, riichi: [1] })).toEqual({
       type: "tsumo",
       winner: 0,
