@@ -59,8 +59,7 @@ export const useSession = create<SessionState>()((set, get) => ({
         "/api/me/register",
         {
           method: "POST",
-          // reason 只用于服务端日志：定位"同一部手机为什么换了身份"
-          body: { reason: existing ? "rejected" : "no_token" },
+          body: {},
         },
       );
       writeToken(token);

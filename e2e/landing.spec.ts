@@ -47,3 +47,12 @@ test("手机 UA 直接看到加入面板；HTTP 下扫码入口隐藏并提示�
   await ctx.close();
   await tvCtx.close();
 });
+
+test("未知路径（如少了房间码的 /r/）回首页", async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 400, height: 800 } });
+  const page = await ctx.newPage();
+  await page.goto("/r/");
+  await expect(page).not.toHaveURL(/\/r\//);
+  await expect(page.getByText("Unexpected Application Error")).toHaveCount(0);
+  await ctx.close();
+});

@@ -31,15 +31,9 @@ export function meRoutes(deps: Deps): Hono {
 
   /** 首次访问：签发设备 token。 */
   app.post("/register", jsonLimit, async (c) => {
-    const body = (await c.req.json().catch(() => ({}))) as { name?: unknown; reason?: unknown };
+    const body = (await c.req.json().catch(() => ({}))) as { name?: unknown };
     const name = cleanName(body.name) ?? "玩家";
     const row = deps.players.create(name, Date.now());
-    // 诊断日志（定位"同一部手机为什么换了身份"，确认根因后可删）：
-    // reason = no_token（本地没有 token）| rejected（有 token 但 /api/me 401）
-    const reason = body.reason === "no_token" || body.reason === "rejected" ? body.reason : "-";
-    console.log(
-      `[register] ${row.id} reason=${reason} origin=${c.req.header("origin") ?? "-"} referer=${c.req.header("referer") ?? "-"} ua=${c.req.header("user-agent") ?? "-"}`,
-    );
     return c.json({ token: row.token, player: toPlayerRef(row) }, 201);
   });
 
