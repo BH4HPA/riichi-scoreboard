@@ -108,8 +108,11 @@ export function createApp({
     return c.json({ error: "internal", message: "服务器内部错误" }, 500);
   });
 
-  if (upgradeWebSocket) mountWebSocket(app, upgradeWebSocket, { registry, players });
-  mountStatic(app, config.webDist);
+  if (upgradeWebSocket) {
+    mountWebSocket(app, upgradeWebSocket, { registry, players });
+  }
+  // 拆分托管（前端在别的域名）时不托管静态产物；CORS 白名单第一项就是前端站点，误入者 302 过去
+  mountStatic(app, { webDist: config.webDist, redirectTo: config.corsOrigins[0] ?? null });
 
   return { app, db, registry, players };
 }

@@ -17,6 +17,8 @@ services:
       QCLOUD_COS_ENDPOINT: "${QCLOUD_COS_ENDPOINT:-}"
       QCLOUD_COS_CDN_DOMAIN: "${QCLOUD_COS_CDN_DOMAIN:-}"
       COS_KEY_PREFIX: "${COS_KEY_PREFIX:-riichi/}"
+      # 前端另行托管时设为空串：镜像不再提供页面，页面路径 302 到 CORS_ORIGINS 第一项
+      WEB_DIST: "${WEB_DIST-/app/web}"
     volumes:
       - riichi_data:/data
     init: true
