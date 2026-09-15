@@ -1,0 +1,141 @@
+name: CI/CD
+
+# 每次推送与 PR 跑门禁；main 上再并行发布前端（COS + CDN 刷新）与服务端（CCR 镜像 + SSH 部署）。
+# 回滚 = 在旧提交的 ref 上手动触发本工作流（web 与 server 同一提交重建）。
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cicd-${{ github.ref }}
+  # main 上进行中的部署不被后续推送打断；PR 可以被新提交取代
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  API_BASE_URL: https://riichi-api.ruivon.cn
+  WEB_URL: https://riichi.ruivon.cn
+  WEB_COS_BUCKET: riichi-scoreboard-1251306253
+  WEB_COS_REGION: ap-shanghai
+  DOCKER_SERVER: useccr.ccs.tencentyun.com
+  IMAGE: useccr.ccs.tencentyun.com/bitego/riichi
+  DEPLOY_SSH_USER: ray
+  DEPLOY_WORKDIR: /home/ray/riichi-scoreboard
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Enable Corepack (Yarn 4)
+        run: |
+          corepack enable
+          yarn --version
+      - uses: actions/cache@v4
+        with:
+          path: ~/.yarn/berry/cache
+          key: yarn-berry-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          restore-keys: yarn-berry-${{ runner.os }}-
+      - run: yarn install --immutable
+      - run: yarn typecheck
+      - run: yarn lint
+      - run: yarn format:check
+      - run: yarn test
+      - name: Install Playwright Chromium
+        run: yarn playwright install --with-deps chromium
+      - run: yarn e2e
+      - name: Upload e2e traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: test-results/
+          if-no-files-found: ignore
+
+  web:
+    needs: check
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment:
+      name: web
+      url: https://riichi.ruivon.cn
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - uses: actions/cache@v4
+        with:
+          path: ~/.yarn/berry/cache
+          key: yarn-berry-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          restore-keys: yarn-berry-${{ runner.os }}-
+      - run: yarn install --immutable
+      - name: Build web against the API domain
+        run: VITE_API_BASE_URL="$API_BASE_URL" yarn workspace @riichi/web build
+      - name: Upload to COS
+        env:
+          QCLOUD_SECRET_ID: ${{ secrets.QCLOUD_SECRET_ID }}
+          QCLOUD_SECRET_KEY: ${{ secrets.QCLOUD_SECRET_KEY }}
+          QCLOUD_WEB_COS_BUCKET: ${{ env.WEB_COS_BUCKET }}
+          QCLOUD_WEB_COS_REGION: ${{ env.WEB_COS_REGION }}
+        run: bash ci/deploy-web-to-cos.sh
+      - name: Purge CDN cache
+        env:
+          TENCENTCLOUD_SECRET_ID: ${{ secrets.QCLOUD_SECRET_ID }}
+          TENCENTCLOUD_SECRET_KEY: ${{ secrets.QCLOUD_SECRET_KEY }}
+        run: |
+          python3 -m pip install --user --quiet tccli
+          export PATH="$HOME/.local/bin:$PATH"
+          tccli cdn PurgePathCache --cli-unfold-argument --Paths "${WEB_URL%/}/" --FlushType flush
+
+  server:
+    needs: check
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment:
+      name: server
+      url: https://riichi-api.ruivon.cn/health
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compute image tag
+        id: tag
+        run: echo "value=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_SERVER }}
+          username: ${{ secrets.QCLOUD_DOCKER_USERNAME }}
+          password: ${{ secrets.QCLOUD_DOCKER_PASSWORD }}
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/server/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.tag.outputs.value }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      - name: Trust the deploy host
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Deploy over SSH
+        env:
+          DEPLOY_SSH_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+        run: |
+          ssh -o StrictHostKeyChecking=yes "${DEPLOY_SSH_USER}@${DEPLOY_SSH_HOST}" \
+            "cd '${DEPLOY_WORKDIR}' && bash ci/deploy-server.sh '${{ steps.tag.outputs.value }}'"

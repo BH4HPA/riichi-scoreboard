@@ -21,6 +21,9 @@ Package manager is **Yarn 4** (via corepack). Node >= 22.13 (node:sqlite); use 2
   dissolve), `landing.spec.ts` (device routing). `SHOTS_DIR=/tmp/x yarn e2e e2e/shots.spec.ts` dumps
   screenshots for visual review (skipped otherwise).
 - `docker compose up -d --build` — single container (server + built web), data volume at `/data`
+- CI/CD: `.github/workflows/cicd.yml` runs the gates above (plus e2e) on every push/PR; pushes to `main`
+  deploy the web build to COS (`ci/deploy-web-to-cos.sh`) and the server image to CCR + the bitego server
+  over SSH (`ci/deploy-server.sh`). Rollback = re-run the workflow on an older commit. See README 部署.
 
 ## Architecture
 
