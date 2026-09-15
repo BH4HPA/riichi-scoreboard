@@ -1,13 +1,20 @@
 import { randomBytes } from "node:crypto";
 import type { Hono } from "hono";
 import type { UpgradeWebSocket, WSContext } from "hono/ws";
-import { dealerOf, kyokuWind, type ClientMessage, type ServerMessage } from "@riichi/core";
+import {
+  assertSeat,
+  dealerOf,
+  kyokuWind,
+  validateHandShape,
+  WS_CLOSE,
+  type ClientMessage,
+  type ServerMessage,
+} from "@riichi/core";
 import type { PlayersRepo } from "../db/players";
 import { evaluateHand } from "../engine/evaluate";
 import {
   describeError,
   RoomClosed,
-  WS_CLOSE_DISSOLVED,
   type LiveRoom,
   type RoomClient,
   type RoomRegistry,
@@ -62,14 +69,17 @@ export function mountWebSocket(app: Hono, upgradeWebSocket: UpgradeWebSocket, de
               code: "unauthorized",
               message: "需要有效的设备 token",
             });
-            ws.close(4001, "unauthorized");
+            ws.close(WS_CLOSE.unauthorized, "unauthorized");
             return;
           }
           try {
             room = deps.registry.get(code);
           } catch (err) {
             fail(ws, null, err);
-            ws.close(err instanceof RoomClosed ? WS_CLOSE_DISSOLVED : 4004, "room unavailable");
+            ws.close(
+              err instanceof RoomClosed ? WS_CLOSE.dissolved : WS_CLOSE.notFound,
+              "room unavailable",
+            );
             return;
           }
           client = {
@@ -117,8 +127,9 @@ export function mountWebSocket(app: Hono, upgradeWebSocket: UpgradeWebSocket, de
                 return;
               }
               try {
+                assertSeat(msg.seat);
                 const result = evaluateHand(
-                  msg.hand,
+                  validateHandShape(msg.hand),
                   {
                     seat: msg.seat,
                     dealer: dealerOf(game.kyoku),

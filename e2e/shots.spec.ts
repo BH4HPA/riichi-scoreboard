@@ -8,7 +8,7 @@ async function phone(browser: Browser, code: string, name: string): Promise<Page
   const ctx = await browser.newContext({ viewport: { width: 400, height: 860 } });
   const page = await ctx.newPage();
   await page.goto(`/r/${code}`);
-  const nameInput = page.locator('input[maxlength="12"]').first();
+  const nameInput = page.getByLabel("昵称");
   await nameInput.fill(name);
   await nameInput.press("Enter");
   return page;

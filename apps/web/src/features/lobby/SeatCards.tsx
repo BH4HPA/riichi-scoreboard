@@ -1,12 +1,12 @@
 import { Check, LogOut, UserPlus } from "lucide-react";
-import { SEATS, WIND_LABELS, type PlayerRef, type Seat } from "@riichi/core";
+import { isLocalPlayer, SEATS, WIND_LABELS, type PlayerRef, type Seat } from "@riichi/core";
 import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/controls";
 import { cn } from "@/lib/utils";
 
 /**
  * 四个座位卡。手机端：点空座入座（onPick）。
- * 电视端：空座可「添加本地玩家」（onAddLocal），本地玩家可「离座」（onLeave）。
+ * 电视端：空座可「添加本地玩家」（onAddLocal）。本地玩家（快照 kind=local）任何端都可「离座」（onLeave）。
  */
 export function SeatCards({
   seats,
@@ -15,7 +15,6 @@ export function SeatCards({
   onPick,
   onAddLocal,
   onLeave,
-  localIds = [],
   tv = false,
 }: {
   seats: (PlayerRef | null)[];
@@ -24,8 +23,6 @@ export function SeatCards({
   onPick?: ((seat: Seat) => void) | undefined;
   onAddLocal?: ((seat: Seat) => void) | undefined;
   onLeave?: ((seat: Seat) => void) | undefined;
-  /** 本设备创建的本地玩家 id，用于标记与离座按钮 */
-  localIds?: string[];
   tv?: boolean;
 }) {
   return (
@@ -34,7 +31,7 @@ export function SeatCards({
         const p = seats[seat];
         const mine = mySeat === seat;
         const clickable = Boolean(onPick) && !mine && !p;
-        const isLocal = p != null && localIds.includes(p.id);
+        const isLocal = isLocalPlayer(p);
         return (
           <div
             key={seat}

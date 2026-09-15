@@ -10,7 +10,8 @@ import {
 } from "@riichi/core";
 import { Badge } from "@/ui/controls";
 import { cn, formatTime } from "@/lib/utils";
-import { HandStrip, IndicatorRow, YakuChips } from "@/features/hand/HandStrip";
+import { HandStrip, IndicatorRow } from "@/features/hand/HandStrip";
+import { YakuChips } from "@/features/hand/YakuChips";
 import type { TileSize } from "@/features/hand/TileFace";
 
 /** 牌面形态录入的和牌记录（番符快选的和牌 hand 为 null，不展示）。 */

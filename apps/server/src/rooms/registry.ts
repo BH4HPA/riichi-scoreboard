@@ -4,6 +4,7 @@ import {
   RulesError,
   createRoom,
   dealerOf,
+  isLocalPlayer,
   kyokuWind,
   reduceRoom,
   replay,
@@ -24,6 +25,7 @@ import {
   type Seat,
   type UiState,
   type WinValue,
+  WS_CLOSE,
 } from "@riichi/core";
 import { toPlayerRef, type PlayersRepo } from "../db/players";
 import type { RoomsRepo } from "../db/rooms";
@@ -40,9 +42,6 @@ export interface RoomClient {
   send(message: string): void;
   close(code: number, reason: string): void;
 }
-
-/** 房间解散时的 WebSocket 关闭码；客户端据此不重连。 */
-export const WS_CLOSE_DISSOLVED = 4010;
 
 export interface LiveRoom {
   code: string;
@@ -110,6 +109,11 @@ export class RoomRegistry {
   /** 内存没有则从事件流回放；已解散的房间用 closed_at 短路，不回放。 */
   get(code: string): LiveRoom {
     const cached = this.rooms.get(code);
+    if (cached?.state.phase === "closed") {
+      // 解散后本应由 ws 层 closeRoom 卸载；若未来到这里说明收尾被跳过，补做一次
+      this.closeRoom(cached);
+      throw new RoomClosed(code);
+    }
     if (cached) return cached;
     const row = this.roomsRepo.get(code);
     if (!row) throw new RoomNotFound(code);
@@ -158,7 +162,7 @@ export class RoomRegistry {
    * 否则发起者会先收到断开而拿不到 ack。
    */
   closeRoom(room: LiveRoom): void {
-    for (const c of room.clients.values()) c.close(WS_CLOSE_DISSOLVED, "dissolved");
+    for (const c of room.clients.values()) c.close(WS_CLOSE.dissolved, "dissolved");
     room.clients.clear();
     room.ui.clear();
     this.rooms.delete(room.code);
@@ -169,11 +173,11 @@ export class RoomRegistry {
    * 座位类命令只能操作自己的座位（本地玩家的座位人人可操作）；牌面交引擎评估。
    */
   private enrich(state: RoomState, cmd: ClientCommand, actor: EventActor): Command {
+    // 只看座位快照：本人或本地玩家可操作；不回查玩家表，删档案也不影响历史房间
     const own = (seat: Seat, what: string) => {
       const occupant = state.seats[seat];
       if (!occupant) throw new DomainError("empty_seat", "座位为空");
-      if (occupant.id === actor.playerId) return;
-      if (this.players.byId(occupant.id)?.kind === "local") return;
+      if (occupant.id === actor.playerId || isLocalPlayer(occupant)) return;
       throw new DomainError("forbidden", `只能${what}自己的座位`);
     };
     switch (cmd.type) {

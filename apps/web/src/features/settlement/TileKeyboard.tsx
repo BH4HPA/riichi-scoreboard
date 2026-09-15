@@ -5,6 +5,7 @@ import {
   ALL_TILES,
   akaLimit,
   akaOf,
+  allHandTiles,
   baseTile,
   isAka,
   isHonor,
@@ -22,7 +23,7 @@ import { Button } from "@/ui/button";
 import { CheckRow, ChipGroup, Label } from "@/ui/controls";
 import { cn } from "@/lib/utils";
 import { TileFace } from "@/features/hand/TileFace";
-import { YakuChips } from "@/features/hand/HandStrip";
+import { YakuChips } from "@/features/hand/YakuChips";
 import { tileLabel } from "@/features/hand/tileLabel";
 
 type Target = "closed" | "dora" | "ura" | "chi" | "pon" | "kan" | "ankan";
@@ -37,13 +38,9 @@ const TARGET_LABELS: Record<Target, string> = {
   ankan: "暗杠",
 };
 
-function allTiles(hand: HandInput): Tile[] {
-  return [...hand.closed, ...hand.melds.flatMap((m) => m.tiles)];
-}
-
 /** 同一基础牌（忽略赤标记）已录入张数。 */
 function countTile(hand: HandInput, tile: Tile): number {
-  return allTiles(hand).filter((t) => sameTile(t, tile)).length;
+  return allHandTiles(hand).filter((t) => sameTile(t, tile)).length;
 }
 
 function closedCapacity(hand: HandInput): number {
@@ -53,7 +50,7 @@ function closedCapacity(hand: HandInput): number {
 /** 该赤五是否还能再录入：受规则总数与同花色上限约束。 */
 function akaAvailable(hand: HandInput, tile: Tile, rules: RoomRules): boolean {
   if (!isAka(tile)) return true;
-  const all = allTiles(hand);
+  const all = allHandTiles(hand);
   const total = all.filter(isAka).length;
   if (total >= rules.hand.akaCount) return false;
   const suit = tileSuit(tile) as "m" | "p" | "s";

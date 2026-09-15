@@ -22,7 +22,7 @@ docker compose up -d --build   # 单容器，:8787，数据卷 /data（SQLite + 
 
 前端与后端同源部署时无需配置；前端单独托管到 COS 时，构建前设置 `VITE_API_BASE_URL`，在服务端设置 `CORS_ORIGINS`，并把 COS 静态站点的 404 回退到 `index.html`（`/console`、`/r/:code` 是前端路由）。
 
-头像等用户文件默认落在 `DATA_DIR/objects`，由服务端在 `/api/objects/*` 托管；配置 `QCLOUD_*` 五项变量后改为直传腾讯云 COS（桶内 `riichi/` 前缀，URL 走 CDN 域名），变量清单见 `.env.template`。数据库结构按 `user_version` 自动迁移，升级镜像无需手工处理。
+头像等用户文件默认落在 `DATA_DIR/objects`，由服务端在 `/api/objects/*` 托管；配置 `QCLOUD_*` 五项变量后改为直传腾讯云 COS（桶内 `riichi/` 前缀，URL 走 CDN 域名），变量清单见 `.env.template`。数据库结构按 `user_version` 自动迁移，升级镜像无需手工处理；从 v1 数据升级时头像字段会被清空（旧的 `DATA_DIR/avatars` 目录不再使用，可手动删除），玩家重新上传即可。
 
 ## 结构
 

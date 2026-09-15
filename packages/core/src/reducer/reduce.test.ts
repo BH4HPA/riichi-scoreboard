@@ -8,10 +8,10 @@ import type { PlayerRef, RoomState } from "../types/state";
 import { createRoom, reduceRoom, replay } from "./reduce";
 
 const players: PlayerRef[] = [
-  { id: "a", name: "阿东", avatar: null },
-  { id: "b", name: "阿南", avatar: null },
-  { id: "c", name: "阿西", avatar: null },
-  { id: "d", name: "阿北", avatar: null },
+  { id: "a", name: "阿东", avatar: null, kind: "device" },
+  { id: "b", name: "阿南", avatar: null, kind: "device" },
+  { id: "c", name: "阿西", avatar: null, kind: "device" },
+  { id: "d", name: "阿北", avatar: null, kind: "device" },
 ];
 
 function events(commands: Command[], startAt = 1_000): RoomEvent[] {

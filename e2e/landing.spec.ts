@@ -33,11 +33,9 @@ test("手机 UA 直接看到加入面板；HTTP 下扫码入口隐藏并提示�
   const page = await ctx.newPage();
   await page.goto("/");
   await expect(page.getByLabel("房间码")).toBeVisible();
-  // 测试环境是 http://127.0.0.1（安全上下文）：Playwright 的 Chromium 有 mediaDevices，因此显示扫码按钮
-  // 只断言二者必居其一，具体取决于是否安全上下文
-  const scanButton = page.getByRole("button", { name: /扫描电视上的二维码/ });
-  const hint = page.getByText(/无法在网页里调用相机/);
-  await expect(scanButton.or(hint)).toBeVisible();
+  // 测试环境是 http://127.0.0.1（浏览器视为安全上下文）且 Chromium 有 mediaDevices → 显示扫码入口
+  await expect(page.getByRole("button", { name: /扫描电视上的二维码/ })).toBeVisible();
+  await expect(page.getByText(/无法在网页里调用相机/)).toHaveCount(0);
   await page.getByLabel("房间码").fill(code.toLowerCase());
   await page.getByRole("button", { name: "加入" }).click();
   await expect(page).toHaveURL(new RegExp(`/r/${code}$`));

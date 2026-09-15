@@ -48,6 +48,7 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
           ready={room.ready}
           mySeat={mySeat}
           onPick={(seat) => send({ type: "sit", seat })}
+          onLeave={(seat) => send({ type: "leave", seat })}
         />
       </div>
 

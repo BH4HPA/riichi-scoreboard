@@ -20,7 +20,7 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   const phones: Page[] = [];
   for (let i = 0; i < 4; i++) {
     const p = await phone(browser, code);
-    const nameInput = p.locator('input[maxlength="12"]').first();
+    const nameInput = p.getByLabel("昵称");
     await nameInput.fill(NAMES[i]!);
     await nameInput.press("Enter");
     await p.getByTestId(`seat-${i}`).getByRole("button", { name: "点击入座" }).click();

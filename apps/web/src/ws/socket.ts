@@ -1,11 +1,12 @@
-import type {
-  ClientCommand,
-  ClientMessage,
-  EvaluatedHand,
-  HandInput,
-  Seat,
-  ServerMessage,
-  UiIntent,
+import {
+  WS_CLOSE,
+  type ClientCommand,
+  type ClientMessage,
+  type EvaluatedHand,
+  type HandInput,
+  type Seat,
+  type ServerMessage,
+  type UiIntent,
 } from "@riichi/core";
 import { wsUrl } from "@/api/client";
 import { newId } from "@/lib/utils";
@@ -21,11 +22,11 @@ export class CommandError extends Error {
   }
 }
 
-/** 服务端主动关闭且不应重连的关闭码 */
+/** 服务端主动关闭且不应重连的关闭码（定义在 core 协议里） */
 const TERMINAL_CLOSE: Record<number, "unauthorized" | "not_found" | "dissolved"> = {
-  4001: "unauthorized",
-  4004: "not_found",
-  4010: "dissolved",
+  [WS_CLOSE.unauthorized]: "unauthorized",
+  [WS_CLOSE.notFound]: "not_found",
+  [WS_CLOSE.dissolved]: "dissolved",
 };
 
 type Pending =

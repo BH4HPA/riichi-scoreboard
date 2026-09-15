@@ -6,7 +6,12 @@ import type { PlayerRef, RoomState } from "../types/state";
 import { createRoom, reduceRoom, replay } from "./reduce";
 import { validateCommand } from "./validateCommand";
 
-const players: PlayerRef[] = ["a", "b", "c", "d"].map((id) => ({ id, name: id, avatar: null }));
+const players: PlayerRef[] = ["a", "b", "c", "d"].map((id) => ({
+  id,
+  name: id,
+  avatar: null,
+  kind: "device",
+}));
 const ev = (command: RoomEvent["command"], seq = 1): RoomEvent => ({
   seq,
   at: seq,
@@ -195,13 +200,27 @@ describe("reduceRoom 阶段与不变量", () => {
     const room = playingRoom();
     const next = reduceRoom(
       room,
-      ev({ type: "syncProfile", seat: 1, player: { id: "b", name: "新名", avatar: "/x" } }, 9),
+      ev(
+        {
+          type: "syncProfile",
+          seat: 1,
+          player: { id: "b", name: "新名", avatar: "/x", kind: "device" },
+        },
+        9,
+      ),
     );
-    expect(next.seats[1]).toEqual({ id: "b", name: "新名", avatar: "/x" });
+    expect(next.seats[1]).toEqual({ id: "b", name: "新名", avatar: "/x", kind: "device" });
     expect(() =>
       reduceRoom(
         room,
-        ev({ type: "syncProfile", seat: 1, player: { id: "z", name: "冒充", avatar: null } }, 9),
+        ev(
+          {
+            type: "syncProfile",
+            seat: 1,
+            player: { id: "z", name: "冒充", avatar: null, kind: "device" },
+          },
+          9,
+        ),
       ),
     ).toThrow(/不符/);
   });

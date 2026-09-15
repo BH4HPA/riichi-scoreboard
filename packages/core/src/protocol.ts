@@ -1,4 +1,5 @@
 import { DomainError } from "./progress/advance";
+import { YAKU_PAGES } from "./reference/yakuTable";
 import type { ClientCommand } from "./types/commands";
 import type { RoomRules } from "./types/rules";
 import type { EvaluatedHand, GameState, HandInput, PlayerRef, RoomState } from "./types/state";
@@ -61,10 +62,21 @@ export interface ReferenceView {
   sub: string;
 }
 export const DEFAULT_REFERENCE_VIEW: ReferenceView = { tab: "yaku", sub: "1" };
+export const POINTS_SUBS = ["ko", "oya", "fu"] as const;
+
+/** 服务端主动关闭连接且客户端不应重连的关闭码。 */
+export const WS_CLOSE = {
+  unauthorized: 4001,
+  notFound: 4004,
+  dissolved: 4010,
+} as const;
 
 const SETTLEMENT_MODES = ["tsumo", "ron", "draw", "abortive", "chombo"] as const;
 const REFERENCE_TABS = ["yaku", "points"] as const;
-const SUB_MAX = 16;
+const REFERENCE_SUBS: Record<ReferenceTab, readonly string[]> = {
+  yaku: YAKU_PAGES.map((p) => p.key),
+  points: POINTS_SUBS,
+};
 const SUMMARY_MAX = 200;
 
 /** 校验并规范化客户端发来的镜像意图；形状不对即抛 DomainError。 */
@@ -81,9 +93,9 @@ export function validateUiIntent(input: unknown): UiIntent {
       return { kind: v.kind };
     case "reference": {
       if (!REFERENCE_TABS.includes(v.tab as ReferenceTab)) return bad();
-      if (typeof v.sub !== "string" || v.sub.length > SUB_MAX || !/^[a-z0-9]*$/.test(v.sub))
-        return bad();
-      return { kind: "reference", tab: v.tab as ReferenceTab, sub: v.sub };
+      const tab = v.tab as ReferenceTab;
+      if (typeof v.sub !== "string" || !REFERENCE_SUBS[tab].includes(v.sub)) return bad();
+      return { kind: "reference", tab, sub: v.sub };
     }
     case "settlement": {
       if (!SETTLEMENT_MODES.includes(v.mode as (typeof SETTLEMENT_MODES)[number])) return bad();

@@ -4,10 +4,19 @@ import type { WinPayment } from "../scoring/payments";
 import type { RoomRules } from "./rules";
 import type { Meld, Seat, Tile } from "./tiles";
 
+export type PlayerKind = "device" | "local";
+
+/** 座位上的玩家快照。kind 随事件落库，座位权限只看快照、不回查玩家表。 */
 export interface PlayerRef {
   id: string;
   name: string;
   avatar: string | null;
+  /** device = 手机登录的设备玩家；local = 主控台创建的本地玩家。旧事件缺省视为 device */
+  kind?: PlayerKind;
+}
+
+export function isLocalPlayer(p: PlayerRef | null | undefined): boolean {
+  return p?.kind === "local";
 }
 
 /** 牌面输入（牌键盘 / 未来的拍照识别产出）。赤五直接以 35/36/37 出现在牌列表中。 */

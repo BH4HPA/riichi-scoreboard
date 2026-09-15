@@ -425,16 +425,72 @@ describe("rooms end-to-end", () => {
     seq = (await ph.until("ack")).seq;
     state = await ph.waitState((r) => r.seats[1] !== null);
     expect(state.ready[1]).toBe(false);
-    // 手机可以让本地玩家离座（人人管理员），但不能动别的设备玩家
+    // 座位快照带 kind：手机端也能看到本地玩家身份
+    expect(state.seats[0]?.kind).toBe("local");
+    expect(state.seats[1]?.kind).toBe("device");
+    // 本地玩家的座位人人可操作：手机取消其准备、再准备、让其离座；但不能带本地玩家坐到已占座位
+    ph.send({
+      type: "command",
+      id: "rd0",
+      baseSeq: seq,
+      command: { type: "setReady", seat: 0, ready: false },
+    });
+    seq = (await ph.until("ack")).seq;
+    expect((await ph.waitState((r) => r.ready[0] === false)).ready[0]).toBe(false);
+    tv.send({
+      type: "command",
+      id: "occupied",
+      baseSeq: seq,
+      command: { type: "sitLocal", seat: 1, playerId: local.id },
+    });
+    expect(await tv.outcome()).toMatchObject({ type: "error", code: "seat_taken" });
+    // 删除档案后座位仍可操作（权限只看快照）
+    expect(
+      (
+        await app.request(`/api/me/locals/${local.id}`, {
+          method: "DELETE",
+          headers: auth(console_.token),
+        })
+      ).status,
+    ).toBe(204);
     ph.send({ type: "command", id: "lv", baseSeq: seq, command: { type: "leave", seat: 0 } });
     seq = (await ph.until("ack")).seq;
     state = await ph.waitState((r) => r.seats[0] === null);
     expect(state.seats[0]).toBeNull();
-    // 改名同步进房间：先重新带入
+    // 已删除的本地玩家不能再入座
+    tv.send({
+      type: "command",
+      id: "gone",
+      baseSeq: seq,
+      command: { type: "sitLocal", seat: 0, playerId: local.id },
+    });
+    expect(await tv.outcome()).toMatchObject({ type: "error", code: "forbidden" });
+    tv.close();
+    ph.close();
+  });
+
+  it("本地玩家档案改名同步进房间；删除接口幂等返回 404", async () => {
+    const console_ = await register("主控台2");
+    const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
+    const created = await app.request("/api/rooms", {
+      method: "POST",
+      headers: auth(console_.token),
+    });
+    const { room } = (await created.json()) as { room: RoomView };
+    const add = await app.request("/api/me/locals", {
+      method: "POST",
+      headers: { ...auth(console_.token), "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "小明" }),
+    });
+    const { local } = (await add.json()) as { local: { id: string } };
+    const tv = new Client(room.code, console_.token);
+    await tv.open();
+    await tv.waitState(() => true);
+    // 改名同步进房间：先带入
     tv.send({
       type: "command",
       id: "sl2",
-      baseSeq: seq,
+      baseSeq: 0,
       command: { type: "sitLocal", seat: 0, playerId: local.id },
     });
     await tv.until("ack");
@@ -444,7 +500,7 @@ describe("rooms end-to-end", () => {
       body: JSON.stringify({ name: "小明2" }),
     });
     expect(renamed.status).toBe(200);
-    state = await tv.waitState((r) => r.seats[0]?.name === "小明2");
+    const state = await tv.waitState((r) => r.seats[0]?.name === "小明2");
     expect(state.seats[0]?.name).toBe("小明2");
     // 删除档案：204；再删 404
     expect(
@@ -464,7 +520,6 @@ describe("rooms end-to-end", () => {
       ).status,
     ).toBe(404);
     tv.close();
-    ph.close();
   });
 
   it("解散房间：发起者先收到 ack 再被断开（4010）；他人断开；REST 410；重连被拒；回放不再进内存", async () => {

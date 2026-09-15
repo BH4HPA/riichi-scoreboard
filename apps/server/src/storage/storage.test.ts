@@ -41,7 +41,7 @@ describe("CosStore", () => {
         region: "ap-shanghai",
         endpoint: null,
         cdnDomain: "https://static.example.com/",
-        keyPrefix: "riichi/",
+        keyPrefix: "riichi", // 无尾斜杠也归一化为 riichi/
       },
       fake,
     );

@@ -42,6 +42,11 @@ function tiles(v: unknown, what: string, max: number): number[] {
   return v.map((t) => int(t, what, 1, MAX_TILE));
 }
 
+/** 牌面输入的形状校验（WS 的 evaluate 消息也复用）。 */
+export function validateHandShape(v: unknown): HandInput {
+  return handInput(v);
+}
+
 function handInput(v: unknown): HandInput {
   if (!isRecord(v)) bad("牌面无效");
   if (!Array.isArray(v.melds) || v.melds.length > 4) bad("副露无效");

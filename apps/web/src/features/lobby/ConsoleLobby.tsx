@@ -1,32 +1,13 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Play, Settings2, Users } from "lucide-react";
 import type { RoomView, Seat } from "@riichi/core";
-import { useSession } from "@/api/session";
 import { Button } from "@/ui/button";
 import { Dialog, DialogContent, DialogFooter } from "@/ui/dialog";
 import { useCommand } from "@/ws/useRoom";
 import { RulesEditor } from "@/features/rules/RulesEditor";
 import { LocalPlayerDialog } from "./LocalPlayerDialog";
-import { localsApi } from "./localsApi";
 import { SeatCards } from "./SeatCards";
-
-/** 本设备创建的本地玩家 id 列表（对话框关闭后刷新，用于座位卡上的标记与离座按钮）。 */
-function useLocalIds(refreshKey: number): string[] {
-  const ensure = useSession((s) => s.ensure);
-  const [ids, setIds] = useState<string[]>([]);
-  useEffect(() => {
-    let active = true;
-    ensure()
-      .then(({ token }) => localsApi.list(token))
-      .then((list) => active && setIds(list.map((l) => l.id)))
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, [ensure, refreshKey]);
-  return ids;
-}
 
 export function ConsoleLobby({
   room,
@@ -43,18 +24,12 @@ export function ConsoleLobby({
   const [draft, setDraft] = useState(room.rules);
   const [localSeat, setLocalSeat] = useState<Seat | null>(null);
   const [localOpen, setLocalOpen] = useState(false);
-  const [localsVersion, setLocalsVersion] = useState(0);
-  const localIds = useLocalIds(localsVersion);
   const full = room.seats.every((s) => s !== null);
   const allReady = full && room.ready.every(Boolean);
   const url = `${window.location.origin}/r/${room.code}`;
   const openLocals = (seat: Seat | null) => {
     setLocalSeat(seat);
     setLocalOpen(true);
-  };
-  const closeLocals = (open: boolean) => {
-    setLocalOpen(open);
-    if (!open) setLocalsVersion((v) => v + 1);
   };
 
   return (
@@ -85,7 +60,6 @@ export function ConsoleLobby({
             seats={room.seats}
             ready={room.ready}
             mySeat={null}
-            localIds={localIds}
             onAddLocal={openLocals}
             onLeave={(seat) => send({ type: "leave", seat })}
             tv
@@ -143,7 +117,7 @@ export function ConsoleLobby({
       <LocalPlayerDialog
         seat={localSeat}
         open={localOpen}
-        onOpenChange={closeLocals}
+        onOpenChange={setLocalOpen}
         seatedIds={room.seats.flatMap((s) => (s ? [s.id] : []))}
         onSit={(seat, playerId) => send({ type: "sitLocal", seat, playerId })}
       />

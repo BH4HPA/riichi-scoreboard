@@ -45,7 +45,9 @@ export class CosStore implements ObjectStore {
     private readonly client: CosClient = createCosClient(config),
   ) {
     this.cdn = config.cdnDomain.replace(/\/+$/, "");
-    this.prefix = config.keyPrefix.replace(/^\/+/, "");
+    // 前缀归一化为 "xxx/"（空串表示桶根），填 "riichi" 与 "riichi/" 等价
+    const trimmed = config.keyPrefix.replace(/^\/+|\/+$/g, "");
+    this.prefix = trimmed ? `${trimmed}/` : "";
   }
 
   async put(key: string, bytes: Uint8Array, contentType: string): Promise<string> {

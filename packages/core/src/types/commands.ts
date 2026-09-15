@@ -15,6 +15,10 @@ export interface RonWin<V> {
 /**
  * 大厅命令。`sit` 的玩家信息与 `ready`、`syncProfile` 由服务端填充，客户端不能自报：
  * 设备玩家按 token 入座（未准备），本地玩家由主控台 `sitLocal` 入座（即已准备）。
+ *
+ * 权限边界（房间内人人都是管理员，服务端不区分主控台与手机）：
+ * - 设备玩家的座位（sit/leave/setReady）只能本人操作；本地玩家的座位任何人可操作；
+ * - 规则、开局、结算、撤销、终局、解散：任何连接者都可发起。
  */
 export type LobbyCommand =
   | { type: "setRules"; rules: RoomRules }

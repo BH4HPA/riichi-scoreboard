@@ -51,7 +51,9 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
 - Four seats 東/南/西/北 (`Seat` 0–3); dealer is derived: `dealerOf(kyoku) = kyoku % 4`; `kyoku` 0–7 =
   東1–南4 (extra rounds for 西入 when enabled); `kyotaku` = riichi sticks on table; `honba` = repeat counter.
 - Tile codes follow riichi-rs (1–34) plus red fives 35/36/37 (`baseTile`/`isAka` in `types/tiles.ts`);
-  red fives are folded to plain fives and counted as `aka_count` only at the engine boundary.
+  red fives are folded to plain fives and counted as `aka_count` only at the engine boundary. Events
+  recorded before this change carry `aka: number` instead; replay still works (points come from the
+  persisted engine result) but such hands render without red-five marks.
 - `RoomRules` fields and their consumers are documented in `packages/core/src/types/rules.ts`.
 - Win input has two shapes: `manual` (han/fu) and `hand` (tiles; evaluated server-side; the hand is kept
   in `WinRecord.hand` for history display; also the input shape for the future photo-recognition feature).

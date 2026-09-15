@@ -1,8 +1,6 @@
 import { randomBytes } from "node:crypto";
-import type { PlayerRef } from "@riichi/core";
+import type { PlayerKind, PlayerRef } from "@riichi/core";
 import type { Database } from "./index";
-
-export type PlayerKind = "device" | "local";
 
 export interface PlayerRow {
   id: string;
@@ -20,7 +18,7 @@ export interface PlayerRow {
 }
 
 export function toPlayerRef(row: PlayerRow): PlayerRef {
-  return { id: row.id, name: row.name, avatar: row.avatar };
+  return { id: row.id, name: row.name, avatar: row.avatar, kind: row.kind };
 }
 
 const COLUMNS = "id, token, name, avatar, avatar_key, kind, created_by, created_at, last_seen";
