@@ -32,7 +32,9 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   }
   await expect(tv.getByText("已准备")).toHaveCount(4);
 
-  await tv.getByRole("button", { name: "开局", exact: true }).click();
+  // 全员准备且在线 → 主控台开局按钮显示倒计时 → 3 s 后自动开局
+  await expect(tv.getByRole("button", { name: /开局 ·/ })).toBeVisible();
+  await expect(phones[1]!.getByText(/秒后自动开局/)).toBeVisible();
   await expect(tv.getByTestId("points-0")).toHaveText("25,000");
   await expect(phones[0]!.getByTestId("points-0")).toHaveText("25,000");
 
@@ -155,18 +157,14 @@ test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手�
   for (const i of [2, 3]) {
     const p = await phone(browser, code);
     await p.getByTestId(`seat-${i}`).click();
-    await p.getByRole("button", { name: "准备", exact: true }).click();
-    await expect(p.getByRole("button", { name: "取消准备" })).toBeVisible();
+    await expect(p.getByRole("button", { name: "准备", exact: true })).toBeVisible();
     phones.push(p);
   }
-  await expect(tv.getByText("已准备")).toHaveCount(4);
   // 手机点自己的座位卡即离座，再点回去
   await expect(phones[1]!.getByTestId("seat-3")).toHaveAccessibleName(/离座$/);
   await phones[1]!.getByTestId("seat-3").click();
   await expect(phones[1]!.getByTestId("seat-3")).toHaveAccessibleName(/点击入座$/);
   await phones[1]!.getByTestId("seat-3").click();
-  await phones[1]!.getByRole("button", { name: "准备", exact: true }).click();
-  await expect(tv.getByText("已准备")).toHaveCount(4);
   // 手机端也能看到本地玩家已入座，并可让其离座（人人管理员）
   await expect(phones[0]!.getByTestId("seat-0")).toContainText("本地甲");
   await tv.getByTestId("seat-1").getByRole("button", { name: "本地乙 离座" }).click();
@@ -181,7 +179,11 @@ test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手�
     .click();
   await expect(tv.getByTestId("seat-1")).toContainText("本地乙");
 
-  await tv.getByRole("button", { name: "开局", exact: true }).click();
+  // 两部手机准备 → 全员准备且在线 → 自动开局（本地玩家入座即准备）
+  await phones[0]!.getByRole("button", { name: "准备", exact: true }).click();
+  await expect(tv.getByRole("button", { name: /开局 ·/ })).toHaveCount(0);
+  await phones[1]!.getByRole("button", { name: "准备", exact: true }).click();
+  await expect(tv.getByRole("button", { name: /开局 ·/ })).toBeVisible();
   await expect(tv.getByTestId("points-0")).toHaveText("25,000");
   await expect(phones[1]!.getByTestId("points-1")).toHaveText("25,000");
 
@@ -194,5 +196,40 @@ test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手�
   expect((await tv.getByTestId("room-code").textContent())?.trim()).not.toBe(code);
   await expect(tv.getByText("操作失败")).toHaveCount(0);
   await expect(tv.getByText("连接已断开")).toHaveCount(0);
+  await tvCtx.close();
+});
+
+test("离线的设备玩家座位可被他人回收；手机可退出房间回首页", async ({ browser }) => {
+  const tvCtx = await browser.newContext({ viewport: { width: 1600, height: 900 } });
+  const tv = await tvCtx.newPage();
+  await tv.goto("/console");
+  const code = (await tv.getByTestId("room-code").textContent())?.trim() ?? "";
+
+  // 手机 A 入座并准备，然后整个浏览器上下文关闭（相当于手机被杀掉/换了浏览器）
+  const ctxA = await browser.newContext({ viewport: { width: 400, height: 800 } });
+  const a = await ctxA.newPage();
+  await a.goto(`/r/${code}`);
+  await a.getByLabel("昵称").fill("旧身份");
+  await a.getByLabel("昵称").press("Enter");
+  await a.getByTestId("seat-0").click();
+  await a.getByRole("button", { name: "准备", exact: true }).click();
+  await expect(tv.getByTestId("seat-0")).toContainText("已准备");
+  await expect(tv.getByTestId("seat-0")).not.toContainText("离线");
+  await ctxA.close();
+  await expect(tv.getByTestId("seat-0")).toContainText("离线");
+
+  // 手机 B（新身份）看到 A 离线，可请离后自己入座
+  const b = await phone(browser, code);
+  await expect(b.getByTestId("seat-0")).toContainText("离线");
+  await b.getByTestId("seat-0").getByRole("button", { name: "旧身份 离座" }).click();
+  await expect(b.getByTestId("seat-0")).toHaveAccessibleName(/点击入座$/);
+  await b.getByTestId("seat-0").click();
+  await expect(tv.getByTestId("seat-0")).not.toContainText("离线");
+
+  // 退出房间：先离座再回首页；主控台上座位变空
+  await b.getByRole("button", { name: "退出房间" }).click();
+  // 测试用的是桌面 UA，首页会按设备分流进主控台；只要离开了房间路由即可
+  await expect(b).not.toHaveURL(/\/r\//);
+  await expect(tv.getByTestId("seat-0")).toContainText("等待加入");
   await tvCtx.close();
 });

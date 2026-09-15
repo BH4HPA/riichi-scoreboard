@@ -10,6 +10,7 @@ import { RoomQr, RoomQrDialog } from "@/features/console/RoomQr";
 import { RulesEditor } from "@/features/rules/RulesEditor";
 import { LocalPlayerDialog } from "./LocalPlayerDialog";
 import { SeatCards } from "./SeatCards";
+import { useCountdown } from "./useCountdown";
 
 /**
  * 主控台大厅。宽屏：左栏二维码、右栏座位 + 规则；
@@ -41,6 +42,7 @@ export function ConsoleLobby({
   }
   const full = room.seats.every((s) => s !== null);
   const allReady = full && room.ready.every(Boolean);
+  const countdown = useCountdown(room.autoStartAt);
   const openLocals = (seat: Seat | null) => {
     setLocalSeat(seat);
     setLocalOpen(true);
@@ -50,6 +52,7 @@ export function ConsoleLobby({
     <SeatCards
       seats={room.seats}
       ready={room.ready}
+      online={room.online}
       mySeat={null}
       onAddLocal={openLocals}
       onLeave={(seat) => send({ type: "leave", seat })}
@@ -88,6 +91,7 @@ export function ConsoleLobby({
         onClick={() => send({ type: "start", force: false })}
       >
         <Play className="h-5 w-5" /> 开局
+        {countdown !== null && <span className="tabular">· {countdown}</span>}
       </Button>
       <Button
         size="lg"

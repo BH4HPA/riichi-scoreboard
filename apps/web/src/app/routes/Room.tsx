@@ -177,6 +177,9 @@ function PhoneGame() {
           <ProfileEditor />
           <h3 className="mb-2 mt-4 text-sm font-medium">战绩</h3>
           <StatsPanel />
+          <Button asChild variant="ghost" size="sm" className="mt-4 w-full text-muted">
+            <Link to="/">退出房间（座位保留，回来扫码即恢复）</Link>
+          </Button>
         </DialogContent>
       </Dialog>
     </div>

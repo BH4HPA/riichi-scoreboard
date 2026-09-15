@@ -19,11 +19,13 @@ function AvatarSlot({ tv }: { tv: boolean }) {
 
 /**
  * 四个座位卡。手机端：点空座入座（onPick），点自己的座位离座（onLeave）——整卡即按钮。
- * 电视端：空座可「添加本地玩家」（onAddLocal）。本地玩家（快照 kind=local）任何端都可「离座」（onLeave）。
+ * 电视端：空座可「添加本地玩家」（onAddLocal）。本地玩家（快照 kind=local）与离线的设备玩家
+ * 任何端都可「离座」（onLeave）——身份丢失的手机靠这个回收自己的旧座位。
  */
 export function SeatCards({
   seats,
   ready,
+  online,
   mySeat,
   onPick,
   onAddLocal,
@@ -32,6 +34,7 @@ export function SeatCards({
 }: {
   seats: (PlayerRef | null)[];
   ready: boolean[];
+  online: boolean[];
   mySeat: Seat | null;
   onPick?: ((seat: Seat) => void) | undefined;
   onAddLocal?: ((seat: Seat) => void) | undefined;
@@ -44,6 +47,7 @@ export function SeatCards({
         const p = seats[seat];
         const mine = mySeat === seat;
         const isLocal = isLocalPlayer(p);
+        const offline = p !== null && !isLocal && online[seat] === false;
         const cardClass = cn(
           "flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border p-3 text-left transition-colors",
           mine ? "border-accent bg-accent/10" : "border-border bg-surface",
@@ -112,8 +116,9 @@ export function SeatCards({
                     </Badge>
                   )}
                 </span>
+                {offline && <Badge tone="neutral">离线</Badge>}
                 <ReadyBadge ready={ready[seat] === true} />
-                {isLocal && onLeave && (
+                {(isLocal || offline) && onLeave && (
                   <button
                     type="button"
                     className="rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-fg"
