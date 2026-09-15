@@ -70,3 +70,12 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   (any phase; `rooms.closed_at` short-circuits replay; WS close code 4010).
 - Players: `device` (has a token, joins from a phone) or `local` (no token, created and seated by the console
   via `sitLocal`, auto-ready; anyone may leave/ready a local seat). Everyone in a room is an admin.
+- Presence: `RoomView.online[seat]` = the seat's device player has a live WebSocket in the room (locals are
+  always online). Anyone may vacate an _offline_ device player's seat (`leave`), never ready it — this is how
+  a phone that lost its token reclaims its old seat. Keepalive constants live in core `WS_KEEPALIVE`: client
+  pings every 5 s and reconnects after 8 s of silence; the server drops a connection idle for 20 s.
+- Auto-start: when the lobby is full, everyone is ready, every device player is online and at least one
+  device player is seated, the server starts a 3 s countdown (`RoomView.autoStartAt`) and commits `start` as
+  the system actor; any change that breaks the condition cancels it. Four locals never auto-start.
+- Deployed split-hosted: `WEB_DIST=` (empty) disables the SPA in the server image; app paths then 302 to
+  the first `CORS_ORIGINS` entry.

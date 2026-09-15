@@ -28,7 +28,7 @@ docker compose up -d --build   # 单容器，:8787，数据卷 /data（SQLite + 
 
 - 手动发布 / 回滚：在 Actions 里对任意提交 `Run workflow`，前端与服务端按同一提交重建。
 - 服务器上只通过 `ci/deploy-server.sh` 起服务：它先读 `~/.env`（云密钥、static 桶、CCR 登录）再读仓库 `.env`（`RIICHI_IMAGE` / `RIICHI_PORT` / `CORS_ORIGINS`），`--no-build` 只拉镜像。直接 `docker compose up` 会在服务器上本地构建，且缺少密钥时会静默退回本地存储模式。
-- 镜像内仍包含同源模式的前端产物（本地与开发机 compose 需要），所以接口域名下也能打开一个计分板，但那不是正式入口，二维码会指向接口域名。
+- 镜像内仍包含同源模式的前端产物（本地与开发机 compose 需要）；线上在服务器 `.env` 里设 `WEB_DIST=`（空）关闭静态托管，接口域名下的页面路径会 302 到正式站点。
 - 仓库 secrets：`QCLOUD_SECRET_ID` / `QCLOUD_SECRET_KEY`（COS 上传 + CDN 刷新）、`QCLOUD_DOCKER_USERNAME` / `QCLOUD_DOCKER_PASSWORD`（CCR）、`DEPLOY_SSH_HOST` / `DEPLOY_SSH_KEY` / `DEPLOY_KNOWN_HOSTS`（部署机）。桶名、域名、镜像名等常量写在工作流的 `env` 里。
 - 腾讯云 CDN 对约 10 秒无数据的 WebSocket 会静默回收，客户端每 5 秒发心跳、8 秒无回包即重连，接口响应带 `Cache-Control: no-store`；CDN 侧接口域名仍应配置为不缓存。
 
