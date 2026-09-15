@@ -3,7 +3,8 @@ import { Check, RefreshCcw, Redo2, Undo2 } from "lucide-react";
 import type { GameView, RoomRules, Seat } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Tip } from "@/ui/controls";
-import { useCommand } from "@/ws/useRoom";
+import { useCommand, useSocket } from "@/ws/useRoom";
+import { RiichiSection } from "@/features/music/RiichiSection";
 import { TsumoDialog, RonDialog } from "./WinDialogs";
 import {
   AbortiveDialog,
@@ -36,14 +37,21 @@ export function ControlPanel({
   roomActions?: ReactNode;
 }) {
   const send = useCommand();
+  const socket = useSocket();
   const [dialog, setDialog] = useState<DialogKey>(null);
   const present = game.present;
   const finished = present.status === "finished";
   const openOf = (key: DialogKey) => (open: boolean) => setDialog(open ? key : null);
   const shared = { game: present, names, rules, mirror };
+  // 点任意结算键即让电视停掉立直音乐（服务端未在播放时忽略），弹窗取消也不恢复
+  const openSettlement = (key: DialogKey) => {
+    socket.music(null);
+    setDialog(key);
+  };
 
   return (
     <div className="space-y-3">
+      <RiichiSection disabled={finished} size={size} />
       <section>
         <h3 className="mb-1.5 text-xs font-medium text-muted">结算</h3>
         <div className="grid grid-cols-3 gap-1.5">
@@ -51,18 +59,23 @@ export function ControlPanel({
             size={size}
             variant="accent"
             disabled={finished}
-            onClick={() => setDialog("tsumo")}
+            onClick={() => openSettlement("tsumo")}
           >
             自摸
           </Button>
-          <Button size={size} variant="accent" disabled={finished} onClick={() => setDialog("ron")}>
+          <Button
+            size={size}
+            variant="accent"
+            disabled={finished}
+            onClick={() => openSettlement("ron")}
+          >
             荣和
           </Button>
           <Button
             size={size}
             variant="outline"
             disabled={finished}
-            onClick={() => setDialog("draw")}
+            onClick={() => openSettlement("draw")}
           >
             流局
           </Button>
@@ -71,7 +84,7 @@ export function ControlPanel({
               size={size}
               variant="outline"
               disabled={finished}
-              onClick={() => setDialog("abortive")}
+              onClick={() => openSettlement("abortive")}
             >
               途中流局
             </Button>
@@ -81,7 +94,7 @@ export function ControlPanel({
               size={size}
               variant="outline"
               disabled={finished}
-              onClick={() => setDialog("chombo")}
+              onClick={() => openSettlement("chombo")}
             >
               错和
             </Button>

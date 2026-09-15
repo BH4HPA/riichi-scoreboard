@@ -40,8 +40,20 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await expect(tv.getByTestId("points-0")).toHaveText("25,000");
   await expect(phones[0]!.getByTestId("points-0")).toHaveText("25,000");
 
+  // 立直音乐：手机 1 按下 → 电视挂上 <audio> 与浮窗；点结算键 → 停（音频请求拦掉，只看状态）
+  await tv.route("**/*.mp3", (route) => route.abort());
+  await phones[1]!.getByRole("button", { name: "立直", exact: true }).click();
+  await expect(tv.getByTestId("riichi-music")).toHaveAttribute(
+    "src",
+    /\/riichi\/music\/[0-9a-f-]{36}\.mp3$/,
+  );
+  await expect(tv.getByTestId("music-float")).toContainText("南家立直 · ");
+  await expect(phones[3]!.getByText(/南家立直 · /)).toBeVisible();
+
   // 手机 0（庄家）自摸 3 番 30 符 → 2000 all
   await phones[0]!.getByRole("button", { name: "自摸", exact: true }).click();
+  await expect(tv.getByTestId("riichi-music")).toHaveCount(0);
+  await expect(tv.getByTestId("music-float")).toHaveCount(0);
   const dialog = phones[0]!.getByRole("dialog");
   await expect(dialog.getByText("自摸结算")).toBeVisible();
   // 底部操作栏贴住对话框底边（滚动区无下内边距挡着 sticky）

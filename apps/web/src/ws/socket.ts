@@ -217,6 +217,11 @@ export class RoomSocket {
     });
   }
 
+  /** 立直音乐：track 为曲库 id，null 表示停止；返回是否已发出（断线时 false）。 */
+  music(track: string | null): boolean {
+    return this.raw({ type: "music", track });
+  }
+
   /** 某个来源（弹窗/面板）的镜像意图；kind=none 表示该来源已关闭。 */
   setUi(source: string, intent: UiIntent): void {
     if (intent.kind === "none") this.intents.delete(source);

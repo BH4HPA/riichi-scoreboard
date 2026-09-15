@@ -9,6 +9,7 @@ import { useConsoleRoom } from "@/features/console/useConsoleRoom";
 import { ConsoleGame } from "@/features/console/ConsoleGame";
 import { DissolveButton } from "@/features/console/DissolveButton";
 import { ConsoleLobby } from "@/features/lobby/ConsoleLobby";
+import { RiichiMusicPlayer } from "@/features/music/RiichiMusicPlayer";
 
 /** 主控台入口：建房/连房、按阶段与屏宽装配大厅或对局页。 */
 export function Console() {
@@ -57,6 +58,7 @@ export function Console() {
             wide={wide}
           />
         )}
+        <RiichiMusicPlayer music={room.music} />
         <Notice />
       </div>
     </SocketContext.Provider>
