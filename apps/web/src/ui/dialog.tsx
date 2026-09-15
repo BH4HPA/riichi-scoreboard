@@ -5,20 +5,30 @@ import { cn } from "@/lib/utils";
 
 export const Dialog = DialogPrimitive.Root;
 
+/**
+ * 对话框内容。默认：手机底部弹层 / 桌面居中卡；`side="right"`：右侧抽屉（历史记录等长列表）。
+ */
 export function DialogContent({
   className,
   children,
   title,
   description,
+  side,
   ...props
-}: ComponentProps<typeof DialogPrimitive.Content> & { title: ReactNode; description?: ReactNode }) {
+}: ComponentProps<typeof DialogPrimitive.Content> & {
+  title: ReactNode;
+  description?: ReactNode;
+  side?: "right";
+}) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px]" />
       <DialogPrimitive.Content
         className={cn(
-          "fixed z-50 flex max-h-[92dvh] w-full flex-col overflow-hidden bg-surface text-fg shadow-2xl outline-none",
-          "bottom-0 left-0 rounded-t-2xl sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl",
+          "fixed z-50 flex flex-col overflow-hidden bg-surface text-fg shadow-2xl outline-none",
+          side === "right"
+            ? "inset-y-0 right-0 w-[min(600px,92vw)] animate-drawer-in"
+            : "bottom-0 left-0 max-h-[92dvh] w-full rounded-t-2xl sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl",
           className,
         )}
         {...props}

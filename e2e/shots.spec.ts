@@ -93,3 +93,38 @@ test("截图：番符表与主控台", async ({ browser }) => {
   await phones[1]!.screenshot({ path: `${OUT}/phone-ref-fu.png`, fullPage: true });
   await tvCtx.close();
 });
+
+test("截图：Pad 横屏/竖屏的大厅与对局页", async ({ browser }) => {
+  for (const [w, h, tag] of [
+    [1024, 768, "pad-landscape"],
+    [768, 1024, "pad-portrait"],
+  ] as const) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: h } });
+    const tv = await ctx.newPage();
+    await tv.goto("/console");
+    await tv.getByText("扫码加入").waitFor();
+    await tv.screenshot({ path: `${OUT}/${tag}-lobby-qr.png` });
+    await tv.getByRole("button", { name: "关闭" }).click();
+    await tv.screenshot({ path: `${OUT}/${tag}-lobby.png` });
+    for (const [seat, name] of [
+      [0, "本地1"],
+      [1, "本地2"],
+      [2, "本地3"],
+      [3, "本地4"],
+    ] as const) {
+      await tv.getByTestId(`seat-${seat}`).getByRole("button", { name: "添加本地玩家" }).click();
+      const dlg = tv.getByRole("dialog");
+      await dlg.getByLabel("新建本地玩家").fill(name);
+      await dlg.getByRole("button", { name: "创建并入座" }).click();
+      await tv.getByTestId(`seat-${seat}`).getByText(name).waitFor();
+    }
+    await tv.getByRole("button", { name: "开局", exact: true }).click();
+    await tv.getByTestId("points-0").waitFor();
+    await tv.screenshot({ path: `${OUT}/${tag}-game.png` });
+    await tv.getByRole("button", { name: /记录/ }).click();
+    await tv.getByRole("dialog").waitFor();
+    await tv.waitForTimeout(400);
+    await tv.screenshot({ path: `${OUT}/${tag}-history-drawer.png` });
+    await ctx.close();
+  }
+});

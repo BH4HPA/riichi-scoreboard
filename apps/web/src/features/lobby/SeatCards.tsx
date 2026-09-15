@@ -26,7 +26,7 @@ export function SeatCards({
   tv?: boolean;
 }) {
   return (
-    <div className={cn("grid gap-2", tv ? "grid-cols-2 gap-4" : "grid-cols-1")}>
+    <div className={cn("grid gap-2", onAddLocal ? "grid-cols-2" : "grid-cols-1", tv && "gap-4")}>
       {SEATS.map((seat) => {
         const p = seats[seat];
         const mine = mySeat === seat;
@@ -37,7 +37,7 @@ export function SeatCards({
             key={seat}
             data-testid={`seat-${seat}`}
             className={cn(
-              "flex items-center gap-3 rounded-xl border p-3 text-left transition-colors",
+              "flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border p-3 text-left transition-colors",
               mine ? "border-accent bg-accent/10" : "border-border bg-surface",
               tv && "p-5",
             )}
@@ -84,14 +84,16 @@ export function SeatCards({
               </button>
             ) : (
               <>
-                <span className={cn("flex-1 text-muted", tv ? "text-lg" : "text-sm")}>
+                <span
+                  className={cn("flex-1 whitespace-nowrap text-muted", tv ? "text-lg" : "text-sm")}
+                >
                   等待加入
                 </span>
                 {onAddLocal && (
                   <button
                     type="button"
                     className={cn(
-                      "inline-flex items-center gap-1 rounded-md border border-dashed border-border px-2.5 py-1 text-muted hover:border-accent hover:text-accent",
+                      "inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-dashed border-border px-2.5 py-1 text-muted hover:border-accent hover:text-accent",
                       tv ? "text-sm" : "text-xs",
                     )}
                     onClick={() => onAddLocal(seat)}
