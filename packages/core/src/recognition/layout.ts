@@ -1,4 +1,4 @@
-import { baseTile, isAka, isHonor, tileSuit, type Meld, type Tile } from "../types/tiles";
+import { baseTile, isAka, isHonor, TILE, tileSuit, type Meld, type Tile } from "../types/tiles";
 import { tileOfClassId } from "./classes";
 import type {
   Detection,
@@ -111,8 +111,12 @@ function splitGroups(row: Item[], gap: number): Item[][] {
   return groups;
 }
 
+/** 暗杠：牌背-X-X-牌背，中间两张同牌（字牌之间的误识别如 發/中 放行，后面报 kan_mismatch 取置信度高的） */
 function isAnkan(g: Item[]): boolean {
-  return g.length === 4 && g[0]!.tile === null && g[3]!.tile === null;
+  if (g.length !== 4 || g[0]!.tile !== null || g[3]!.tile !== null) return false;
+  const [a, b] = [g[1]!.tile, g[2]!.tile];
+  if (a === null || b === null) return false;
+  return baseTile(a) === baseTile(b) || (isHonor(a) && isHonor(b));
 }
 
 /**
@@ -123,10 +127,14 @@ function isMeldSegment(g: Item[]): boolean {
   if (isAnkan(g)) return true;
   if (g.length !== 3 && g.length !== 4) return false;
   const faces = g.filter((i) => i.tile !== null);
-  // 明杠允许一张牌背：白板是空白面，模型偶尔把它认成牌背
-  if (faces.length < g.length && !(g.length === 4 && faces.length === 3)) return false;
   const sides = g.filter((i) => i.side).length;
   const bases = faces.map((i) => baseTile(i.tile!)).sort((a, b) => a - b);
+  // 白板的杠允许一张牌背：白板是空白面，模型偶尔把它认成牌背；别的牌旁边的牌背只能是误检
+  if (faces.length < g.length) {
+    return (
+      g.length === 4 && faces.length === 3 && bases.every((b) => b === TILE.Haku) && sides <= 2
+    );
+  }
   if (bases.every((b) => b === bases[0])) return sides === 1 || (g.length === 4 && sides === 2);
   if (g.length !== 3 || sides !== 1 || isHonor(bases[0]!)) return false;
   return (
@@ -151,17 +159,22 @@ interface Partition {
 }
 
 /**
- * 明杠/加杠的第四张是横着叠在横置牌上面的，框中心比同组其他牌高出约一张牌宽，会被聚成单独一行。
- * 同一种牌的两张横置框横向重叠、纵向相距不超过 1.2 倍框高时视为叠放，把两张的 cy 归到中点。
+ * 明杠/加杠的第四张是横着叠在横置牌上面的，框中心比同组其他牌高出约一张牌宽（实拍 0.85–1.05 倍横置框高），
+ * 会被聚成单独一行。同一种牌的两张横置框横向重叠、纵向相距不超过 1.1 倍框高、且其中一张身边没有正放牌
+ * （叠在上面的那张是孤立的；相邻两行各自的横置牌旁边都有同行的正放牌）时视为叠放，把两张的 cy 归到中点。
  */
-function mergeStacked(items: Item[]): void {
+function mergeStacked(items: Item[], medW: number, medH: number): void {
+  const upright = items.filter((i) => !i.side);
+  const alone = (s: Item) =>
+    !upright.some((u) => Math.abs(u.cx - s.cx) < 1.5 * medW && Math.abs(u.cy - s.cy) < 0.3 * medH);
   const sides = items.filter((i) => i.side && i.tile !== null);
   for (const a of sides) {
     for (const b of sides) {
       if (a === b || baseTile(a.tile!) !== baseTile(b.tile!)) continue;
       const dy = Math.abs(a.cy - b.cy);
-      if (dy === 0 || dy > 1.2 * Math.max(a.h, b.h)) continue;
+      if (dy === 0 || dy > 1.1 * Math.max(a.h, b.h)) continue;
       if (Math.abs(a.cx - b.cx) > 0.5 * Math.max(a.w, b.w)) continue;
+      if (!alone(a) && !alone(b)) continue;
       a.cy = b.cy = (a.cy + b.cy) / 2;
     }
   }
@@ -184,28 +197,39 @@ function dropStrayBacks(g: Item[]): { items: Item[]; dropped: number } {
  */
 function partition(raw: Item[]): Partition | null {
   const { items: g, dropped } = dropStrayBacks(raw);
-  let best: Partition | null = null;
-  const score = (p: Partition) => (p.closed?.length ?? 0) * 100 - p.melds.length;
-  const walk = (from: number, closed: Item[] | null, melds: Item[][]) => {
-    if (from === g.length) {
-      if (closed === null && melds.length === 0) return;
-      const p = { closed, melds, dropped };
-      if (!best || score(p) > score(best)) best = p;
-      return;
-    }
+  if (g.length === 0) return null;
+  type Tail = { closed: Item[] | null; melds: Item[][] };
+  const score = (t: Tail) => (t.closed?.length ?? 0) * 100 - t.melds.length;
+  // 分数按段可加，所以从 (from, 是否已取暗牌段) 出发的最优后缀与前缀无关，可记忆化：
+  // 不记忆的 DFS 在「300 张同种牌每三张一横」这类对抗输入上是指数级（PATCH 体最多 300 框）
+  const memo: (Tail | null | undefined)[][] = [new Array(g.length + 1), new Array(g.length + 1)];
+  const walk = (from: number, hasClosed: boolean): Tail | null => {
+    const k = hasClosed ? 1 : 0;
+    const hit = memo[k]![from];
+    if (hit !== undefined) return hit;
+    let best: Tail | null = from === g.length ? { closed: null, melds: [] } : null;
+    const consider = (t: Tail) => {
+      if (!best || score(t) > score(best)) best = t;
+    };
     for (const size of [3, 4]) {
       const seg = g.slice(from, from + size);
-      if (seg.length === size && isMeldSegment(seg)) walk(from + size, closed, [...melds, seg]);
+      if (seg.length !== size || !isMeldSegment(seg)) continue;
+      const rest = walk(from + size, hasClosed);
+      if (rest) consider({ closed: rest.closed, melds: [seg, ...rest.melds] });
     }
-    if (!closed) {
+    if (!hasClosed) {
       for (let size = 2; from + size <= g.length; size += 3) {
         const seg = g.slice(from, from + size);
-        if (isClosedSegment(seg)) walk(from + size, seg, melds);
+        if (!isClosedSegment(seg)) continue;
+        const rest = walk(from + size, true);
+        if (rest) consider({ closed: seg, melds: rest.melds });
       }
     }
+    memo[k]![from] = best;
+    return best;
   };
-  walk(0, null, []);
-  return best;
+  const t = walk(0, false);
+  return t && { ...t, dropped };
 }
 
 function isCleanRow(items: Item[]): boolean {
@@ -217,7 +241,10 @@ export function layoutHand(
   options: Partial<LayoutOptions> = {},
 ): LayoutResult {
   const opts = { ...DEFAULT_LAYOUT, ...options };
-  const detections = allDetections.filter((d) => d.conf >= opts.minConf);
+  // 与 decodeNmsOutput 同一约定，只收正面积的框：零面积框会让宽高比中位数变 NaN、把所有框滤光
+  const detections = allDetections.filter(
+    (d) => d.conf >= opts.minConf && d.box[2] > d.box[0] && d.box[3] > d.box[1],
+  );
   const warnings: RecognitionWarning[] = [];
   const warn = (code: RecognitionWarningCode, message: string) => warnings.push({ code, message });
   const empty: RecognizedHand = {
@@ -233,7 +260,12 @@ export function layoutHand(
   }
 
   const low = detections.filter((d) => d.conf < opts.lowConf).length;
-  if (low > 0) warn("low_conf", `${low} 张牌置信度较低，请核对`);
+  const tooLow = allDetections.length - detections.length;
+  const lowNotes = [
+    ...(low > 0 ? [`${low} 张牌置信度较低，请核对`] : []),
+    ...(tooLow > 0 ? [`${tooLow} 个置信度过低或形状无效的框已忽略`] : []),
+  ];
+  if (lowNotes.length > 0) warn("low_conf", lowNotes.join("；"));
 
   const swap = isPortrait(detections);
   // 牌是刚性的，同一张照片里正放牌的框比例高度一致；明显更窄的框是误检（残缺、杂物），剔除
@@ -242,10 +274,10 @@ export function layoutHand(
   const items = all.filter((i) => i.side || i.w / i.h >= 0.85 * ratioRef);
   if (items.length < all.length)
     warn("odd_box", `${all.length - items.length} 个检测框形状异常，已忽略`);
-  mergeStacked(items);
   const upright = items.filter((i) => !i.side);
   const medH = median((upright.length ? upright : items).map((i) => i.h));
   const medW = median((upright.length ? upright : items).map((i) => i.w));
+  mergeStacked(items, medW, medH);
   const rows: Row[] = clusterRows(items, opts.rowGap * medH).map((r) => ({
     cy: r.reduce((s, i) => s + i.cy, 0) / r.length,
     groups: splitGroups(r, opts.groupGap * medW),
@@ -286,21 +318,22 @@ export function layoutHand(
   const hasSide = (seg: Item[]) => seg.some((i) => i.side && i.tile !== null);
   const closedPick =
     pick((g, seg) => !!parts.get(g)?.closed && hasSide(seg)) ??
-    pick((g) => !!parts.get(g)?.closed) ??
+    // 拆不开的组（副露里一张认错）按整组长度参与：比两张的指示牌行长，用户改一张就行
+    pick((g) => !!parts.get(g)?.closed || !parts.has(g)) ??
     pick(() => true);
   let closedGroup: Item[];
   let handRow: Row;
   let closedSeg: Item[];
   if (closedPick) [closedGroup, handRow, closedSeg] = closedPick;
   else {
+    // 所有组都是纯副露（照片里没有暗牌）：不占用任何组，副露照常收集，张数由 count 提示
     handRow = rows[rows.length - 1]!;
-    closedGroup = handRow.groups[0]!;
-    closedSeg = closedGroup;
+    closedGroup = [];
+    closedSeg = [];
   }
   if (closedSeg.length % 3 !== 2)
     warn("bad_group", `暗牌组应为 3n+2 张，实际 ${closedSeg.length} 张`);
-  const droppedBacks = parts.get(closedGroup)?.dropped ?? 0;
-  if (droppedBacks > 0) warn("back_in_hand", `手牌行里有 ${droppedBacks} 张牌背，已忽略`);
+  let droppedBacks = parts.get(closedGroup)?.dropped ?? 0;
 
   // 暗牌 + 和张
   const closedTiles = closedSeg.filter((i) => i.tile !== null);
@@ -355,9 +388,11 @@ export function layoutHand(
     for (const g of row.groups) {
       if (g === closedGroup || !isPureMelds(g)) continue;
       consumed.add(g);
+      droppedBacks += parts.get(g)!.dropped;
       for (const seg of parts.get(g)!.melds) addMeld(seg);
     }
   }
+  if (droppedBacks > 0) warn("back_in_hand", `手牌与副露之间有 ${droppedBacks} 张牌背，已忽略`);
 
   // 指示牌行：手牌行之外、剩余的组不含横置/牌背且 ≤5 张的行。横拍只看上方；竖拍分不清哪边是「上」，
   // 两侧都收集、取有干净行的那一侧（两侧都有取行数多的）。离手牌近的是里宝，远的是表宝牌。

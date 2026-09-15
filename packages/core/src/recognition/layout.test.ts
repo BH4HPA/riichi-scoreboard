@@ -389,4 +389,77 @@ describe("layoutHand", () => {
     const { hand: h } = layoutHand(hand.dets);
     expect(h.closed.slice(0, 3)).toEqual([AKA.M5, AKA.P5, AKA.S5]);
   });
+
+  it("副露里一张牌认错、整组拆不开：整组当暗牌交给用户改，不让两张的指示牌行冒充暗牌", () => {
+    // 碰 8m 的第三张认成了 9m，与暗牌连排
+    const hand = row(["2m", "3m", "4m", "5s", "5s", "6p", "7p", "8p~", "8m", "8m~", "9m"], 10, 300);
+    const dora = row(["6s", "3s"], 30, 200);
+    const { hand: h, warnings } = layoutHand([...hand.dets, ...dora.dets]);
+    expect(h.closed).toHaveLength(11);
+    expect(h.melds).toEqual([]);
+    expect(h.doraIndicators).toEqual([TILE.S6, TILE.S3]);
+    expect(warnings.map((w) => w.code)).toEqual(["multi_win", "count"]);
+  });
+
+  it("暗牌的横放和张与下一行同种牌的碰不会被当成叠放合并", () => {
+    const closed = row(
+      ["2m", "3m", "4m", "6p", "7p", "8p", "1z", "1z", "9s", "9s", "5s~"],
+      10,
+      300,
+    );
+    const pon = row(["5s", "5s~", "5s"], 300, 300 + Math.round(H * 0.8)); // 紧贴的下一行，横置 5s 与和张同列
+    const { hand: h, warnings } = layoutHand([...closed.dets, ...pon.dets]);
+    expect(warnings).toEqual([]);
+    expect(h.winTile).toBe(TILE.S5);
+    expect(h.closed).toHaveLength(11);
+    expect(h.melds).toEqual([{ open: true, tiles: [TILE.S5, TILE.S5, TILE.S5] }]);
+  });
+
+  it("碰旁边的误检牌背不会把碰升成杠（只有白板才容一张牌背）", () => {
+    const closed = row(
+      ["2m", "3m", "4m", "6p", "7p", "8p", "1z", "1z", "9s", "9s", "3s~"],
+      10,
+      300,
+    );
+    const pon = row(["8m", "8m~", "8m", "back"], closed.end + GAP, 300);
+    const { hand: h, warnings } = layoutHand([...closed.dets, ...pon.dets]);
+    expect(h.melds).toEqual([{ open: true, tiles: [TILE.M8, TILE.M8, TILE.M8] }]);
+    expect(warnings.map((w) => w.code)).toEqual(["back_in_hand"]);
+  });
+
+  it("照片里只有副露、没有暗牌：副露照常收集，不把副露当暗牌双计", () => {
+    const pon = row(["3m", "3m~", "3m"], 10, 200);
+    const { hand: h, warnings } = layoutHand(pon.dets);
+    expect(h.closed).toEqual([]);
+    expect(h.melds).toEqual([{ open: true, tiles: [TILE.M3, TILE.M3, TILE.M3] }]);
+    expect(warnings.map((w) => w.code)).toEqual(["bad_group", "count"]);
+  });
+
+  it("永不抛错、有界耗时：对抗连排（300 张同种牌每三张一横）与随机/退化框", () => {
+    // 不记忆化的拆分是指数级：这条 300 张的输入曾经跑不完
+    const adversarial = Array.from({ length: 300 }, (_, i) =>
+      det("1m", 10 + i * 42, 200, { side: i % 3 === 1 }),
+    );
+    const t0 = Date.now();
+    expect(() => layoutHand(adversarial)).not.toThrow();
+    expect(Date.now() - t0).toBeLessThan(50);
+    // 退化框：零面积、反向、单张、全牌背
+    expect(layoutHand([{ cls: 0, conf: 0.9, box: [5, 5, 5, 5] }]).warnings[0]!.code).toBe(
+      "no_tiles",
+    );
+    expect(() => layoutHand([{ cls: 0, conf: 0.9, box: [9, 9, 1, 1] }])).not.toThrow();
+    expect(() => layoutHand(row(["back", "back", "back"], 0, 0).dets)).not.toThrow();
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 48271) % 2147483647) / 2147483647) as number;
+    for (let n = 0; n < 2000; n++) {
+      const dets: Detection[] = Array.from({ length: Math.floor(rnd() * 40) }, () => {
+        const x = rnd() * 600;
+        const y = rnd() * 600;
+        const w = rnd() < 0.1 ? 0 : rnd() * 80;
+        const h = rnd() < 0.1 ? 0 : rnd() * 80;
+        return { cls: Math.floor(rnd() * 38), conf: rnd(), box: [x, y, x + w, y + h] };
+      });
+      expect(() => layoutHand(dets)).not.toThrow();
+    }
+  });
 });
