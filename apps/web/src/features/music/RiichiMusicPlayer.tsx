@@ -23,12 +23,13 @@ export function RiichiMusicPlayer({
 function Playing({ music, label }: { music: MusicState; label: string }) {
   const audio = useRef<HTMLAudioElement>(null);
   const [src, setSrc] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
   const [blocked, setBlocked] = useState(false);
   const notify = useRoomStore((s) => s.notify);
 
   useEffect(() => {
     let active = true;
-    loadMusic(music.track).then(
+    loadMusic(music.track, (p) => active && setProgress(p)).then(
       (url) => active && setSrc(url),
       () => active && notify("error", `立直音乐加载失败：${label}`),
     );
@@ -69,7 +70,7 @@ function Playing({ music, label }: { music: MusicState; label: string }) {
         data-testid="riichi-music"
         data-track={music.track}
       />
-      <MusicFloat label={label} />
+      <MusicFloat label={label} loading={src ? null : progress} />
       {blocked && (
         <button
           type="button"
