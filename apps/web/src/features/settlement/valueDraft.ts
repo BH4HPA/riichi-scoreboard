@@ -1,4 +1,5 @@
 import type { ClientWinValue, EvaluatedHand, HandInput, HandValue } from "@riichi/core";
+import type { DraftRecognition } from "@/features/recognition/applyRecognized";
 
 export interface ValueDraft {
   mode: "manual" | "hand";
@@ -7,6 +8,8 @@ export interface ValueDraft {
   yakuman: number;
   hand: HandInput;
   evaluated: EvaluatedHand | null;
+  /** 牌面来自拍照识别时的记录信息；手工录入为 null */
+  recognition: DraftRecognition | null;
 }
 
 export function emptyHand(tsumo: boolean): HandInput {
@@ -37,7 +40,15 @@ export function isHandComplete(hand: HandInput): boolean {
 }
 
 export function createValueDraft(tsumo: boolean): ValueDraft {
-  return { mode: "manual", han: 3, fu: 40, yakuman: 0, hand: emptyHand(tsumo), evaluated: null };
+  return {
+    mode: "manual",
+    han: 3,
+    fu: 40,
+    yakuman: 0,
+    hand: emptyHand(tsumo),
+    evaluated: null,
+    recognition: null,
+  };
 }
 
 /** 草稿 → 可计算的番符值；牌面未评估或非和牌形时为 null。 */

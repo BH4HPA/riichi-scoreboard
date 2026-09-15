@@ -10,6 +10,8 @@ export default defineConfig({
   resolve: {
     alias: { "@": path.resolve(import.meta.dirname, "./src") },
   },
+  // onnxruntime-web 是运行时才动态 import 的大包，且自带 wasm 定位逻辑，不做依赖预构建
+  optimizeDeps: { exclude: ["onnxruntime-web"] },
   server: {
     port: 5173,
     proxy: {

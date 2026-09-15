@@ -10,6 +10,7 @@ import {
 import { ChipGroup, Label, Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/controls";
 import { useSocket } from "@/ws/useRoom";
 import { CommandError } from "@/ws/socket";
+import { CameraButton } from "@/features/recognition/CameraButton";
 import { TileKeyboard } from "./TileKeyboard";
 import { isHandComplete, type ValueDraft } from "./valueDraft";
 
@@ -134,7 +135,8 @@ export function ValuePicker({
           />
         </div>
       </TabsContent>
-      <TabsContent value="hand" className="mt-3">
+      <TabsContent value="hand" className="mt-3 space-y-3">
+        <CameraButton draft={draft} onChange={onChange} rules={rules} />
         <TileKeyboard
           hand={draft.hand}
           onChange={(hand) => onChange((d) => ({ ...d, hand, evaluated: null }))}

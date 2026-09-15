@@ -22,10 +22,12 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.46.0",
+    "onnxruntime-web": "^1.30.0",
     "qr-scanner": "^1.4.2",
     "qrcode.react": "^4.2.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "react-easy-crop": "^6.2.3",
     "react-router": "^8.3.1",
     "tailwind-merge": "^3.7.0",
     "zustand": "^5.0.15"

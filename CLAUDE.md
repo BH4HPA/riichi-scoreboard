@@ -79,17 +79,24 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   the system actor; any change that breaks the condition cancels it. Four locals never auto-start.
 - Deployed split-hosted: `WEB_DIST=` (empty) disables the SPA in the server image; app paths then 302 to
   the first `CORS_ORIGINS` entry.
-- Photo recognition — model side only so far: a YOLO11n detector over 38 classes. The class list
-  (index = class id) and the currently published model live in `packages/core/src/recognition/manifest.json`
-  (`model: null` = nothing published yet). `ml/` is the Python/uv training workbench (public datasets →
-  remap → train → export ONNX with embedded NMS, `[1,300,6]` output → `ci/upload-model.sh` verifies the
-  class order against the manifest, uploads to `riichi/models/<uuid>.onnx` and writes `model` back into
-  the manifest); `ml/configs/tiles.yaml` and `label_studio.xml` are generated from the manifest by
-  `ml/scripts/gen_classes.py` (CI runs it with `--check`), `ml/configs/remap/*.json` are hand-maintained.
-  Planned next (not implemented): phone-side inference with onnxruntime-web, server-side with
-  onnxruntime-node, layout post-processing as pure TS in core, photo retention for retraining. Layout
-  convention for photos: hand row = closed tiles, gap, win tile, gap, melds (4 tiles with backs at both
-  ends = closed kan); dora indicators on the row above (a second row above = ura).
+- Photo recognition: a YOLO11n detector over 38 classes (`1m..9m,0m,1p..9p,0p,1s..9s,0s,1z..7z,back`).
+  The class list (index = class id) and the currently published model live in
+  `packages/core/src/recognition/manifest.json` (`model: null` hides the phone entry point). `ml/` is the
+  Python/uv training workbench (public datasets + synthetic scenes from `sprites.py`/`synth.py` → train →
+  export ONNX with embedded class-agnostic NMS, `[1,300,6]` output → `ci/upload-model.sh` verifies the
+  class order against the manifest, uploads to `riichi/models/<uuid>.onnx` and writes `model` back).
+  Phone flow (`apps/web/src/features/recognition`): pick photo → `CropDialog` (react-easy-crop; the user
+  crops to hand + melds + indicators, rivers out) → `POST /api/recognitions` (raw JPEG, stored as
+  `hands/<player>/…jpg` + a `recognitions` row) in parallel with in-browser inference (onnxruntime-web,
+  single-thread WASM, model fetched from the CDN) → `decodeNmsOutput` + `layoutHand` (pure TS in core)
+  → `applyRecognized` fills the `ValueDraft`, `ValuePicker` auto-evaluates → after the win command is
+  accepted the final hand is `PATCH`ed back as `corrected` (training truth). Engine pref
+  `riichi.recognition.engine`: "server" sends `?infer=1` and needs a `ServerRecognizer` injected into
+  `createApp` (none yet → 503 → automatic fallback to the browser). Layout convention (photo): closed
+  tiles contiguous with the **win tile turned sideways** at either end (3n+2 tiles); melds are groups of
+  3/4 that contain a sideways tile (or back-X-X-back = closed kan) and may sit right/below/above; rows
+  above the hand with no sideways tile and no back are indicators (top row = dora, the row nearer the
+  hand = ura). `layoutHand` never throws; it returns warnings the editor shows.
 - Riichi music: `RoomView.music` (`{track, seat, at}`) is memory-only room state like `online`; a client
   sends `{type:"music", track: id | null}` (the section lives in the shared `ControlPanel`, so the console
   can press it for local players with `seat: null`), the TV plays the track from the static bucket

@@ -13,6 +13,8 @@ import { Button } from "@/ui/button";
 import { Label, Select } from "@/ui/controls";
 import { Dialog, DialogContent, DialogFooter } from "@/ui/dialog";
 import { useCommand } from "@/ws/useRoom";
+import { useSession } from "@/api/session";
+import { confirmRecognized } from "@/features/recognition/recognize";
 import { ValuePicker } from "./ValuePicker";
 import { createValueDraft, draftToClientValue, draftValue, type ValueDraft } from "./valueDraft";
 import { PreviewGrid } from "./PreviewGrid";
@@ -133,7 +135,10 @@ function TsumoForm({ game, names, rules, mirror, defaultSeat, onDone }: FormProp
       ...(effectivePao !== null ? { pao: effectivePao } : {}),
     });
     setBusy(false);
-    if (ok) onDone();
+    if (ok) {
+      confirmRecognized(draft, useSession.getState().token);
+      onDone();
+    }
   };
 
   return (
@@ -263,7 +268,11 @@ function RonForm({ game, names, rules, mirror, defaultSeat, onDone }: FormProps)
       riichi: seatsOf(riichi),
     });
     setBusy(false);
-    if (ok) onDone();
+    if (ok) {
+      const token = useSession.getState().token;
+      for (const w of wins) confirmRecognized(w.draft, token);
+      onDone();
+    }
   };
 
   const setWin = (i: number, patch: Partial<RonWinDraftState>) =>
