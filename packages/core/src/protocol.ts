@@ -1,7 +1,8 @@
+import { findTrack } from "./music";
 import { DomainError } from "./progress/advance";
 import { assertSeat, validateHandShape } from "./reducer/validateCommand";
 import { YAKU_PAGES } from "./reference/yakuTable";
-import type { ClientCommand } from "./types/commands";
+import type { ClientCommand, Command } from "./types/commands";
 import type { RoomRules } from "./types/rules";
 import {
   isLocalPlayer,
@@ -41,8 +42,49 @@ export interface RoomView {
   online: boolean[];
   /** 距自动开局的剩余毫秒（广播时刻计）；null 表示未在倒计时。用剩余量而非时刻，手机时钟偏差不影响显示 */
   autoStartIn: number | null;
+  /** 电视正在播放的立直音乐；内存态，不进事件表 */
+  music: MusicState | null;
   game: GameView | null;
   gameNo: number;
+}
+
+/** 谁按下了立直、放哪首：track 为曲库 id；seat 为 null 表示按下者没有座位（如主控台代按）。 */
+export interface MusicState {
+  track: string;
+  seat: Seat | null;
+  name: string;
+  at: number;
+}
+
+/** 提交后应停止立直音乐的命令：这一局结束或对局阶段变化。穷举，新增命令时必须表态。 */
+export const STOPS_MUSIC: Record<Command["type"], boolean> = {
+  tsumo: true,
+  ron: true,
+  draw: true,
+  abortive: true,
+  chombo: true,
+  adjust: true,
+  endGame: true,
+  newGame: true,
+  toLobby: true,
+  start: true,
+  dissolve: true,
+  setRules: false,
+  sit: false,
+  leave: false,
+  setReady: false,
+  syncProfile: false,
+  undo: false,
+  redo: false,
+};
+
+/** 校验客户端发来的立直音乐请求：null = 停止；否则必须是曲库里的 id。 */
+export function validateMusicTrack(input: unknown): string | null {
+  if (input === null) return null;
+  if (typeof input !== "string" || !findTrack(input)) {
+    throw new DomainError("bad_music", "曲目不存在");
+  }
+  return input;
 }
 
 /** 各座位在线状态（见 RoomView.online）。 */
@@ -66,6 +108,7 @@ export function toRoomView(
   seq: number,
   onlinePlayerIds: ReadonlySet<string>,
   autoStartIn: number | null,
+  music: MusicState | null,
 ): RoomView {
   return {
     code: state.code,
@@ -76,6 +119,7 @@ export function toRoomView(
     ready: state.ready,
     online: seatsOnline(state, onlinePlayerIds),
     autoStartIn,
+    music,
     game: state.game
       ? {
           present: state.game.present,
@@ -265,6 +309,8 @@ export interface PlayerStats {
 export type ClientMessage =
   | { type: "command"; id: string; baseSeq: number; command: ClientCommand }
   | { type: "ui"; intent: UiIntent }
+  /** 立直音乐：track 为曲库 id，null 表示停止 */
+  | { type: "music"; track: string | null }
   | { type: "evaluate"; id: string; seat: Seat; hand: HandInput }
   | { type: "ping" };
 
