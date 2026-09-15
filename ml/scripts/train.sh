@@ -5,6 +5,7 @@
 # fliplr=0：牌面左右不对称（数字/字牌镜像后不是同一类），关掉水平翻转增强。
 # 默认 Apple Silicon（DEVICE=mps；个别算子回退 CPU 需要 PYTORCH_ENABLE_MPS_FALLBACK=1）；
 # 有 CUDA 时 DEVICE=0。后面的 yolo 参数会覆盖前面的，所以 "$@" 里也可以直接写 device=0。
+# project 用绝对路径：相对路径会被 ultralytics 放到全局 settings 的 runs_dir 下（首次运行时记的 cwd），不在 ml/ 里。
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -17,7 +18,7 @@ uv run yolo detect train \
   data=configs/tiles.yaml \
   imgsz=640 epochs=100 batch=32 device="${DEVICE:-mps}" \
   fliplr=0 \
-  project=runs name="$NAME" exist_ok=True \
+  project="$PWD/runs" name="$NAME" exist_ok=True \
   "$@"
 
 echo "best weights: runs/$NAME/weights/best.pt"
