@@ -23,7 +23,7 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
     const nameInput = p.getByLabel("昵称");
     await nameInput.fill(NAMES[i]!);
     await nameInput.press("Enter");
-    await p.getByTestId(`seat-${i}`).getByRole("button", { name: "点击入座" }).click();
+    await p.getByTestId(`seat-${i}`).click();
     await expect(p.getByTestId(`seat-${i}`)).toContainText(NAMES[i]!);
     await expect(p.getByRole("button", { name: "准备", exact: true })).toBeVisible();
     await p.getByRole("button", { name: "准备", exact: true }).click();
@@ -145,11 +145,18 @@ test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手�
   const phones: Page[] = [];
   for (const i of [2, 3]) {
     const p = await phone(browser, code);
-    await p.getByTestId(`seat-${i}`).getByRole("button", { name: "点击入座" }).click();
+    await p.getByTestId(`seat-${i}`).click();
     await p.getByRole("button", { name: "准备", exact: true }).click();
     await expect(p.getByRole("button", { name: "取消准备" })).toBeVisible();
     phones.push(p);
   }
+  await expect(tv.getByText("已准备")).toHaveCount(4);
+  // 手机点自己的座位卡即离座，再点回去
+  await expect(phones[1]!.getByTestId("seat-3")).toHaveAccessibleName(/离座$/);
+  await phones[1]!.getByTestId("seat-3").click();
+  await expect(phones[1]!.getByTestId("seat-3")).toHaveAccessibleName("点击入座");
+  await phones[1]!.getByTestId("seat-3").click();
+  await phones[1]!.getByRole("button", { name: "准备", exact: true }).click();
   await expect(tv.getByText("已准备")).toHaveCount(4);
   // 手机端也能看到本地玩家已入座，并可让其离座（人人管理员）
   await expect(phones[0]!.getByTestId("seat-0")).toContainText("本地甲");

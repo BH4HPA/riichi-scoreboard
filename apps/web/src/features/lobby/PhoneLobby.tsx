@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Settings2 } from "lucide-react";
 import type { RoomView, Seat } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Dialog, DialogContent, DialogFooter } from "@/ui/dialog";
@@ -31,7 +32,7 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
             setRulesOpen(true);
           }}
         >
-          规则
+          <Settings2 className="h-4 w-4" /> 修改规则
         </Button>
       </div>
 
