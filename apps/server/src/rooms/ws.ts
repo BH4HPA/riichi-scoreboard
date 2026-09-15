@@ -4,7 +4,14 @@ import type { UpgradeWebSocket, WSContext } from "hono/ws";
 import { dealerOf, kyokuWind, type ClientMessage, type ServerMessage } from "@riichi/core";
 import type { PlayersRepo } from "../db/players";
 import { evaluateHand } from "../engine/evaluate";
-import { describeError, type LiveRoom, type RoomClient, type RoomRegistry } from "./registry";
+import {
+  describeError,
+  RoomClosed,
+  WS_CLOSE_DISSOLVED,
+  type LiveRoom,
+  type RoomClient,
+  type RoomRegistry,
+} from "./registry";
 
 interface Deps {
   registry: RoomRegistry;
@@ -62,10 +69,16 @@ export function mountWebSocket(app: Hono, upgradeWebSocket: UpgradeWebSocket, de
             room = deps.registry.get(code);
           } catch (err) {
             fail(ws, null, err);
-            ws.close(4004, "room not found");
+            ws.close(err instanceof RoomClosed ? WS_CLOSE_DISSOLVED : 4004, "room unavailable");
             return;
           }
-          client = { clientId, playerId: player.id, name: player.name, send: (m) => ws.send(m) };
+          client = {
+            clientId,
+            playerId: player.id,
+            name: player.name,
+            send: (m) => ws.send(m),
+            close: (c, r) => ws.close(c, r),
+          };
           send(ws, { type: "welcome", playerId: player.id });
           try {
             deps.registry.join(room, client);
@@ -131,6 +144,7 @@ export function mountWebSocket(app: Hono, upgradeWebSocket: UpgradeWebSocket, de
                   clientId,
                 });
                 send(ws, { type: "ack", id: id ?? "", seq: event.seq });
+                if (room.state.phase === "closed") deps.registry.closeRoom(room);
               } catch (err) {
                 fail(ws, id, err);
               }

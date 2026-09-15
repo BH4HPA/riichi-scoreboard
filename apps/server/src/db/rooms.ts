@@ -6,6 +6,8 @@ export interface RoomRow {
   rules: RoomRules;
   created_at: number;
   updated_at: number;
+  /** 解散时间；用于不回放事件流即可判定房间已关闭 */
+  closed_at: number | null;
 }
 
 export class RoomsRepo {
@@ -32,8 +34,19 @@ export class RoomsRepo {
 
   get(code: string): RoomRow | null {
     const row = this.db.prepare("SELECT * FROM rooms WHERE code = ?").get(code) as
-      { code: string; rules: string; created_at: number; updated_at: number } | undefined;
+      | {
+          code: string;
+          rules: string;
+          created_at: number;
+          updated_at: number;
+          closed_at: number | null;
+        }
+      | undefined;
     return row ? { ...row, rules: JSON.parse(row.rules) as RoomRules } : null;
+  }
+
+  markClosed(code: string, at: number): void {
+    this.db.prepare("UPDATE rooms SET closed_at = ? WHERE code = ?").run(at, code);
   }
 
   exists(code: string): boolean {

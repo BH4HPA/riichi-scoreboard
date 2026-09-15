@@ -118,6 +118,7 @@ export function validateCommand(input: unknown): ClientCommand {
     case "start":
       return { type: "start", force: bool(input.force, "强开标记") };
     case "toLobby":
+    case "dissolve":
     case "undo":
     case "redo":
     case "endGame":

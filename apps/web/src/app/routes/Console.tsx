@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { PanelRightOpen, Wifi } from "lucide-react";
+import { PanelRightOpen, Wifi, XCircle } from "lucide-react";
 import { seatNames, type RoomView } from "@riichi/core";
 import { api, ApiError } from "@/api/client";
 import { useSession } from "@/api/session";
@@ -7,7 +7,8 @@ import { Button } from "@/ui/button";
 import { Dialog, DialogContent } from "@/ui/dialog";
 import { ConnectionBadge, Notice } from "@/ui/notice";
 import { useRoomStore } from "@/ws/store";
-import { SocketContext, useRoomConnection } from "@/ws/useRoom";
+import { SocketContext, useCommand, useRoomConnection } from "@/ws/useRoom";
+import { ConfirmDialog } from "@/features/settlement/OtherDialogs";
 import { ConsoleLobby } from "@/features/lobby/ConsoleLobby";
 import { RoundHeader } from "@/features/scoreboard/RoundHeader";
 import { PointsGrid } from "@/features/scoreboard/PointsGrid";
@@ -47,7 +48,8 @@ function useConsoleRoom() {
             if (active) setCode(saved);
             return;
           } catch (err) {
-            if (!(err instanceof ApiError && err.status === 404)) throw err;
+            // 404 不存在 / 410 已解散：都需要新建
+            if (!(err instanceof ApiError && (err.status === 404 || err.status === 410))) throw err;
           }
         }
         if (!active) return;
@@ -73,12 +75,48 @@ function useConsoleRoom() {
   return { code, error, newRoom };
 }
 
+/** 解散房间：二次确认后发命令；服务端会随后断开所有连接，主控台自动建新房。 */
+function DissolveButton({
+  open,
+  onOpenChange,
+  code,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  code: string;
+}) {
+  const send = useCommand();
+  return (
+    <>
+      <Button variant="ghost" size="sm" className="text-neg" onClick={() => onOpenChange(true)}>
+        <XCircle className="h-4 w-4" /> 解散房间
+      </Button>
+      <ConfirmDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        title={`解散房间 ${code}？`}
+        description="所有手机会被断开，进行中的对局不再记录战绩；主控台会自动创建新房间。"
+        confirmText="解散"
+        danger
+        onConfirm={() => send({ type: "dissolve" })}
+      />
+    </>
+  );
+}
+
 export function Console() {
   const { code, error, newRoom } = useConsoleRoom();
   const socket = useRoomConnection(code);
   const room = useRoomStore((s) => s.room);
   const intents = useRoomStore((s) => s.intents);
+  const closedReason = useRoomStore((s) => s.closedReason);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [dissolveOpen, setDissolveOpen] = useState(false);
+
+  // 房间被解散（本机或其它端发起）后自动开新房；新连接建立时 closedReason 会被清空，不会重复触发
+  useEffect(() => {
+    if (closedReason === "dissolved") void newRoom();
+  }, [closedReason, newRoom]);
 
   if (error) {
     return <div className="flex min-h-dvh items-center justify-center text-neg">{error}</div>;
@@ -93,12 +131,15 @@ export function Console() {
 
   const names = seatNames(room);
   const game = room.game;
+  const dissolve = (
+    <DissolveButton open={dissolveOpen} onOpenChange={setDissolveOpen} code={room.code} />
+  );
 
   return (
     <SocketContext.Provider value={socket}>
       <div className="min-h-dvh bg-bg text-fg">
         {room.phase === "lobby" || !game ? (
-          <ConsoleLobby room={room} onNewRoom={newRoom} />
+          <ConsoleLobby room={room} onNewRoom={newRoom} extraActions={dissolve} />
         ) : (
           <div className="flex h-dvh flex-col gap-4 p-6">
             <header className="flex items-center gap-4">
@@ -112,6 +153,7 @@ export function Console() {
               <Button variant="outline" size="sm" onClick={() => setPanelOpen(true)}>
                 <PanelRightOpen className="h-4 w-4" /> 操作
               </Button>
+              {dissolve}
             </header>
 
             <main className="grid min-h-0 flex-1 grid-cols-[2fr_3fr] gap-4">

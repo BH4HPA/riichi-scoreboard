@@ -173,6 +173,24 @@ describe("reduceRoom 阶段与不变量", () => {
     expect(next.game!.present.points).toEqual([25000, 27000, 25000, 23000]);
   });
 
+  it("解散：任何阶段可用；解散后一切命令被拒绝，对局快照保留", () => {
+    const lobby = reduceRoom(createRoom("R", MLEAGUE_RULES), ev({ type: "dissolve" }));
+    expect(lobby.phase).toBe("closed");
+    const playing = playingRoom();
+    const closed = reduceRoom(playing, ev({ type: "dissolve" }, 9));
+    expect(closed.phase).toBe("closed");
+    expect(closed.game).toBe(playing.game);
+    for (const cmd of [
+      { type: "toLobby" },
+      { type: "start", force: true },
+      { type: "undo" },
+      { type: "endGame" },
+      { type: "dissolve" },
+    ] as const) {
+      expect(() => reduceRoom(closed, ev(cmd, 10))).toThrow(/已解散/);
+    }
+  });
+
   it("syncProfile 只更新对应座位且要求 id 一致", () => {
     const room = playingRoom();
     const next = reduceRoom(

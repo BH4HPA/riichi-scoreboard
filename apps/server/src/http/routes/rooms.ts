@@ -3,7 +3,7 @@ import { bodyLimit } from "hono/body-limit";
 import { defaultRules, validateRules, RulesError } from "@riichi/core";
 import { requirePlayer, type AuthEnv } from "../../auth/deviceToken";
 import type { PlayersRepo } from "../../db/players";
-import { RoomNotFound, type RoomRegistry } from "../../rooms/registry";
+import { RoomClosed, RoomNotFound, type RoomRegistry } from "../../rooms/registry";
 
 interface Deps {
   registry: RoomRegistry;
@@ -39,6 +39,8 @@ export function roomRoutes(deps: Deps): Hono<AuthEnv> {
     } catch (err) {
       if (err instanceof RoomNotFound)
         return c.json({ error: "room_not_found", message: err.message }, 404);
+      if (err instanceof RoomClosed)
+        return c.json({ error: "room_closed", message: err.message }, 410);
       throw err;
     }
   });

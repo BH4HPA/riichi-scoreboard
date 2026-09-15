@@ -45,6 +45,7 @@ async function register(name: string): Promise<{ token: string; id: string }> {
 }
 
 class Client {
+  readonly socket: WebSocket;
   private readonly ws: WebSocket;
   private readonly queue: ServerMessage[] = [];
   private waiters: Array<(m: ServerMessage) => void> = [];
@@ -56,6 +57,7 @@ class Client {
   ui: UiState[] = [];
   constructor(code: string, token: string) {
     this.ws = new WebSocket(`${wsUrl}/ws?room=${code}&token=${token}`);
+    this.socket = this.ws;
     this.ws.addEventListener("message", (evt) => {
       const msg = JSON.parse(String(evt.data)) as ServerMessage;
       if (msg.type === "state") {
@@ -463,5 +465,46 @@ describe("rooms end-to-end", () => {
     ).toBe(404);
     tv.close();
     ph.close();
+  });
+
+  it("解散房间：发起者先收到 ack 再被断开（4010）；他人断开；REST 410；重连被拒；回放不再进内存", async () => {
+    const console_ = await register("主控台");
+    const phone = await register("手机");
+    const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
+    const created = await app.request("/api/rooms", {
+      method: "POST",
+      headers: auth(console_.token),
+    });
+    const { room } = (await created.json()) as { room: RoomView };
+    const tv = new Client(room.code, console_.token);
+    const ph = new Client(room.code, phone.token);
+    await Promise.all([tv.open(), ph.open()]);
+    await tv.waitState(() => true);
+    await ph.waitState(() => true);
+    const closedCodes: number[] = [];
+    const phClosed = new Promise<void>((resolve) =>
+      ph.socket.addEventListener("close", (e) => {
+        closedCodes.push(e.code);
+        resolve();
+      }),
+    );
+    const tvClosed = new Promise<number>((resolve) =>
+      tv.socket.addEventListener("close", (e) => resolve(e.code)),
+    );
+
+    tv.send({ type: "command", id: "d", baseSeq: 0, command: { type: "dissolve" } });
+    // ack 必须先于关闭到达
+    expect(await tv.outcome()).toMatchObject({ type: "ack", seq: 1 });
+    expect(await tvClosed).toBe(4010);
+    await phClosed;
+    expect(closedCodes).toEqual([4010]);
+
+    const gone = await app.request(`/api/rooms/${room.code}`, { headers: auth(console_.token) });
+    expect(gone.status).toBe(410);
+    // 重新连接被拒（4010 + room_closed），且不需要回放事件
+    const again = new Client(room.code, phone.token);
+    await again.open();
+    expect(await again.until("error")).toMatchObject({ code: "room_closed" });
+    expect(() => ctx.registry.get(room.code)).toThrow(/已解散/);
   });
 });

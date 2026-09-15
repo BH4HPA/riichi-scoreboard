@@ -23,7 +23,9 @@ export type LobbyCommand =
   | { type: "setReady"; seat: Seat; ready: boolean }
   | { type: "syncProfile"; seat: Seat; player: PlayerRef }
   | { type: "start"; force: boolean }
-  | { type: "toLobby" };
+  | { type: "toLobby" }
+  /** 解散房间：任何阶段可用，之后房间只读 */
+  | { type: "dissolve" };
 
 export type GameCommand<V = WinValue> =
   | { type: "tsumo"; winner: Seat; value: V; riichi: Seat[]; pao?: Seat; endGame?: boolean }

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
+import { Button } from "@/ui/button";
 import { BookOpen, History, ScrollText, User, Wifi } from "lucide-react";
 import { DEFAULT_REFERENCE_VIEW, seatNames, seatOfPlayer, type ReferenceView } from "@riichi/core";
 import { Dialog, DialogContent } from "@/ui/dialog";
@@ -26,8 +27,20 @@ export function Room() {
   const socket = useRoomConnection(roomCode);
   const room = useRoomStore((s) => s.room);
   const status = useRoomStore((s) => s.status);
+  const closedReason = useRoomStore((s) => s.closedReason);
   const playerId = useRoomStore((s) => s.playerId);
 
+  if (closedReason === "dissolved") {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 px-6 text-center">
+        <p className="text-lg font-semibold">房间 {roomCode} 已解散</p>
+        <p className="text-sm text-muted">主控台已解散这个房间，请扫描新的二维码加入。</p>
+        <Button asChild variant="outline">
+          <Link to="/">返回首页</Link>
+        </Button>
+      </div>
+    );
+  }
   if (status === "closed" && !room) {
     return (
       <div className="flex min-h-dvh items-center justify-center px-6 text-center text-neg">

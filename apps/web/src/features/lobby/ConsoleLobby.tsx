@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Play, Settings2, Users } from "lucide-react";
 import type { RoomView, Seat } from "@riichi/core";
@@ -28,7 +28,16 @@ function useLocalIds(refreshKey: number): string[] {
   return ids;
 }
 
-export function ConsoleLobby({ room, onNewRoom }: { room: RoomView; onNewRoom: () => void }) {
+export function ConsoleLobby({
+  room,
+  onNewRoom,
+  extraActions,
+}: {
+  room: RoomView;
+  onNewRoom: () => void;
+  /** 放在底部操作栏右侧的额外按钮（如解散房间） */
+  extraActions?: ReactNode;
+}) {
   const send = useCommand();
   const [rulesOpen, setRulesOpen] = useState(false);
   const [draft, setDraft] = useState(room.rules);
@@ -122,9 +131,12 @@ export function ConsoleLobby({ room, onNewRoom }: { room: RoomView; onNewRoom: (
           >
             强制开局
           </Button>
-          <Button size="lg" variant="ghost" className="ml-auto" onClick={onNewRoom}>
-            新房间
-          </Button>
+          <span className="ml-auto flex items-center gap-2">
+            {extraActions}
+            <Button size="lg" variant="ghost" onClick={onNewRoom}>
+              新房间
+            </Button>
+          </span>
         </div>
       </section>
 

@@ -38,7 +38,11 @@ export interface RoomClient {
   playerId: string;
   name: string;
   send(message: string): void;
+  close(code: number, reason: string): void;
 }
+
+/** 房间解散时的 WebSocket 关闭码；客户端据此不重连。 */
+export const WS_CLOSE_DISSOLVED = 4010;
 
 export interface LiveRoom {
   code: string;
@@ -53,6 +57,13 @@ export class RoomNotFound extends Error {
   constructor(code: string) {
     super(`房间 ${code} 不存在`);
     this.name = "RoomNotFound";
+  }
+}
+
+export class RoomClosed extends Error {
+  constructor(code: string) {
+    super(`房间 ${code} 已解散`);
+    this.name = "RoomClosed";
   }
 }
 
@@ -96,12 +107,13 @@ export class RoomRegistry {
     return live;
   }
 
-  /** 内存没有则从事件流回放。 */
+  /** 内存没有则从事件流回放；已解散的房间用 closed_at 短路，不回放。 */
   get(code: string): LiveRoom {
     const cached = this.rooms.get(code);
     if (cached) return cached;
     const row = this.roomsRepo.get(code);
     if (!row) throw new RoomNotFound(code);
+    if (row.closed_at !== null) throw new RoomClosed(code);
     const events = this.roomsRepo.events(code);
     const live: LiveRoom = {
       code,
@@ -132,12 +144,24 @@ export class RoomRegistry {
     this.roomsRepo.transaction(() => {
       this.roomsRepo.appendEvent(room.code, event);
       this.resultsRepo.onTransition(room.state, next);
+      if (next.phase === "closed") this.roomsRepo.markClosed(room.code, event.at);
     });
     room.state = next;
     room.seq = event.seq;
     room.lastActivity = event.at;
     this.broadcastState(room);
     return event;
+  }
+
+  /**
+   * 解散后的收尾：关闭所有连接并从内存卸载。由 ws 层在给发起者回 ack 之后调用，
+   * 否则发起者会先收到断开而拿不到 ack。
+   */
+  closeRoom(room: LiveRoom): void {
+    for (const c of room.clients.values()) c.close(WS_CLOSE_DISSOLVED, "dissolved");
+    room.clients.clear();
+    room.ui.clear();
+    this.rooms.delete(room.code);
   }
 
   /**
@@ -279,5 +303,7 @@ export function describeError(err: unknown): ErrorInfo {
   if (err instanceof RoomNotFound) {
     return { code: "room_not_found", message: err.message, internal: false };
   }
+  if (err instanceof RoomClosed)
+    return { code: "room_closed", message: err.message, internal: false };
   return { code: "internal", message: "服务器内部错误", internal: true };
 }

@@ -21,6 +21,13 @@ export class CommandError extends Error {
   }
 }
 
+/** 服务端主动关闭且不应重连的关闭码 */
+const TERMINAL_CLOSE: Record<number, "unauthorized" | "not_found" | "dissolved"> = {
+  4001: "unauthorized",
+  4004: "not_found",
+  4010: "dissolved",
+};
+
 type Pending =
   | { kind: "command"; resolve: (seq: number) => void; reject: (e: CommandError) => void }
   | { kind: "evaluate"; resolve: (r: EvaluatedHand) => void; reject: (e: CommandError) => void };
@@ -70,8 +77,9 @@ export class RoomSocket {
       for (const p of this.pending.values())
         p.reject(new CommandError("disconnected", "连接已断开"));
       this.pending.clear();
-      if (this.closedByUser || evt.code === 4001 || evt.code === 4004) {
-        useRoomStore.getState().set({ status: "closed" });
+      const reason = TERMINAL_CLOSE[evt.code];
+      if (this.closedByUser || reason) {
+        useRoomStore.getState().set({ status: "closed", closedReason: reason ?? null });
         return;
       }
       const delay = Math.min(1000 * 2 ** this.retry, 10_000);

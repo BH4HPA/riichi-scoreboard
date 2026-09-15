@@ -112,7 +112,8 @@ export interface Undoable<T> {
 
 export interface RoomState {
   code: string;
-  phase: "lobby" | "playing" | "finished";
+  /** closed = 已解散：任何命令都被拒绝，客户端连接被关闭 */
+  phase: "lobby" | "playing" | "finished" | "closed";
   rules: RoomRules;
   seats: (PlayerRef | null)[];
   ready: boolean[];

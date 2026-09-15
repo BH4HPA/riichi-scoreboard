@@ -85,6 +85,8 @@ function applyLobbyCommand(room: RoomState, cmd: LobbyCommand): RoomState {
       if (room.phase === "playing") throw new DomainError("locked", "对局进行中不能返回大厅");
       return { ...room, phase: "lobby", game: null, ready: [false, false, false, false] };
     }
+    case "dissolve":
+      return { ...room, phase: "closed" };
     default:
       throw new DomainError("bad_command", `未知命令 ${(cmd as { type: string }).type}`);
   }
@@ -106,6 +108,7 @@ function startGame(room: RoomState, at: number): RoomState {
 /** 纯函数：房间状态 + 事件 → 新房间状态。失败抛 DomainError / RulesError。 */
 export function reduceRoom(room: RoomState, event: RoomEvent): RoomState {
   const cmd = event.command;
+  if (room.phase === "closed") throw new DomainError("closed", "房间已解散");
 
   if (!isGameCommand(cmd)) {
     const next = applyLobbyCommand(room, cmd);
