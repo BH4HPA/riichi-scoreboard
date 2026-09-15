@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { MLEAGUE_RULES } from "../rules/mleague";
 import type { HandInput } from "../types/state";
-import { TILE } from "../types/tiles";
-import { fromEngineOutput, toEngineInput, validateHandInput, YAKU_ID } from "./options";
+import { AKA, TILE } from "../types/tiles";
+import {
+  akaCount,
+  akaLimit,
+  fromEngineOutput,
+  toEngineInput,
+  validateHandInput,
+  YAKU_ID,
+} from "./options";
 
 const R = MLEAGUE_RULES;
 
@@ -29,7 +36,6 @@ function hand(partial: Partial<HandInput> = {}): HandInput {
     tsumo: false,
     doraIndicators: [TILE.M1],
     uraIndicators: [],
-    aka: 0,
     riichi: false,
     doubleRiichi: false,
     ippatsu: false,
@@ -89,8 +95,130 @@ describe("toEngineInput", () => {
     expect(() => validateHandInput(hand({ closed: hand().closed.slice(1) }), R)).toThrow(/14 张/);
   });
 
-  it("规则约束：赤牌上限、未立直不计里宝、无一发规则", () => {
-    expect(() => validateHandInput(hand({ aka: 4 }), R)).toThrow(/赤宝牌/);
+  it("赤五：折回普通五送引擎，张数计入 aka_count，和张为赤五时同样折回", () => {
+    const closed = [...hand().closed];
+    closed[closed.indexOf(TILE.P5)] = AKA.P5;
+    const h = hand({ closed, winTile: AKA.P5 });
+    const input = toEngineInput(h, { seat: 1, dealer: 0, roundWind: 0 }, R);
+    expect(input.options.aka_count).toBe(1);
+    expect(input.options.tile_discarded_by_someone).toBe(TILE.P5);
+    expect(input.closed_part.every((t) => t <= 34)).toBe(true);
+    expect(input.closed_part.filter((t) => t === TILE.P5)).toHaveLength(0);
+    expect(akaCount(h)).toBe(1);
+    // 副露中的赤五同样计数并折回
+    const open = hand({
+      closed: [
+        TILE.M1,
+        TILE.M2,
+        TILE.M3,
+        TILE.S7,
+        TILE.S8,
+        TILE.S9,
+        TILE.M7,
+        TILE.M8,
+        TILE.M9,
+        TILE.P2,
+        TILE.P2,
+      ],
+      melds: [{ open: true, tiles: [AKA.M5, TILE.M5, TILE.M5] }],
+      winTile: TILE.P2,
+    });
+    const openInput = toEngineInput(open, { seat: 1, dealer: 0, roundWind: 0 }, R);
+    expect(openInput.options.aka_count).toBe(1);
+    expect(openInput.open_part[0]![1]).toEqual([TILE.M5, TILE.M5, TILE.M5]);
+  });
+
+  it("赤五上限：总数不超过规则、同色不超过 akaLimit、与普通五合计不超过 4 张", () => {
+    const three = hand({
+      closed: [
+        AKA.M5,
+        TILE.M5,
+        TILE.M5,
+        TILE.P4,
+        AKA.P5,
+        TILE.P6,
+        TILE.S7,
+        TILE.S8,
+        TILE.S9,
+        TILE.M7,
+        TILE.M8,
+        TILE.M9,
+        TILE.P2,
+        TILE.P2,
+      ],
+      winTile: TILE.M9,
+    });
+    expect(() => validateHandInput(three, R)).not.toThrow();
+    const twoM = hand({
+      closed: [
+        AKA.M5,
+        AKA.M5,
+        TILE.M5,
+        TILE.P4,
+        TILE.P5,
+        TILE.P6,
+        TILE.S7,
+        TILE.S8,
+        TILE.S9,
+        TILE.M7,
+        TILE.M8,
+        TILE.M9,
+        TILE.P2,
+        TILE.P2,
+      ],
+      winTile: TILE.M9,
+    });
+    expect(() => validateHandInput(twoM, R)).toThrow(/同一花色/);
+    const noAka = { ...R, hand: { ...R.hand, akaCount: 0 as const } };
+    expect(() => validateHandInput(three, noAka)).toThrow(/赤宝牌最多 0/);
+    const fourAka = { ...R, hand: { ...R.hand, akaCount: 4 as const } };
+    const twoP = hand({
+      closed: [
+        TILE.M5,
+        TILE.M5,
+        TILE.M5,
+        AKA.P5,
+        AKA.P5,
+        TILE.P5,
+        TILE.S7,
+        TILE.S8,
+        TILE.S9,
+        TILE.M7,
+        TILE.M8,
+        TILE.M9,
+        TILE.P2,
+        TILE.P2,
+      ],
+      winTile: TILE.M9,
+    });
+    expect(() => validateHandInput(twoP, fourAka)).not.toThrow();
+    expect(() => validateHandInput(twoP, R)).toThrow(/同一花色/);
+    const fiveFives = hand({
+      closed: [
+        AKA.P5,
+        TILE.P5,
+        TILE.P5,
+        TILE.P5,
+        TILE.P5,
+        TILE.P6,
+        TILE.S7,
+        TILE.S8,
+        TILE.S9,
+        TILE.M7,
+        TILE.M8,
+        TILE.M9,
+        TILE.P2,
+        TILE.P2,
+      ],
+      winTile: TILE.M9,
+    });
+    expect(() => validateHandInput(fiveFives, R)).toThrow(/超过 4 张/);
+    expect(akaLimit("p", 4)).toBe(2);
+    expect(akaLimit("m", 4)).toBe(1);
+    expect(akaLimit("s", 3)).toBe(1);
+  });
+
+  it("规则约束：未立直不计里宝、无一发规则", () => {
     expect(() => validateHandInput(hand({ uraIndicators: [TILE.S1] }), R)).toThrow(/未立直/);
     const noIppatsu = { ...R, hand: { ...R.hand, ippatsu: false } };
     expect(() => validateHandInput(hand({ riichi: true, ippatsu: true }), noIppatsu)).toThrow(

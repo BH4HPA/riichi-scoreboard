@@ -196,28 +196,14 @@ export function TileKeyboard({
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <Label>和张</Label>
-          <ChipGroup
-            value={hand.winTile || null}
-            onChange={(t) => update({ winTile: t })}
-            options={distinctClosed.map((t) => ({ value: t, label: tileLabel(t) }))}
-            className="mt-1"
-          />
-        </div>
-        <div>
-          <Label>赤宝牌</Label>
-          <ChipGroup
-            value={hand.aka}
-            onChange={(n) => update({ aka: n })}
-            options={Array.from({ length: rules.hand.akaCount + 1 }, (_, i) => ({
-              value: i,
-              label: i,
-            }))}
-            className="mt-1"
-          />
-        </div>
+      <div>
+        <Label>和张</Label>
+        <ChipGroup
+          value={hand.winTile || null}
+          onChange={(t) => update({ winTile: t })}
+          options={distinctClosed.map((t) => ({ value: t, label: tileLabel(t) }))}
+          className="mt-1"
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-2 text-xs">

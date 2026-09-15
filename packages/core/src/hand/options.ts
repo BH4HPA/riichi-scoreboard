@@ -2,8 +2,12 @@ import { DomainError } from "../progress/advance";
 import type { RoomRules } from "../types/rules";
 import type { EvaluatedHand, HandInput } from "../types/state";
 import {
+  baseTile,
   doraFromIndicator,
+  isAka,
+  MAX_TILE,
   seatWind,
+  tileSuit,
   windTile,
   type Seat,
   type Tile,
@@ -173,7 +177,25 @@ export interface HandContext {
 const MELD_TILE_COUNT = 3;
 
 function isTile(t: unknown): t is Tile {
-  return Number.isInteger(t) && (t as number) >= 1 && (t as number) <= 34;
+  return Number.isInteger(t) && (t as number) >= 1 && (t as number) <= MAX_TILE;
+}
+
+/** 手牌与副露中的全部牌（含赤标记）。 */
+export function allHandTiles(hand: Pick<HandInput, "closed" | "melds">): Tile[] {
+  return [...hand.closed, ...hand.melds.flatMap((m) => m.tiles)];
+}
+
+/** 赤五张数（引擎 aka_count）。 */
+export function akaCount(hand: Pick<HandInput, "closed" | "melds">): number {
+  return allHandTiles(hand).filter(isAka).length;
+}
+
+/**
+ * 每花色允许的赤五张数：赤 3 每色一张；赤 4 时五筒两张（常见规则）。
+ */
+export function akaLimit(suit: "m" | "p" | "s", rulesAkaCount: number): number {
+  if (rulesAkaCount === 0) return 0;
+  return rulesAkaCount >= 4 && suit === "p" ? 2 : 1;
 }
 
 /** 校验牌面输入的结构与规则约束。 */
@@ -190,8 +212,18 @@ export function validateHandInput(hand: HandInput, rules: RoomRules): void {
   if (!isTile(hand.winTile) || !hand.closed.includes(hand.winTile)) {
     throw new DomainError("bad_win_tile", "和张必须包含在暗牌中");
   }
-  if (hand.aka < 0 || hand.aka > rules.hand.akaCount) {
+  const akaBySuit = { m: 0, p: 0, s: 0 };
+  for (const t of allHandTiles(hand)) {
+    if (isAka(t)) akaBySuit[tileSuit(t) as "m" | "p" | "s"] += 1;
+  }
+  const akaTotal = akaBySuit.m + akaBySuit.p + akaBySuit.s;
+  if (akaTotal > rules.hand.akaCount) {
     throw new DomainError("bad_aka", `赤宝牌最多 ${rules.hand.akaCount} 张`);
+  }
+  for (const suit of ["m", "p", "s"] as const) {
+    if (akaBySuit[suit] > akaLimit(suit, rules.hand.akaCount)) {
+      throw new DomainError("bad_aka", "同一花色的赤五超过规则允许张数");
+    }
   }
   const maxIndicators = rules.hand.kanDora ? 5 : 1;
   if (hand.doraIndicators.length > maxIndicators || !hand.doraIndicators.every(isTile)) {
@@ -211,14 +243,15 @@ export function validateHandInput(hand: HandInput, rules: RoomRules): void {
   if (hand.ippatsu && !hand.riichi && !hand.doubleRiichi)
     throw new DomainError("bad_ippatsu", "未立直不能一发");
   const tileCounts = new Map<Tile, number>();
-  for (const t of [...hand.closed, ...hand.melds.flatMap((m) => m.tiles)]) {
-    tileCounts.set(t, (tileCounts.get(t) ?? 0) + 1);
+  for (const t of allHandTiles(hand)) {
+    const b = baseTile(t);
+    tileCounts.set(b, (tileCounts.get(b) ?? 0) + 1);
   }
   for (const [t, n] of tileCounts)
     if (n > 4) throw new DomainError("bad_tiles", `牌 ${t} 超过 4 张`);
 }
 
-/** 牌面 + 规则 → 引擎输入。 */
+/** 牌面 + 规则 → 引擎输入（赤五折回普通五，张数计入 aka_count）。 */
 export function toEngineInput(hand: HandInput, ctx: HandContext, rules: RoomRules): EngineInput {
   validateHandInput(hand, rules);
   const dora = hand.doraIndicators.map(doraFromIndicator);
@@ -234,17 +267,17 @@ export function toEngineInput(hand: HandInput, ctx: HandContext, rules: RoomRule
   if (rules.hand.renhou === "none") disabled.push(YAKU_ID.Renhou);
 
   return {
-    closed_part: closed,
-    open_part: hand.melds.map((m) => [m.open, [...m.tiles]]),
+    closed_part: closed.map(baseTile),
+    open_part: hand.melds.map((m) => [m.open, m.tiles.map(baseTile)]),
     options: {
       dora,
-      aka_count: hand.aka,
+      aka_count: akaCount(hand),
       first_take: hand.firstTake,
       riichi: hand.riichi || hand.doubleRiichi,
       ippatsu: hand.ippatsu,
       double_riichi: hand.doubleRiichi,
       after_kan: hand.afterKan,
-      tile_discarded_by_someone: hand.tsumo ? -1 : hand.winTile,
+      tile_discarded_by_someone: hand.tsumo ? -1 : baseTile(hand.winTile),
       bakaze: windTile(ctx.roundWind),
       jikaze: windTile(seatWind(ctx.seat, ctx.dealer)),
       allow_aka: rules.hand.akaCount > 0,

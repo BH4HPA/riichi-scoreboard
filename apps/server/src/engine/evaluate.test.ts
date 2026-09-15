@@ -26,7 +26,6 @@ function hand(partial: Partial<HandInput> = {}): HandInput {
     tsumo: false,
     doraIndicators: [TILE.S1],
     uraIndicators: [],
-    aka: 0,
     riichi: false,
     doubleRiichi: false,
     ippatsu: false,

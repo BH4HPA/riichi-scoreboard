@@ -178,6 +178,7 @@ function makeWinRecord(
     tier: scoreTier(v, rules),
     payment,
     yaku: value.kind === "hand" ? value.result.yaku : null,
+    hand: value.kind === "hand" ? value.hand : null,
     pao: pao ?? null,
   };
 }

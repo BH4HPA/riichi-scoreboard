@@ -128,6 +128,43 @@ describe("reduceRoom 阶段与不变量", () => {
     expect(ok.game!.present.points).toEqual([73000, -23000, 25000, 25000]);
   });
 
+  it("牌面形态的和牌把手牌与役种写入历史记录", () => {
+    const room = playingRoom();
+    const hand = {
+      closed: [1, 2, 3, 13, 36, 15, 25, 26, 27, 7, 8, 9, 11, 11],
+      melds: [],
+      winTile: 9,
+      tsumo: false,
+      doraIndicators: [],
+      uraIndicators: [],
+      riichi: false,
+      doubleRiichi: false,
+      ippatsu: false,
+      afterKan: false,
+      lastTile: false,
+      firstTake: false,
+    };
+    const result = { han: 2, fu: 30, yakuman: 0, yaku: { "33": 1, "55": 1 }, isAgari: true };
+    const next = reduceRoom(
+      room,
+      ev(
+        {
+          type: "ron",
+          loser: 3,
+          wins: [{ winner: 1, value: { kind: "hand", hand, result } }],
+          riichi: [],
+        },
+        9,
+      ),
+    );
+    const entry = next.game!.present.history[0]!;
+    expect(entry.kind).toBe("ron");
+    if (entry.kind !== "ron") return;
+    expect(entry.wins[0]!.hand).toEqual(hand);
+    expect(entry.wins[0]!.yaku).toEqual(result.yaku);
+    expect(next.game!.present.points).toEqual([25000, 27000, 25000, 23000]);
+  });
+
   it("syncProfile 只更新对应座位且要求 id 一致", () => {
     const room = playingRoom();
     const next = reduceRoom(

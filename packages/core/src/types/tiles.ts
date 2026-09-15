@@ -1,8 +1,39 @@
 /**
  * 牌编码与 riichi-rs 一致：
  * 万 1-9 → 1..9，筒 1-9 → 10..18，索 1-9 → 19..27，东南西北 → 28..31，白发中 → 32..34。
+ * 本项目额外定义赤五：赤五万 35、赤五筒 36、赤五索 37（送引擎前用 baseTile 折回 5，并计入 aka_count）。
  */
 export type Tile = number;
+
+export const AKA = { M5: 35, P5: 36, S5: 37 } as const;
+export const AKA_TILES: readonly Tile[] = [AKA.M5, AKA.P5, AKA.S5];
+export const MAX_TILE = AKA.S5;
+
+/** 赤五 → 对应的普通五；其余原样。 */
+export function baseTile(tile: Tile): Tile {
+  if (tile === AKA.M5) return 5;
+  if (tile === AKA.P5) return 14;
+  if (tile === AKA.S5) return 23;
+  return tile;
+}
+
+export function isAka(tile: Tile): boolean {
+  return tile >= AKA.M5;
+}
+
+/** 忽略赤标记后是否同一张牌。 */
+export function sameTile(a: Tile, b: Tile): boolean {
+  return baseTile(a) === baseTile(b);
+}
+
+/** 普通五 → 赤五（非五牌原样返回）。 */
+export function akaOf(tile: Tile): Tile {
+  const base = baseTile(tile);
+  if (base === 5) return AKA.M5;
+  if (base === 14) return AKA.P5;
+  if (base === 23) return AKA.S5;
+  return tile;
+}
 
 export const TILE = {
   M1: 1,
@@ -70,23 +101,31 @@ export function windTile(wind: Wind): Tile {
 }
 
 export function isHonor(tile: Tile): boolean {
-  return tile >= TILE.East;
+  return tile >= TILE.East && tile <= TILE.Chun;
 }
 
 export function tileSuit(tile: Tile): "m" | "p" | "s" | "z" {
-  if (tile <= 9) return "m";
-  if (tile <= 18) return "p";
-  if (tile <= 27) return "s";
+  const t = baseTile(tile);
+  if (t <= 9) return "m";
+  if (t <= 18) return "p";
+  if (t <= 27) return "s";
   return "z";
 }
 
 export function tileNumber(tile: Tile): number {
-  return isHonor(tile) ? tile - TILE.East + 1 : ((tile - 1) % 9) + 1;
+  const t = baseTile(tile);
+  return isHonor(t) ? t - TILE.East + 1 : ((t - 1) % 9) + 1;
 }
 
-/** 宝牌指示牌 → 宝牌 */
+/** 宝牌指示牌 → 宝牌（赤五指示牌与普通五等价） */
 export function doraFromIndicator(indicator: Tile): Tile {
-  if (indicator >= TILE.Haku) return indicator === TILE.Chun ? TILE.Haku : indicator + 1;
-  if (indicator >= TILE.East) return indicator === TILE.North ? TILE.East : indicator + 1;
-  return tileNumber(indicator) === 9 ? indicator - 8 : indicator + 1;
+  const t = baseTile(indicator);
+  if (t >= TILE.Haku) return t === TILE.Chun ? TILE.Haku : t + 1;
+  if (t >= TILE.East) return t === TILE.North ? TILE.East : t + 1;
+  return tileNumber(t) === 9 ? t - 8 : t + 1;
+}
+
+/** 牌序排序键：按基础牌，赤五排在同数普通牌之前。 */
+export function tileOrder(tile: Tile): number {
+  return baseTile(tile) * 2 + (isAka(tile) ? 0 : 1);
 }

@@ -1,7 +1,7 @@
 import { DomainError } from "../progress/advance";
 import type { ClientCommand, ClientWinValue, RonWin } from "../types/commands";
 import type { AbortiveReason, HandInput } from "../types/state";
-import type { Seat } from "../types/tiles";
+import { MAX_TILE, type Seat } from "../types/tiles";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -39,7 +39,7 @@ function int(v: unknown, what: string, min: number, max: number): number {
 
 function tiles(v: unknown, what: string, max: number): number[] {
   if (!Array.isArray(v) || v.length > max) bad(`${what}无效`);
-  return v.map((t) => int(t, what, 1, 34));
+  return v.map((t) => int(t, what, 1, MAX_TILE));
 }
 
 function handInput(v: unknown): HandInput {
@@ -51,11 +51,10 @@ function handInput(v: unknown): HandInput {
       if (!isRecord(m)) bad("副露无效");
       return { open: bool(m.open, "副露明暗"), tiles: tiles(m.tiles, "副露牌", 4) };
     }),
-    winTile: int(v.winTile, "和张", 1, 34),
+    winTile: int(v.winTile, "和张", 1, MAX_TILE),
     tsumo: bool(v.tsumo, "自摸标记"),
     doraIndicators: tiles(v.doraIndicators, "宝牌指示牌", 5),
     uraIndicators: tiles(v.uraIndicators, "里宝指示牌", 5),
-    aka: int(v.aka, "赤宝牌", 0, 4),
     riichi: bool(v.riichi, "立直"),
     doubleRiichi: bool(v.doubleRiichi, "两立直"),
     ippatsu: bool(v.ippatsu, "一发"),

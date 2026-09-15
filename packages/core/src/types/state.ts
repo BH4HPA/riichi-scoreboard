@@ -10,18 +10,17 @@ export interface PlayerRef {
   avatar: string | null;
 }
 
-/** 牌面输入（牌键盘 / 未来的拍照识别产出） */
+/** 牌面输入（牌键盘 / 未来的拍照识别产出）。赤五直接以 35/36/37 出现在牌列表中。 */
 export interface HandInput {
   closed: Tile[];
   melds: Meld[];
-  /** 和张，包含在 closed 里（自摸时为最后一张） */
+  /** 和张，包含在 closed 里（精确码，赤五即 35/36/37） */
   winTile: Tile;
   tsumo: boolean;
   /** 宝牌指示牌（含杠宝） */
   doraIndicators: Tile[];
   /** 里宝指示牌（仅立直时有效） */
   uraIndicators: Tile[];
-  aka: number;
   riichi: boolean;
   doubleRiichi: boolean;
   ippatsu: boolean;
@@ -53,6 +52,8 @@ export interface WinRecord {
   tier: ScoreTier;
   payment: WinPayment;
   yaku: Record<string, number> | null;
+  /** 牌面形态录入时的手牌（历史展示用）；番符快选为 null */
+  hand: HandInput | null;
   pao: Seat | null;
 }
 

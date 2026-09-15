@@ -17,7 +17,6 @@ export function emptyHand(tsumo: boolean): HandInput {
     tsumo,
     doraIndicators: [],
     uraIndicators: [],
-    aka: 0,
     riichi: false,
     doubleRiichi: false,
     ippatsu: false,
