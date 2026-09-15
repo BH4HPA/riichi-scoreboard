@@ -5,6 +5,7 @@
 - Roboflow 导出：data.yaml 里的 names（list 或 {id: name}），图片在 */images/，标签在同级 labels/
 - Label Studio 的 YOLO 导出：classes.txt（每行一个类），images/ + labels/
 
+标签行支持 YOLO 矩形（cls cx cy w h）与分割多边形（cls x1 y1 … xn yn，取外接矩形）。
 映射文件 configs/remap/<name>.json：{"来源类名": "canonical 类名" | null}，null = 丢弃该类的框。
 首次遇到没有映射文件的来源，会按别名表猜一份写到 configs/remap/<name>.json，
 未能猜出的项填 null 并退出（返回码 2），请人工补全后重跑。
@@ -116,12 +117,18 @@ def convert_label(text: str, id_map: dict[int, int | None], where: Path) -> str:
         parts = line.split()
         if not parts:
             continue
-        if len(parts) != 5:
-            raise SystemExit(f"{where}:{n}: expected `cls cx cy w h`, got {len(parts)} columns (segmentation labels?)")
+        if len(parts) == 5:
+            coords = parts[1:]
+        elif len(parts) > 5 and len(parts) % 2 == 1:  # 分割多边形 cls x1 y1 … xn yn → 外接矩形
+            xs = [float(v) for v in parts[1::2]]
+            ys = [float(v) for v in parts[2::2]]
+            coords = [f"{v:.6f}" for v in ((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, max(xs) - min(xs), max(ys) - min(ys))]
+        else:
+            raise SystemExit(f"{where}:{n}: expected `cls cx cy w h` or a polygon, got {len(parts)} columns")
         target = id_map.get(int(parts[0]))
         if target is None:
             continue
-        out.append(" ".join([str(target), *parts[1:]]))
+        out.append(" ".join([str(target), *coords]))
     return "\n".join(out) + ("\n" if out else "")
 
 

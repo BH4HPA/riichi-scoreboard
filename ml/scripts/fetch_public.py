@@ -10,11 +10,11 @@ from pathlib import Path
 
 DATASETS = {
     # name: (workspace, project)  —— name 也是 configs/remap/<name>.json 的文件名。
-    # 页面 = https://universe.roboflow.com/<workspace>/<project>（2026-09 核对过存在；许可以页面为准）
-    "riichimahjongdetection": ("riichimahjongdetection", "riichi-mahjong-detection"),  # ~424 张，CC BY 4.0
-    "mahjong_yolo": ("test-wmo8i", "mahjong_yolo"),  # ~4.5k 张
-    "yolo_mahjong": ("yolo-qshla", "yolo_mahjong"),  # ~1.7k 张
-    "hust": ("hust-xq5rx", "riichi-mahjong"),  # ~256 张
+    # 页面 = https://universe.roboflow.com/<workspace>/<project>（2026-09-15 实际下载过；许可以页面为准）
+    "riichimahjongdetection": ("riichimahjongdetection", "riichi-mahjong-detection"),  # v3 1160 张，38 类（0z = 牌背），CC BY 4.0
+    "yolo_mahjong": ("yolo-qshla", "yolo_mahjong"),  # v7 4012 张，38 类（r5m/r5p/r5s + back）
+    "hust": ("hust-xq5rx", "riichi-mahjong"),  # v8 477 张，34 类（无赤五、无牌背）
+    # test-wmo8i/mahjong_yolo 已剔除：只有 218 张且 data.yaml 的 names 被 README 文本污染，标签 id 无法对应
 }
 
 RAW = Path(__file__).resolve().parent.parent / "data/raw"
