@@ -8,6 +8,38 @@ import {
 } from "@riichi/core";
 import { Badge } from "@/ui/controls";
 import { cn, formatTime } from "@/lib/utils";
+import { HandStrip, IndicatorRow, YakuChips } from "@/features/hand/HandStrip";
+import type { TileSize } from "@/features/hand/TileFace";
+
+/** 牌面形态录入的和牌：手牌 + 指示牌 + 役种。 */
+function WinHands({ entry, size }: { entry: HistoryEntry; size: TileSize }) {
+  if (entry.kind !== "tsumo" && entry.kind !== "ron") return null;
+  const wins = entry.kind === "tsumo" ? [entry.win] : entry.wins;
+  const shown = wins.filter((w) => w.hand !== null);
+  if (shown.length === 0) return null;
+  return (
+    <div className="mt-1.5 space-y-2">
+      {shown.map((w) => (
+        <div key={w.winner} className="space-y-1">
+          {shown.length > 1 && (
+            <div className="text-[11px] text-muted">{entry.names[w.winner]}</div>
+          )}
+          <HandStrip
+            closed={w.hand!.closed}
+            melds={w.hand!.melds}
+            winTile={w.hand!.winTile}
+            size={size}
+          />
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            <IndicatorRow label="宝牌指示" tiles={w.hand!.doraIndicators} />
+            <IndicatorRow label="里宝指示" tiles={w.hand!.uraIndicators} />
+          </div>
+          {w.yaku && <YakuChips yaku={w.yaku} yakuman={w.value.yakuman} />}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function DeltaCells({ entry, compact = false }: { entry: HistoryEntry; compact?: boolean }) {
   return (
@@ -64,7 +96,10 @@ export function HistoryTable({ history, tv = false }: { history: HistoryEntry[];
               <td className="px-2 py-2">
                 <DeltaCells entry={entry} />
               </td>
-              <td className="px-2 py-2 text-muted">{describeEntry(entry)}</td>
+              <td className="px-2 py-2 text-muted">
+                {describeEntry(entry)}
+                <WinHands entry={entry} size={tv ? "sm" : "xs"} />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -89,6 +124,7 @@ export function HistoryList({ history }: { history: HistoryEntry[] }) {
             <DeltaCells entry={entry} compact />
           </div>
           <p className="mt-1 text-xs text-muted">{describeEntry(entry)}</p>
+          <WinHands entry={entry} size="xs" />
         </li>
       ))}
     </ul>

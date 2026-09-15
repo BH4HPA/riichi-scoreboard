@@ -69,13 +69,14 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await ron.getByRole("combobox").first().click();
   await phones[2]!.getByRole("option", { name: "北家" }).click();
   await ron.getByRole("tab", { name: "牌面" }).click();
-  // 123m 456p 789s 789m 22p（和张 9m）
+  // 123m 4筒 赤5筒 6筒 789s 789m 22p（和张 9m）：平和 + 赤宝牌 = 2 番 30 符 → 2000
+  const keyboard = ron.getByTestId("tile-keyboard");
   for (const t of [
     "1萬",
     "2萬",
     "3萬",
     "4筒",
-    "5筒",
+    "赤5筒",
     "6筒",
     "7索",
     "8索",
@@ -86,16 +87,21 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
     "2筒",
     "9萬",
   ]) {
-    await ron.locator(".grid-cols-9 button", { hasText: t }).first().click();
+    await keyboard.getByRole("button", { name: t, exact: true }).click();
   }
   await ron.getByRole("button", { name: "计算番符" }).click();
-  await expect(ron.getByText("1 番 30 符")).toBeVisible();
+  await expect(ron.getByText("2 番 30 符")).toBeVisible();
+  await expect(ron.getByText("赤宝牌 1 番")).toBeVisible();
   await ron.getByRole("button", { name: "确认荣和" }).click();
-  await expect(tv.getByTestId("points-2")).toHaveText("26,000");
-  await expect(tv.getByTestId("points-3")).toHaveText("24,000");
+  await expect(tv.getByTestId("points-2")).toHaveText("27,000");
+  await expect(tv.getByTestId("points-3")).toHaveText("23,000");
   await expect(
-    tv.getByText("闲家 西家 荣和 北家 1 番 30 符，共 1,000 点，共收入 1,000 点。"),
+    tv.getByText("闲家 西家 荣和 北家 2 番 30 符，共 2,000 点，共收入 2,000 点。"),
   ).toBeVisible();
+  // 历史记录展示牌面：和张 9萬 单独标出，赤5筒 出现在手牌里，役种 chips
+  const historyRow = tv.getByRole("row").filter({ hasText: "西家 荣和 北家" });
+  await expect(historyRow.getByRole("img", { name: "赤5筒" })).toBeVisible();
+  await expect(historyRow.getByText("平和 1 番")).toBeVisible();
 
   await tvCtx.close();
 });

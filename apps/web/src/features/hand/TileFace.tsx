@@ -1,79 +1,94 @@
-import { isHonor, tileNumber, tileSuit, type Tile } from "@riichi/core";
+import type { Tile } from "@riichi/core";
 import { cn } from "@/lib/utils";
-import { tileLabel } from "./tileLabel";
+import { tileAssetName, tileLabel } from "./tileLabel";
+import { TILE_PX, type TileSize } from "./tileSize";
 
-const HONORS = ["東", "南", "西", "北", "白", "發", "中"];
-const SUIT_LABEL = { m: "萬", p: "筒", s: "索", z: "" } as const;
-const SUIT_COLOR = {
-  m: "text-rose-600",
-  p: "text-sky-600",
-  s: "text-emerald-600",
-  z: "text-fg",
-} as const;
+const ASSETS = import.meta.glob("../../assets/tiles/*.svg", {
+  eager: true,
+  query: "?url",
+  import: "default",
+}) as Record<string, string>;
 
+function tileUrl(tile: Tile): string {
+  return ASSETS[`../../assets/tiles/${tileAssetName(tile)}.svg`] ?? "";
+}
+
+export type { TileSize } from "./tileSize";
+
+/**
+ * 单张牌：`<img>` 引用扁平风格 SVG。
+ * - `back`：牌背（暗杠首尾）；`rotated`：横置（副露叫牌）；`selected`：和张/当前选中；`dim`：不可选。
+ */
 export function TileFace({
   tile,
   size = "md",
   selected = false,
   dim = false,
+  rotated = false,
+  back = false,
   onClick,
   className,
 }: {
   tile: Tile;
-  size?: "sm" | "md";
+  size?: TileSize;
   selected?: boolean;
   dim?: boolean;
+  rotated?: boolean;
+  back?: boolean;
   onClick?: (() => void) | undefined;
   className?: string;
 }) {
-  const suit = tileSuit(tile);
-  const honor = isHonor(tile);
-  const body = (
+  const { w, h } = TILE_PX[size];
+  const label = back ? "牌背" : tileLabel(tile);
+  const face = back ? (
     <span
+      className="block rounded-[3px] border border-slate-600 bg-slate-500 shadow-sm"
+      style={{ width: w, height: h }}
+      aria-hidden
+    />
+  ) : (
+    <img
+      src={tileUrl(tile)}
+      alt=""
+      draggable={false}
       className={cn(
-        "inline-flex flex-col items-center justify-center rounded-md border bg-white leading-none text-black shadow-sm",
-        size === "sm" ? "h-9 w-7 text-[11px]" : "h-12 w-9 text-sm",
-        selected ? "border-accent ring-2 ring-accent/50" : "border-zinc-300",
-        dim && "opacity-40",
-        className,
+        "block rounded-[3px] shadow-sm",
+        selected && "ring-2 ring-accent ring-offset-1 ring-offset-surface",
       )}
+      style={{ width: w, height: h }}
+    />
+  );
+  const body = rotated ? (
+    <span className="relative inline-block" style={{ width: h, height: w }} aria-hidden>
+      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rotate-90">
+        {face}
+      </span>
+    </span>
+  ) : (
+    face
+  );
+  const wrapped = (
+    <span
+      className={cn("inline-flex shrink-0 items-end", dim && "opacity-35", className)}
+      role="img"
+      aria-label={label}
     >
-      {honor ? (
-        <span
-          className={cn(
-            "font-semibold",
-            size === "sm" ? "text-sm" : "text-lg",
-            tile === 33 ? "text-emerald-700" : tile === 34 ? "text-rose-600" : "text-zinc-800",
-          )}
-        >
-          {HONORS[tile - 28]}
-        </span>
-      ) : (
-        <>
-          <span
-            className={cn(
-              "font-semibold tabular",
-              size === "sm" ? "text-sm" : "text-lg",
-              SUIT_COLOR[suit],
-            )}
-          >
-            {tileNumber(tile)}
-          </span>
-          <span className={cn("text-[9px]", SUIT_COLOR[suit])}>{SUIT_LABEL[suit]}</span>
-        </>
-      )}
+      {body}
     </span>
   );
-  if (!onClick) return body;
+  if (!onClick) return wrapped;
   return (
     <button
       type="button"
       onClick={onClick}
-      className="active:scale-95"
-      aria-label={tileLabel(tile)}
+      className="rounded-[3px] transition-transform active:scale-95"
+      aria-label={label}
       aria-pressed={selected}
+      disabled={dim}
     >
-      {body}
+      <span className={cn("inline-flex shrink-0 items-end", dim && "opacity-35", className)}>
+        {body}
+      </span>
     </button>
   );
 }
