@@ -2,7 +2,6 @@ import { Crown } from "lucide-react";
 import {
   computeRanks,
   dealerOf,
-  formatDiff,
   formatPoints,
   SEATS,
   WIND_LABELS,
@@ -45,7 +44,6 @@ export function PointsGrid({
       {SEATS.map((seat) => {
         const isDealer = seat === dealer && game.status !== "finished";
         const tone = rankTone(ranks[seat]!, ranks);
-        const diff = game.points[seat]! - rules.final.startPoints;
         return (
           <div
             key={seat}
@@ -84,14 +82,9 @@ export function PointsGrid({
               >
                 <span data-testid={`points-${seat}`}>{formatPoints(game.points[seat]!)}</span>
               </span>
-              <div className="flex flex-col items-end gap-1">
-                <Badge tone={tone} size={tv ? "md" : "sm"}>
-                  第 {ranks[seat]} 名
-                </Badge>
-                <span className={cn("text-xs tabular", diff >= 0 ? "text-pos" : "text-neg")}>
-                  {formatDiff(diff)}
-                </span>
-              </div>
+              <Badge tone={tone} size={tv ? "md" : "sm"}>
+                第 {ranks[seat]} 名
+              </Badge>
             </div>
           </div>
         );
