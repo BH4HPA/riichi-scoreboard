@@ -90,7 +90,10 @@ export function SeatCards({
                 {p.name}
               </span>
               <ReadyBadge ready={ready[seat] === true} />
-              <LogOut className="h-4 w-4 text-muted" aria-hidden />
+              {/* 与本地玩家卡的离座按钮同尺寸，右侧对齐 */}
+              <span className="p-1.5 text-muted" aria-hidden>
+                <LogOut className="h-4 w-4" />
+              </span>
             </button>
           );
         }
