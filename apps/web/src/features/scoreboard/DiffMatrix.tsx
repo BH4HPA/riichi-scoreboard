@@ -18,9 +18,9 @@ export function DiffMatrix({
   const ranks = computeRanks(game.points, rules.final.tieRule);
   return (
     <div className="overflow-x-auto">
-      <table className={cn("w-full border-collapse text-sm", tv && "text-base")}>
+      <table className={cn("w-full border-collapse", tv ? "text-lg" : "text-sm")}>
         <thead>
-          <tr className="text-xs text-muted">
+          <tr className={cn("text-muted", tv ? "text-sm" : "text-xs")}>
             <th className="px-2 py-1.5 text-left font-medium">点差</th>
             {order.map((s) => (
               <th key={s} className="max-w-24 truncate px-2 py-1.5 text-right font-medium">
@@ -32,9 +32,11 @@ export function DiffMatrix({
         <tbody>
           {order.map((row) => (
             <tr key={row} className="border-t border-border">
-              <td className="px-2 py-1.5">
+              <td className={cn("px-2", tv ? "py-2" : "py-1.5")}>
                 <div className="flex items-center gap-1.5">
-                  <Badge tone="outline">{ranks[row]}</Badge>
+                  <Badge tone="outline" size={tv ? "md" : "sm"}>
+                    {ranks[row]}
+                  </Badge>
                   <span className="max-w-32 truncate">{names[row]}</span>
                 </div>
               </td>
@@ -44,7 +46,8 @@ export function DiffMatrix({
                   <td
                     key={col}
                     className={cn(
-                      "px-2 py-1.5 text-right tabular",
+                      "px-2 text-right tabular",
+                      tv ? "py-2" : "py-1.5",
                       row === col
                         ? "text-muted/50"
                         : d > 0

@@ -1,16 +1,26 @@
 import { useState } from "react";
 import { XCircle } from "lucide-react";
-import { Button } from "@/ui/button";
+import { Button, type ButtonProps } from "@/ui/button";
 import { useCommand } from "@/ws/useRoom";
 import { ConfirmDialog } from "@/features/settlement/OtherDialogs";
 
 /** 解散房间：二次确认后发命令；服务端随后断开所有连接，主控台收到断开后自动建新房。 */
-export function DissolveButton({ code }: { code: string }) {
+export function DissolveButton({
+  code,
+  size = "md",
+  variant = "outline",
+  className,
+}: {
+  code: string;
+  size?: ButtonProps["size"];
+  variant?: ButtonProps["variant"];
+  className?: string;
+}) {
   const send = useCommand();
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button variant="ghost" size="sm" className="text-neg" onClick={() => setOpen(true)}>
+      <Button variant={variant} size={size} className={className} onClick={() => setOpen(true)}>
         <XCircle className="h-4 w-4" /> 解散房间
       </Button>
       <ConfirmDialog

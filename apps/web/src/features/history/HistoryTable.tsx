@@ -21,10 +21,6 @@ function winHands(entry: HistoryEntry): WinRecord[] {
   return wins.filter((w) => w.hand !== null);
 }
 
-function winHandsCount(entry: HistoryEntry): number {
-  return winHands(entry).length;
-}
-
 /** 手牌 + 指示牌 + 役种。 */
 function WinHands({ entry, size }: { entry: HistoryEntry; size: TileSize }) {
   const shown = winHands(entry);
@@ -53,9 +49,23 @@ function WinHands({ entry, size }: { entry: HistoryEntry; size: TileSize }) {
   );
 }
 
-function DeltaCells({ entry, compact = false }: { entry: HistoryEntry; compact?: boolean }) {
+function DeltaCells({
+  entry,
+  compact = false,
+  wide = false,
+}: {
+  entry: HistoryEntry;
+  compact?: boolean;
+  wide?: boolean;
+}) {
   return (
-    <div className={cn("grid grid-cols-2 gap-x-3 gap-y-0.5", compact ? "text-[11px]" : "text-xs")}>
+    <div
+      className={cn(
+        "grid gap-y-0.5",
+        wide ? "grid-cols-4 gap-x-4 text-sm" : "grid-cols-2 gap-x-3",
+        !wide && (compact ? "text-[11px]" : "text-xs"),
+      )}
+    >
       {SEATS.map((s) => {
         const d = entry.deltas[s]!;
         return (
@@ -81,50 +91,48 @@ export function HistoryTable({ history, tv = false }: { history: HistoryEntry[];
   }
   return (
     <div className="overflow-x-auto">
-      <table className={cn("w-full min-w-[640px] border-collapse text-sm", tv && "text-base")}>
-        <thead className="sticky top-0 bg-surface text-xs text-muted">
+      <table className={cn("w-full border-collapse", tv ? "text-base" : "text-sm")}>
+        <thead className={cn("sticky top-0 bg-surface text-muted", tv ? "text-sm" : "text-xs")}>
           <tr>
-            <th className={cn("px-2 py-1.5 text-left font-medium", tv ? "w-40" : "w-28")}>场次</th>
-            <th className="w-16 px-2 py-1.5 text-left font-medium">庄家</th>
-            <th className="w-28 px-2 py-1.5 text-left font-medium">立直玩家</th>
-            <th className="w-44 px-2 py-1.5 text-left font-medium">点差变动</th>
-            <th className="px-2 py-1.5 text-left font-medium">结算信息</th>
+            <th className={cn("px-2 py-1.5 text-left font-medium", tv ? "w-44" : "w-28")}>场次</th>
+            <th className="w-24 px-2 py-1.5 text-left font-medium">庄家</th>
+            <th className="w-32 px-2 py-1.5 text-left font-medium">立直玩家</th>
+            <th className="px-2 py-1.5 text-left font-medium">点差变动</th>
           </tr>
         </thead>
         <tbody>
-          {history.map((entry) => {
-            const hasHands = winHandsCount(entry) > 0;
-            return (
-              <Fragment key={entry.seq}>
-                <tr className={cn("border-t border-border align-top", hasHands && "border-b-0")}>
-                  <td className="px-2 py-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="tabular">{roundLabel(entry.kyoku, entry.honba)}</span>
-                      <Badge tone="outline">{ENTRY_KIND_LABELS[entry.kind]}</Badge>
-                    </div>
-                    <div className="text-[11px] text-muted">{formatTime(entry.at)}</div>
-                  </td>
-                  <td className="px-2 py-2">{entry.names[entry.dealer]}</td>
-                  <td className="px-2 py-2 text-muted">
-                    {entry.riichi.length
-                      ? entry.riichi.map((s) => entry.names[s]).join("、")
-                      : "无"}
-                  </td>
-                  <td className="px-2 py-2">
-                    <DeltaCells entry={entry} />
-                  </td>
-                  <td className="px-2 py-2 text-muted">{describeEntry(entry)}</td>
-                </tr>
-                {hasHands && (
-                  <tr>
-                    <td colSpan={5} className="px-2 pb-2">
-                      <WinHands entry={entry} size={tv ? "sm" : "xs"} />
-                    </td>
-                  </tr>
-                )}
-              </Fragment>
-            );
-          })}
+          {history.map((entry) => (
+            <Fragment key={entry.seq}>
+              <tr className="border-t border-border align-top">
+                <td className="px-2 pt-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="tabular">{roundLabel(entry.kyoku, entry.honba)}</span>
+                    <Badge tone="outline" size={tv ? "md" : "sm"}>
+                      {ENTRY_KIND_LABELS[entry.kind]}
+                    </Badge>
+                  </div>
+                  <div className={cn("text-muted", tv ? "text-xs" : "text-[11px]")}>
+                    {formatTime(entry.at)}
+                  </div>
+                </td>
+                <td className="px-2 pt-2">{entry.names[entry.dealer]}</td>
+                <td className="px-2 pt-2 text-muted">
+                  {entry.riichi.length ? entry.riichi.map((s) => entry.names[s]).join("、") : "无"}
+                </td>
+                <td className="px-2 pt-2">
+                  <DeltaCells entry={entry} wide={tv} />
+                </td>
+              </tr>
+              <tr>
+                <td colSpan={4} className="px-2 pb-2 pt-1">
+                  <p className={cn("text-muted", tv ? "text-sm" : "text-xs")}>
+                    {describeEntry(entry)}
+                  </p>
+                  <WinHands entry={entry} size={tv ? "sm" : "xs"} />
+                </td>
+              </tr>
+            </Fragment>
+          ))}
         </tbody>
       </table>
     </div>

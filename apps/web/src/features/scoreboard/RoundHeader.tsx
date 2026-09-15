@@ -30,9 +30,9 @@ export function RoundHeader({
       className={cn("flex flex-wrap items-center gap-x-4 gap-y-2", tv ? "text-base" : "text-sm")}
     >
       <div className="flex items-center gap-2">
-        <span className={cn("font-semibold tabular", tv ? "text-3xl" : "text-lg")}>{label}</span>
+        <span className={cn("font-semibold tabular", tv ? "text-xl" : "text-lg")}>{label}</span>
         {game.status !== "finished" && (
-          <Badge tone="accent" className={tv ? "text-sm" : ""}>
+          <Badge tone="accent" size={tv ? "md" : "sm"}>
             庄家：{names[dealerOf(game.kyoku)]}
           </Badge>
         )}
@@ -43,8 +43,12 @@ export function RoundHeader({
           {formatPoints(tableSticks)}
         </span>
         <span>点</span>
-        <Badge tone="outline">{game.kyotaku} 棒</Badge>
-        <Badge tone="outline">{game.honba} 本场</Badge>
+        <Badge tone="outline" size={tv ? "md" : "sm"}>
+          {game.kyotaku} 棒
+        </Badge>
+        <Badge tone="outline" size={tv ? "md" : "sm"}>
+          {game.honba} 本场
+        </Badge>
       </div>
       <div className="ml-auto flex items-center gap-4 text-muted">
         <span className="flex items-center gap-1">

@@ -26,8 +26,13 @@ export function Label({ className, ...props }: ComponentProps<"label">) {
 export function Badge({
   className,
   tone = "neutral",
+  size = "sm",
   ...props
-}: ComponentProps<"span"> & { tone?: "neutral" | "accent" | "pos" | "neg" | "outline" }) {
+}: ComponentProps<"span"> & {
+  tone?: "neutral" | "accent" | "pos" | "neg" | "outline";
+  /** md：电视端可读尺寸 */
+  size?: "sm" | "md";
+}) {
   const tones = {
     neutral: "bg-surface-2 text-fg",
     accent: "bg-accent text-accent-fg",
@@ -38,7 +43,8 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium leading-none",
+        "inline-flex items-center gap-1 rounded-md font-medium leading-none",
+        size === "md" ? "px-2 py-1 text-sm" : "px-1.5 py-0.5 text-[11px]",
         tones[tone],
         className,
       )}

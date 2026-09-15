@@ -63,16 +63,16 @@ export function PointsGrid({
                 src={seats[seat]?.avatar ?? null}
                 size={tv ? "lg" : "md"}
               />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 text-xs text-muted">
-                  <span>{WIND_LABELS[seatWind(seat, dealer)]}</span>
-                  <span className={cn("truncate text-fg", tv ? "text-lg" : "text-sm")}>
-                    {names[seat]}
-                  </span>
-                </div>
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <span className={cn("truncate font-medium", tv ? "text-xl" : "text-sm")}>
+                  {names[seat]}
+                </span>
+                <Badge tone="outline" size={tv ? "md" : "sm"} className="shrink-0">
+                  {WIND_LABELS[seatWind(seat, dealer)]}
+                </Badge>
               </div>
               {isDealer && (
-                <Badge tone="accent" aria-label="庄家">
+                <Badge tone="accent" size={tv ? "md" : "sm"} aria-label="庄家" className="shrink-0">
                   <Crown className="h-3 w-3" />
                   {tv && "庄家"}
                 </Badge>

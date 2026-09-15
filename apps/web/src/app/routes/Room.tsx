@@ -89,12 +89,8 @@ function PhoneGame() {
   const closeSheet = (open: boolean) => !open && setSheet(null);
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col gap-3 px-4 pb-24 pt-4">
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col gap-3 px-4 pb-28 pt-4">
       <RoundHeader game={game.present} names={names} rules={room.rules} />
-      <div className="flex items-center gap-2 text-xs text-muted">
-        <span>房间 {room.code}</span>
-        <ConnectionBadge />
-      </div>
       <PointsGrid
         game={game.present}
         seats={room.seats}
@@ -126,6 +122,12 @@ function PhoneGame() {
         className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 backdrop-blur"
         aria-label="功能"
       >
+        <div className="mx-auto flex max-w-md items-center justify-between px-4 pt-1.5 text-[11px] text-muted">
+          <span>
+            房间 <span className="font-semibold tabular text-fg">{room.code}</span>
+          </span>
+          <ConnectionBadge />
+        </div>
         <div className="mx-auto grid max-w-md grid-cols-4">
           {NAV.map(([key, Icon, label]) => (
             <button

@@ -51,7 +51,7 @@ export function Console() {
           <ConsoleLobby
             room={room}
             onNewRoom={newRoom}
-            extraActions={<DissolveButton code={room.code} />}
+            extraActions={<DissolveButton code={room.code} size="lg" className="text-neg" />}
           />
         ) : (
           <div className="flex h-dvh flex-col gap-4 p-6">
@@ -66,7 +66,6 @@ export function Console() {
               <Button variant="outline" size="sm" onClick={() => setPanelOpen(true)}>
                 <PanelRightOpen className="h-4 w-4" /> 操作
               </Button>
-              <DissolveButton code={room.code} />
             </header>
 
             <main className="grid min-h-0 flex-1 grid-cols-[2fr_3fr] gap-4">
@@ -101,13 +100,19 @@ export function Console() {
             </main>
 
             <Dialog open={panelOpen} onOpenChange={setPanelOpen}>
-              <DialogContent title="主控台操作" description="也可以用手机远程操作。">
+              <DialogContent
+                title="主控台操作"
+                description="也可以用手机远程操作。"
+                className="sm:max-w-2xl"
+              >
                 <ControlPanel
                   game={game}
                   names={names}
                   rules={room.rules}
                   mirror={false}
                   mySeat={null}
+                  size="lg"
+                  roomActions={<DissolveButton code={room.code} size="lg" variant="danger" />}
                 />
               </DialogContent>
             </Dialog>

@@ -153,7 +153,8 @@ test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手�
   await expect(tv.getByTestId("points-0")).toHaveText("25,000");
   await expect(phones[1]!.getByTestId("points-1")).toHaveText("25,000");
 
-  // 对局中解散：手机看到提示，主控台自动开新房，且没有错误提示
+  // 对局中解散（入口在「操作」对话框）：手机看到提示，主控台自动开新房，且没有错误提示
+  await tv.getByRole("button", { name: "操作" }).click();
   await tv.getByRole("button", { name: "解散房间" }).click();
   await tv.getByRole("button", { name: "解散", exact: true }).click();
   await expect(phones[0]!.getByText(`房间 ${code} 已解散`)).toBeVisible();

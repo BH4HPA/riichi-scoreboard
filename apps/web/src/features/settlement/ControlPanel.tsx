@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Check, RefreshCcw, Redo2, Undo2 } from "lucide-react";
 import type { GameView, RoomRules, Seat } from "@riichi/core";
 import { Button } from "@/ui/button";
@@ -24,13 +24,16 @@ export function ControlPanel({
   mirror,
   mySeat,
   size = "md",
+  roomActions,
 }: {
   game: GameView;
   names: string[];
   rules: RoomRules;
   mirror: boolean;
   mySeat: Seat | null;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
+  /** 主控台专属的房间级操作（如解散房间），放在最后一段 */
+  roomActions?: ReactNode;
 }) {
   const send = useCommand();
   const [dialog, setDialog] = useState<DialogKey>(null);
@@ -127,6 +130,12 @@ export function ControlPanel({
           </Button>
         </div>
       </section>
+      {roomActions && (
+        <section>
+          <h3 className="mb-1.5 text-xs font-medium text-muted">房间</h3>
+          <div className="grid grid-cols-3 gap-1.5">{roomActions}</div>
+        </section>
+      )}
 
       <TsumoDialog
         open={dialog === "tsumo"}
