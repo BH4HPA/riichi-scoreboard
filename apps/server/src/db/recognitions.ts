@@ -7,7 +7,6 @@ export interface RecognitionRow {
   player_id: string;
   photo_key: string;
   model_id: string;
-  engine: string | null;
   ms: number | null;
   detections: string | null;
   recognized: string | null;
@@ -38,7 +37,6 @@ export class RecognitionsRepo {
       sets.push(`${column} = ?`);
       args.push(value);
     };
-    if (patch.engine !== undefined) set("engine", patch.engine);
     if (patch.modelId !== undefined) set("model_id", patch.modelId);
     if (patch.ms !== undefined) set("ms", patch.ms);
     if (patch.detections !== undefined) set("detections", JSON.stringify(patch.detections));

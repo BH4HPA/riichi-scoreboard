@@ -4,7 +4,6 @@ import { createValueDraft } from "../settlement/valueDraft";
 import { applyRecognized } from "./applyRecognized";
 
 const result: RecognitionResult = {
-  engine: "browser",
   modelId: "m",
   ms: 812,
   detections: [],
@@ -32,7 +31,7 @@ describe("applyRecognized", () => {
     expect(next.hand.uraIndicators).toEqual([TILE.P8]);
     expect(next.hand.riichi).toBe(true);
     expect(next.evaluated).toBeNull();
-    expect(next.recognition).toMatchObject({ key: "k1", id: null, engine: "browser", ms: 812 });
+    expect(next.recognition).toMatchObject({ key: "k1", id: null, ms: 812 });
     expect(next.recognition!.warnings.map((w) => w.code)).toEqual(["count", "extra_rows"]);
   });
 

@@ -2,27 +2,11 @@ import path from "node:path";
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
 
 const FIXTURE = path.join(import.meta.dirname, "fixtures/hand.jpg");
+/** 假检测器（ml/scripts/e2e_detector.py）：恒定输出下面这副手牌的检测框，链路其余部分都是真的 */
+const DETECTOR = path.join(import.meta.dirname, "fixtures/detector.onnx");
 
 /** 123m 4筒 赤5筒 6筒 789s 789m 22p，和张 9m：平和 + 赤宝牌 = 2 番 30 符 */
-const HAND = {
-  closed: [1, 2, 3, 13, 36, 15, 25, 26, 27, 7, 8, 11, 11, 9],
-  melds: [],
-  winTile: 9,
-  doraIndicators: [],
-  uraIndicators: [],
-};
-
-const SERVER_RESULT = {
-  id: "rec-e2e",
-  result: {
-    engine: "server",
-    modelId: "e2e",
-    ms: 321,
-    detections: [],
-    hand: HAND,
-    warnings: [{ code: "low_conf", message: "1 张牌置信度较低，请核对" }],
-  },
-};
+const CLOSED = [1, 2, 3, 13, 36, 15, 25, 26, 27, 7, 8, 11, 11, 9];
 
 async function phone(browser: Browser, code: string): Promise<Page> {
   const ctx = await browser.newContext({ viewport: { width: 400, height: 800 } });
@@ -60,24 +44,19 @@ async function openRonHandTab(browser: Browser): Promise<{ phone: Page; dialog: 
   return { phone: p, dialog };
 }
 
-test("服务器引擎：拍照 → 裁剪 → 识别结果填入牌面并自动算番 → 结算后回填真值", async ({
+test("拍照 → 裁剪 → 本机推理填入牌面并自动算番 → 检测框与结算后的真值都回填", async ({
   browser,
 }) => {
   const { phone: p, dialog } = await openRonHandTab(browser);
-  await p.route("**/api/recognitions?infer=1", (route) =>
-    route.fulfill({
-      status: 201,
-      contentType: "application/json",
-      body: JSON.stringify(SERVER_RESULT),
-    }),
+  await p.route("**/riichi/models/*.onnx", (route) =>
+    route.fulfill({ path: DETECTOR, contentType: "application/octet-stream" }),
   );
-  const patches: unknown[] = [];
-  await p.route("**/api/recognitions/rec-e2e", async (route) => {
-    patches.push(route.request().postDataJSON());
+  const patches: Record<string, unknown>[] = [];
+  await p.route("**/api/recognitions/*", async (route) => {
+    patches.push(route.request().postDataJSON() as Record<string, unknown>);
     await route.fulfill({ status: 204 });
   });
 
-  await dialog.getByRole("button", { name: "服务器识别" }).click();
   await dialog.getByTestId("recognize-file").setInputFiles(FIXTURE);
   const cropDialog = p.getByRole("dialog").filter({ hasText: "裁剪照片" });
   await expect(cropDialog).toBeVisible();
@@ -85,7 +64,9 @@ test("服务器引擎：拍照 → 裁剪 → 识别结果填入牌面并自动�
   await expect(confirmCrop).toBeEnabled();
   await confirmCrop.click();
 
-  await expect(dialog.getByTestId("recognize-status")).toHaveText("服务器识别 · 321 ms");
+  await expect(dialog.getByTestId("recognize-status")).toHaveText(/^识别完成 · \d+ ms$/, {
+    timeout: 30_000,
+  });
   await expect(dialog.getByText("1 张牌置信度较低，请核对")).toBeVisible();
   const handArea = dialog.getByTestId("hand-area");
   await expect(handArea.getByRole("button", { name: "赤5筒" })).toBeVisible();
@@ -94,13 +75,19 @@ test("服务器引擎：拍照 → 裁剪 → 识别结果填入牌面并自动�
 
   await dialog.getByRole("button", { name: "确认荣和" }).click();
   await expect(p.getByTestId("points-2")).toHaveText("27,000");
-  await expect.poll(() => patches.length).toBeGreaterThan(0);
-  const corrected = (patches[0] as { corrected: { closed: number[]; winTile: number } }).corrected;
-  expect(corrected.closed).toEqual(HAND.closed);
+  await expect.poll(() => patches.some((x) => "corrected" in x)).toBe(true);
+  const recognized = patches.find((x) => "detections" in x)!;
+  expect((recognized.detections as unknown[]).length).toBe(14);
+  expect((recognized.recognized as { winTile: number }).winTile).toBe(9);
+  const corrected = patches.find((x) => "corrected" in x)!.corrected as {
+    closed: number[];
+    winTile: number;
+  };
+  expect(corrected.closed).toEqual(CLOSED);
   expect(corrected.winTile).toBe(9);
 });
 
-test("本机引擎：模型加载失败 → 错误提示、牌面不变，照片仍已上传", async ({ browser }) => {
+test("模型加载失败 → 错误提示、牌面不变，照片仍已上传", async ({ browser }) => {
   const { phone: p, dialog } = await openRonHandTab(browser);
   await p.route("**/riichi/models/*.onnx", (route) => route.abort());
   const uploaded = p.waitForRequest(

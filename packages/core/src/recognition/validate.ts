@@ -3,7 +3,7 @@ import { validateHandShape } from "../reducer/validateCommand";
 import type { HandInput } from "../types/state";
 import { MAX_TILE } from "../types/tiles";
 import { RECOGNITION_CLASSES } from "./classes";
-import type { Detection, RecognitionEngine, RecognitionPatch, RecognizedHand } from "./types";
+import type { Detection, RecognitionPatch, RecognizedHand } from "./types";
 
 export const MAX_DETECTIONS = 300;
 
@@ -37,6 +37,7 @@ function detection(v: unknown): Detection {
   if (conf < 0 || conf > 1) bad("置信度无效");
   if (!Array.isArray(v.box) || v.box.length !== 4) bad("检测框无效");
   const box = v.box.map((n) => finite(n, "检测框")) as [number, number, number, number];
+  if (box[2] <= box[0] || box[3] <= box[1]) bad("检测框无效");
   return { cls, conf, box };
 }
 
@@ -67,10 +68,6 @@ function corrected(v: unknown): HandInput {
 export function validateRecognitionPatch(v: unknown): RecognitionPatch {
   if (!isRecord(v)) bad("请求体无效");
   const patch: RecognitionPatch = {};
-  if (v.engine !== undefined) {
-    if (v.engine !== "browser" && v.engine !== "server") bad("引擎无效");
-    patch.engine = v.engine as RecognitionEngine;
-  }
   if (v.modelId !== undefined) {
     if (typeof v.modelId !== "string" || !/^[0-9a-f-]{36}$/.test(v.modelId)) bad("模型 id 无效");
     patch.modelId = v.modelId;

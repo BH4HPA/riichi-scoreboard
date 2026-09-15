@@ -91,6 +91,8 @@ CREATE TABLE recognitions (
 );
 CREATE INDEX idx_recognitions_player ON recognitions (player_id, created_at);
 `,
+  // v4：只剩手机浏览器一种推理引擎，engine 列没有信息量
+  `ALTER TABLE recognitions DROP COLUMN engine;`,
 ];
 
 export type Database = DatabaseSync;

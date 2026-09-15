@@ -5,9 +5,11 @@
 流程：模型检测 → 每类取置信度最高的框（多出的框打印为可疑）→ 框内找牌面轮廓、最小外接矩形 →
 整张照片的牌共用同一个旋转角（取中位数），方向由多数牌「转正后高大于宽」投票决定 →
 转正后紧贴裁剪 → data/sprites/<class>/<图名>.png；
-每张图另存 data/sprites/contact_<图名>.jpg 拼图供肉眼核对：认错的把 png 挪到正确类目录或删掉。
+每张图另存 data/sprites/contact_<图名>.jpg 拼图供肉眼核对：认错的把 png 挪到正确类目录或删掉，
+然后 --contact-only 按目录现状重画拼图再核对一遍。
 模型认不出牌背时按「饱和度高于白牌面」的色块兜底。
-用法：uv run scripts/sprites.py <weights> data/family [--out data/sprites] [--conf 0.25]"""
+用法：uv run scripts/sprites.py <weights> data/family [--out data/sprites] [--conf 0.25]
+      uv run scripts/sprites.py --contact-only [--out data/sprites]"""
 
 import argparse
 import json
@@ -135,15 +137,30 @@ def contact_sheet(sprites: dict, classes: list, path: Path, cell=90):
     sheet.save(path, quality=90)
 
 
+def redraw_contacts(out: Path, classes: list[str]) -> int:
+    """按 data/sprites/<class>/<图名>.png 的现状重画每张图的拼图（手工挪动/删除之后用）。"""
+    stems = sorted({p.stem for c in classes for p in (out / c).glob("*.png")})
+    for stem in stems:
+        sprites = {c: cv2.imread(str(out / c / f"{stem}.png")) for c in classes if (out / c / f"{stem}.png").exists()}
+        contact_sheet(sprites, classes, out / f"contact_{stem}.jpg")
+        print(f"{stem}: {len(sprites)} sprites, missing {[c for c in classes if c not in sprites]}")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("weights")
-    ap.add_argument("images")
+    ap.add_argument("weights", nargs="?")
+    ap.add_argument("images", nargs="?")
     ap.add_argument("--out", default=str(ML / "data/sprites"))
     ap.add_argument("--conf", type=float, default=0.25)
+    ap.add_argument("--contact-only", action="store_true", help="不检测，只按目录现状重画拼图")
     args = ap.parse_args()
 
     classes: list[str] = json.loads(MANIFEST.read_text(encoding="utf-8"))["classes"]
+    if args.contact_only:
+        return redraw_contacts(Path(args.out), classes)
+    if not args.weights or not args.images:
+        ap.error("weights and images are required unless --contact-only")
     images = sorted(p for p in Path(args.images).iterdir() if p.suffix.lower() in IMAGE_SUFFIXES)
     if not images:
         print(f"no images in {args.images}", file=sys.stderr)

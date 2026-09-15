@@ -19,7 +19,7 @@ const hand = {
 describe("validateRecognitionPatch", () => {
   it("只保留给出的字段", () => {
     const p = validateRecognitionPatch({
-      engine: "browser",
+      modelId: "12b2722c-cbce-4e9b-9bd1-341280bd0204",
       ms: 812,
       detections: [{ cls: 0, conf: 0.9, box: [1, 2, 3, 4] }],
       recognized: {
@@ -30,7 +30,7 @@ describe("validateRecognitionPatch", () => {
         uraIndicators: [],
       },
     });
-    expect(p.engine).toBe("browser");
+    expect(p.modelId).toBe("12b2722c-cbce-4e9b-9bd1-341280bd0204");
     expect(p.ms).toBe(812);
     expect(p.detections).toHaveLength(1);
     expect(p.recognized?.winTile).toBe(0);
@@ -38,9 +38,9 @@ describe("validateRecognitionPatch", () => {
     expect(validateRecognitionPatch({ corrected: hand }).corrected?.winTile).toBe(9);
   });
 
-  it("拒绝：空体、坏引擎、负耗时、检测框过多/NaN/越界类、非法手牌", () => {
+  it("拒绝：空体、坏模型 id、负耗时、检测框过多/NaN/越界类、非法手牌", () => {
     expect(() => validateRecognitionPatch({})).toThrow();
-    expect(() => validateRecognitionPatch({ engine: "gpu" })).toThrow();
+    expect(() => validateRecognitionPatch({ modelId: "v1" })).toThrow();
     expect(() => validateRecognitionPatch({ ms: -1 })).toThrow();
     expect(() =>
       validateRecognitionPatch({
@@ -53,6 +53,9 @@ describe("validateRecognitionPatch", () => {
     expect(() =>
       validateRecognitionPatch({ detections: [{ cls: 38, conf: 1, box: [0, 0, 1, 1] }] }),
     ).toThrow();
+    expect(() =>
+      validateRecognitionPatch({ detections: [{ cls: 0, conf: 1, box: [5, 5, 5, 9] }] }),
+    ).toThrow(/检测框/);
     expect(() => validateRecognitionPatch({ corrected: { ...hand, winTile: 99 } })).toThrow(/和张/);
     expect(() =>
       validateRecognitionPatch({

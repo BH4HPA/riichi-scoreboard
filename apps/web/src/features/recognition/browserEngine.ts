@@ -27,7 +27,6 @@ export async function recognizeInBrowser(
   const detections = decodeNmsOutput(output, geom, RECOGNITION_CLASSES.length);
   const { hand, warnings } = layoutHand(detections);
   return {
-    engine: "browser",
     modelId: model.id,
     ms: Math.round(performance.now() - t0),
     detections,

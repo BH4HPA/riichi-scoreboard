@@ -88,15 +88,20 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   Phone flow (`apps/web/src/features/recognition`): pick photo → `CropDialog` (react-easy-crop; the user
   crops to hand + melds + indicators, rivers out) → `POST /api/recognitions` (raw JPEG, stored as
   `hands/<player>/…jpg` + a `recognitions` row) in parallel with in-browser inference (onnxruntime-web,
-  single-thread WASM, model fetched from the CDN) → `decodeNmsOutput` + `layoutHand` (pure TS in core)
-  → `applyRecognized` fills the `ValueDraft`, `ValuePicker` auto-evaluates → after the win command is
-  accepted the final hand is `PATCH`ed back as `corrected` (training truth). Engine pref
-  `riichi.recognition.engine`: "server" sends `?infer=1` and needs a `ServerRecognizer` injected into
-  `createApp` (none yet → 503 → automatic fallback to the browser). Layout convention (photo): closed
-  tiles contiguous with the **win tile turned sideways** at either end (3n+2 tiles); melds are groups of
-  3/4 that contain a sideways tile (or back-X-X-back = closed kan) and may sit right/below/above; rows
-  above the hand with no sideways tile and no back are indicators (top row = dora, the row nearer the
-  hand = ura). `layoutHand` never throws; it returns warnings the editor shows.
+  single-thread WASM, model fetched from the CDN; `prefetchDetector` warms it up when the phone joins a
+  room, `CameraButton` shows the download progress only if it is still not ready) → `decodeNmsOutput` +
+  `layoutHand` (pure TS in core) → `applyRecognized` fills the `ValueDraft`, `ValuePicker`
+  auto-evaluates → after the win command is accepted the final hand is `PATCH`ed back as `corrected`
+  (training truth). Inference runs only on the phone (a server engine was considered and dropped: phone
+  WASM is fast enough). Layout convention (photo): closed tiles contiguous with the **win tile turned
+  sideways** at either end (3n+2 tiles); melds are groups of 3/4 that contain a sideways tile (kan may
+  have two: the added tile is stacked sideways on top; back-X-X-back = closed kan) and may sit
+  right/below/above, usually with no gap between groups — `layoutHand` splits a contiguous run by meld
+  legality; rows above the hand with no sideways tile and no back are indicators (top row = dora, the
+  row nearer the hand = ura; ura present ⇒ riichi auto-checked). `layoutHand` never throws and is bounded
+  (memoized partition; adversarial 300-box inputs stay under a few ms); it returns warnings the editor
+  shows. `e2e/recognize.spec.ts` swaps the CDN model for `e2e/fixtures/detector.onnx`
+  (`ml/scripts/e2e_detector.py`, constant output) so the real ORT → layout → evaluate → PATCH chain runs.
 - Riichi music: `RoomView.music` (`{track, seat, at}`) is memory-only room state like `online`; a client
   sends `{type:"music", track: id | null}` (the section lives in the shared `ControlPanel`, so the console
   can press it for local players with `seat: null`), the TV plays the track from the static bucket

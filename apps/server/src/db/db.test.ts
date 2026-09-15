@@ -27,7 +27,7 @@ describe("数据库迁移", () => {
       1,
     );
     migrate(db);
-    expect(schemaVersion(db)).toBe(3);
+    expect(schemaVersion(db)).toBe(MIGRATIONS.length);
     const players = new PlayersRepo(db);
     const row = players.byToken("tok");
     expect(row).toMatchObject({ id: "p1", name: "老玩家", kind: "device", avatar: null });
@@ -42,21 +42,21 @@ describe("数据库迁移", () => {
     expect(players.byToken("")).toBeNull();
   });
 
-  it("v3：识别记录表，JSON 列往返，归属校验", () => {
+  it("v3/v4：识别记录表（engine 列已删），JSON 列往返，归属校验", () => {
     const db = new DatabaseSync(":memory:");
     migrate(db);
     const repo = new RecognitionsRepo(db);
     const id = repo.create("p1", "hands/p1/x.jpg", "model-1", 100);
     const get = () =>
       db.prepare("SELECT * FROM recognitions WHERE id = ?").get(id) as unknown as RecognitionRow;
-    expect(get()).toMatchObject({ player_id: "p1", engine: null, detections: null });
+    expect(get()).toMatchObject({ player_id: "p1", ms: null, detections: null });
+    expect(get()).not.toHaveProperty("engine");
     const detections = [
       { cls: 3, conf: 0.9, box: [1, 2, 3, 4] as [number, number, number, number] },
     ];
-    expect(repo.patch(id, "p1", { engine: "browser", ms: 812, detections }, 200)).toBe(true);
+    expect(repo.patch(id, "p1", { ms: 812, detections }, 200)).toBe(true);
     expect(repo.patch(id, "someone-else", { ms: 1 }, 300)).toBe(false);
     const row = get();
-    expect(row.engine).toBe("browser");
     expect(row.ms).toBe(812);
     expect(JSON.parse(row.detections!)).toEqual(detections);
     expect(row.updated_at).toBe(200);

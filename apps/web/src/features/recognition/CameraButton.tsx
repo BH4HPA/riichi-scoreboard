@@ -1,35 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera } from "lucide-react";
-import { RECOGNITION_MANIFEST, type RecognitionEngine, type RoomRules } from "@riichi/core";
+import { RECOGNITION_MANIFEST, type RoomRules } from "@riichi/core";
 import { useSession } from "@/api/session";
 import type { ValueDraft } from "@/features/settlement/valueDraft";
 import { Button } from "@/ui/button";
-import { ChipGroup } from "@/ui/controls";
 import { useRoomStore } from "@/ws/store";
 import { applyRecognized } from "./applyRecognized";
 import { CropDialog, type CroppedPhoto } from "./CropDialog";
-import { readEnginePref, writeEnginePref } from "./enginePref";
 import { recognizePhoto, type RecognizePhase } from "./recognize";
-
-const ENGINE_OPTIONS: { value: RecognitionEngine; label: string }[] = [
-  { value: "browser", label: "本机识别" },
-  { value: "server", label: "服务器识别" },
-];
-
-const ENGINE_LABELS: Record<RecognitionEngine, string> = {
-  browser: "本机识别",
-  server: "服务器识别",
-};
 
 const PHASE_TEXT: Record<Exclude<RecognizePhase, "loading-model">, string> = {
   uploading: "识别中…",
   running: "识别中…",
-  server: "服务器识别中…",
 };
 
 /**
- * 牌面页顶部的拍照入口：选图 → 裁剪 → 识别 → 灌进草稿（随后 ValuePicker 自动算番）。
- * 引擎可切换并显示耗时，便于对比；识别记录 id 挂在草稿上，结算确认后回填真值。
+ * 牌面页顶部的拍照入口：选图 → 裁剪 → 本机识别 → 灌进草稿（随后 ValuePicker 自动算番）。
+ * 模型通常已在进房间时预热好；没好就在这里显示下载进度。识别记录 id 挂在草稿上，结算确认后回填真值。
  */
 export function CameraButton({
   draft,
@@ -42,18 +29,12 @@ export function CameraButton({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [engine, setEngine] = useState<RecognitionEngine>(readEnginePref);
   const [phase, setPhase] = useState<RecognizePhase | null>(null);
   const [progress, setProgress] = useState(0);
   const [thumb, setThumb] = useState<string | null>(null);
   useEffect(() => () => void (thumb && URL.revokeObjectURL(thumb)), [thumb]);
 
   if (!RECOGNITION_MANIFEST.model) return null;
-
-  const pickEngine = (e: RecognitionEngine) => {
-    setEngine(e);
-    writeEnginePref(e);
-  };
 
   const run = async (photo: CroppedPhoto) => {
     setFile(null);
@@ -65,7 +46,7 @@ export function CameraButton({
     try {
       const { token } = await useSession.getState().ensure();
       setProgress(0);
-      const result = await recognizePhoto(key, photo, engine, token, {
+      const result = await recognizePhoto(key, photo, token, {
         onPhase: setPhase,
         onProgress: setProgress,
         onId: (got) => {
@@ -75,7 +56,6 @@ export function CameraButton({
             d.recognition?.key === key ? { ...d, recognition: { ...d.recognition, id: got } } : d,
           );
         },
-        onFallback: () => notify("info", "服务器识别未启用，已改用本机识别"),
       });
       onChange((d) => {
         const next = applyRecognized(d, result, rules, key);
@@ -103,7 +83,6 @@ export function CameraButton({
           <Camera className="mr-1 h-4 w-4" />
           拍照识别
         </Button>
-        <ChipGroup value={engine} onChange={pickEngine} options={ENGINE_OPTIONS} />
         {thumb && (
           <img src={thumb} alt="已识别的照片" className="ml-auto h-12 w-12 rounded object-cover" />
         )}
@@ -122,11 +101,11 @@ export function CameraButton({
       />
       <div className="text-xs text-muted" aria-live="polite" data-testid="recognize-status">
         {phase === "loading-model"
-          ? `首次使用，下载模型与运行时 ${Math.round(progress * 100)}%（约 25 MB，之后走缓存）`
+          ? `模型还在下载 ${Math.round(progress * 100)}%（约 25 MB，只下一次）`
           : phase
             ? PHASE_TEXT[phase]
             : rec
-              ? `${ENGINE_LABELS[rec.engine]} · ${rec.ms} ms`
+              ? `识别完成 · ${rec.ms} ms`
               : "拍下手牌、副露和宝牌指示牌，裁掉牌河，自动填入下方牌面"}
       </div>
       {phase === "loading-model" && (

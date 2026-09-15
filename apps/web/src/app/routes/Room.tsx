@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 import { Button } from "@/ui/button";
 import { BookOpen, History, ScrollText, User, Wifi } from "lucide-react";
@@ -24,6 +24,7 @@ import { ReferenceSheet } from "@/features/reference/ReferenceSheet";
 import { RulesEditor } from "@/features/rules/RulesEditor";
 import { ProfileEditor, StatsPanel } from "@/features/profile/ProfileEditor";
 import { useMirror } from "@/features/settlement/useMirror";
+import { prefetchDetector } from "@/features/recognition/prefetch";
 
 type Sheet = "reference" | "rules" | "history" | "me" | null;
 
@@ -35,6 +36,11 @@ export function Room() {
   const status = useRoomStore((s) => s.status);
   const closedReason = useRoomStore((s) => s.closedReason);
   const playerId = useRoomStore((s) => s.playerId);
+  // 进了房间就预热识别模型，牌局开始前下完，结算拍照时不用等
+  const joined = room !== null;
+  useEffect(() => {
+    if (joined) prefetchDetector();
+  }, [joined]);
 
   if (closedReason === "dissolved") {
     return (

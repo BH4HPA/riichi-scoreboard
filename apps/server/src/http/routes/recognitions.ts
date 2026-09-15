@@ -4,7 +4,6 @@ import { DomainError, validateRecognitionPatch } from "@riichi/core";
 import { requirePlayer, type AuthEnv } from "../../auth/deviceToken";
 import type { PlayersRepo } from "../../db/players";
 import type { RecognitionsRepo } from "../../db/recognitions";
-import { RecognizerBusy, type ServerRecognizer } from "../../recognition/recognizer";
 import type { ObjectStore } from "../../storage";
 import { PHOTO_MAX_BYTES, PhotoError, savePhoto, validatePhoto } from "../photos";
 
@@ -12,7 +11,6 @@ interface Deps {
   players: PlayersRepo;
   recognitions: RecognitionsRepo;
   store: ObjectStore;
-  recognizer: ServerRecognizer | null;
   /** 当前发布的模型 id；null = 未发布，拒收照片 */
   modelId: string | null;
 }
@@ -58,9 +56,8 @@ const tooLarge = (max: string) =>
 
 /**
  * 识别记录：
- * - POST /            原始 JPEG 体 → 存照片 + 建记录 → 201 {id, result}；`?infer=1` 由服务器引擎识别
- *                     （未启用 → 503 不落库；引擎忙 → 201 且 result 为 null，手机复用记录做本机推理）
- * - PATCH /:id        手机端回填 {engine, modelId, ms, detections, recognized}，结算后回填 {corrected}
+ * - POST /            原始 JPEG 体 → 存照片 + 建记录 → 201 {id}（推理在手机上跑）
+ * - PATCH /:id        手机端回填 {modelId, ms, detections, recognized}，结算后回填 {corrected}
  */
 export function recognitionRoutes(deps: Deps): Hono {
   const now = Date.now;
@@ -70,11 +67,7 @@ export function recognitionRoutes(deps: Deps): Hono {
   authed.use("*", requirePlayer(deps.players));
 
   authed.post("/", tooLarge("photo"), async (c) => {
-    const infer = c.req.query("infer") === "1";
     if (!deps.modelId) return c.json({ error: "no_model", message: "尚未发布识别模型" }, 409);
-    if (infer && !deps.recognizer?.ready()) {
-      return c.json({ error: "recognition_unavailable", message: "服务器识别未启用" }, 503);
-    }
     const player = c.get("player");
     const t = now();
     const bytes = new Uint8Array(await c.req.arrayBuffer());
@@ -89,27 +82,7 @@ export function recognitionRoutes(deps: Deps): Hono {
     }
     const key = await savePhoto(deps.store, player.id, bytes, t);
     const id = deps.recognitions.create(player.id, key, deps.modelId, t);
-    if (!infer) return c.json({ id, result: null }, 201);
-    try {
-      const result = await deps.recognizer!.recognize(bytes);
-      deps.recognitions.patch(
-        id,
-        player.id,
-        {
-          engine: "server",
-          modelId: result.modelId,
-          ms: result.ms,
-          detections: result.detections,
-          recognized: result.hand,
-        },
-        now(),
-      );
-      return c.json({ id, result }, 201);
-    } catch (err) {
-      // 引擎忙：照片与记录已落库，让手机复用这条记录做本机推理，不必再传一次
-      if (err instanceof RecognizerBusy) return c.json({ id, result: null }, 201);
-      throw err;
-    }
+    return c.json({ id }, 201);
   });
 
   authed.patch("/:id", tooLarge("patch"), async (c) => {

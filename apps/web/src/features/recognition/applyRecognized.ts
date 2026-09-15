@@ -1,18 +1,16 @@
 import {
   baseTile,
   isAka,
-  type RecognitionEngine,
   type RecognitionResult,
   type RecognitionWarning,
   type RoomRules,
 } from "@riichi/core";
 import type { ValueDraft } from "@/features/settlement/valueDraft";
 
-/** 草稿里挂的识别信息：本次运行的 key（等上传用）、记录 id（上传完成后才有）、引擎、耗时、提示。 */
+/** 草稿里挂的识别信息：本次运行的 key（等上传用）、记录 id（上传完成后才有）、耗时、提示。 */
 export interface DraftRecognition {
   key: string;
   id: string | null;
-  engine: RecognitionEngine;
   ms: number;
   warnings: RecognitionWarning[];
 }
@@ -63,6 +61,6 @@ export function applyRecognized(
       riichi,
     },
     evaluated: null,
-    recognition: { key, id: null, engine: result.engine, ms: result.ms, warnings },
+    recognition: { key, id: null, ms: result.ms, warnings },
   };
 }
