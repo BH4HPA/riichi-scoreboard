@@ -43,7 +43,7 @@ test("手机 UA 直接看到加入面板；HTTP 下扫码入口隐藏并提示�
   // 正确房间码（小写也可）：输满自动进房
   await page.getByLabel("房间码").fill(code.toLowerCase());
   await expect(page).toHaveURL(new RegExp(`/r/${code}$`));
-  await expect(page.getByText("选择座位")).toBeVisible();
+  await expect(page.getByTestId("seat-0")).toBeVisible();
   await ctx.close();
   await tvCtx.close();
 });

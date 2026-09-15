@@ -5,7 +5,7 @@ async function phone(browser: Browser, code: string): Promise<Page> {
   const ctx = await browser.newContext({ viewport: { width: 400, height: 800 } });
   const page = await ctx.newPage();
   await page.goto(`/r/${code}`);
-  await expect(page.getByText("选择座位")).toBeVisible();
+  await expect(page.getByTestId("seat-0")).toBeVisible();
   return page;
 }
 
