@@ -72,6 +72,10 @@ test("截图：番符表与主控台", async ({ browser }) => {
   await tv.waitForTimeout(500);
   await tv.screenshot({ path: `${OUT}/tv-ref-yakuman.png` });
   await phones[1]!.screenshot({ path: `${OUT}/phone-ref-yakuman.png` });
+  await dlg.getByRole("tab", { name: "二番" }).click();
+  await phones[1]!.getByText("对对和").waitFor();
+  await phones[1]!.getByText("对对和").scrollIntoViewIfNeeded();
+  await phones[1]!.screenshot({ path: `${OUT}/phone-ref-2han.png` });
   await dlg.getByRole("tab", { name: "点数计算" }).click();
   await tv.getByText("闲家点数表").waitFor();
   await tv.waitForTimeout(300);

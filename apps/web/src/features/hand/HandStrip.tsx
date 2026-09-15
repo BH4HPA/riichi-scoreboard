@@ -2,12 +2,16 @@ import { tileOrder, type Meld, type Tile } from "@riichi/core";
 import { cn } from "@/lib/utils";
 import { TileFace, type TileSize } from "./TileFace";
 
-/** 手牌展示：暗牌按牌序、和张右置留空隙、副露成组（明副露首张横置，暗杠首尾牌背）。 */
+/**
+ * 手牌展示：暗牌按牌序、和张右置留空隙、副露成组（明副露首张横置，暗杠首尾牌背）。
+ * wrap=false 时不换行，由调用方提供横向滚动容器（手机番符表）。
+ */
 export function HandStrip({
   closed,
   melds,
   winTile = null,
   size = "sm",
+  wrap = true,
   className,
 }: {
   closed: readonly Tile[];
@@ -15,6 +19,7 @@ export function HandStrip({
   /** 和张（精确码）；null 表示不单独标出 */
   winTile?: Tile | null;
   size?: TileSize;
+  wrap?: boolean;
   className?: string;
 }) {
   const rest = [...closed];
@@ -24,7 +29,13 @@ export function HandStrip({
   }
   rest.sort((a, b) => tileOrder(a) - tileOrder(b));
   return (
-    <div className={cn("flex flex-wrap items-end gap-x-3 gap-y-1", className)}>
+    <div
+      className={cn(
+        "flex items-end gap-x-3 gap-y-1",
+        wrap ? "flex-wrap" : "w-max flex-nowrap",
+        className,
+      )}
+    >
       <div className="flex items-end gap-px">
         {rest.map((t, i) => (
           <TileFace key={i} tile={t} size={size} />

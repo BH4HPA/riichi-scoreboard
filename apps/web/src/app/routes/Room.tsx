@@ -150,7 +150,11 @@ function PhoneGame() {
         </DialogContent>
       </Dialog>
       <Dialog open={sheet === "reference"} onOpenChange={closeSheet}>
-        <DialogContent title="番符表" description="打开时电视会同步显示" className="sm:max-w-2xl">
+        <DialogContent
+          title="番符表"
+          description="打开时电视会同步显示"
+          className="h-[92dvh] sm:max-w-2xl"
+        >
           <ReferenceSheet rules={room.rules} view={refView} onViewChange={setRefView} />
         </DialogContent>
       </Dialog>

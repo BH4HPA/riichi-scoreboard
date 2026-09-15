@@ -36,12 +36,15 @@ function YakuCard({ info, tv }: { info: YakuInfo; tv: boolean }) {
         <p className={cn("text-muted", tv ? "text-base" : "text-sm")}>{info.description}</p>
         {info.example && (
           <>
-            <HandStrip
-              closed={info.example.closed}
-              melds={info.example.melds}
-              winTile={info.example.winTile}
-              size={tv ? "md" : "sm"}
-            />
+            <div className={cn(!tv && "-mx-3 overflow-x-auto px-3 pb-1")}>
+              <HandStrip
+                closed={info.example.closed}
+                melds={info.example.melds}
+                winTile={info.example.winTile}
+                size={tv ? "md" : "sm"}
+                wrap={tv}
+              />
+            </div>
             <div className="flex flex-wrap gap-x-3">
               <IndicatorRow label="宝牌指示" tiles={info.example.doraIndicators} size="sm" />
               <IndicatorRow label="里宝指示" tiles={info.example.uraIndicators} size="sm" />

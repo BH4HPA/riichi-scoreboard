@@ -40,10 +40,14 @@ export function TileFace({
 }) {
   const { w, h } = TILE_PX[size];
   const label = back ? "牌背" : tileLabel(tile);
+  // 横置：外框固定为 h×w，图片本体绕左上角旋转 90° 再平移进框；不依赖 preflight 的 img max-width
+  const rotation = rotated
+    ? { transform: "rotate(90deg) translateY(-100%)", transformOrigin: "top left" }
+    : {};
   const face = back ? (
     <span
       className="block rounded-[3px] border border-slate-600 bg-slate-500 shadow-sm"
-      style={{ width: w, height: h }}
+      style={{ width: w, height: h, ...rotation }}
       aria-hidden
     />
   ) : (
@@ -52,17 +56,15 @@ export function TileFace({
       alt=""
       draggable={false}
       className={cn(
-        "block rounded-[3px] shadow-sm",
+        "block max-w-none rounded-[3px] shadow-sm",
         selected && "ring-2 ring-accent ring-offset-1 ring-offset-surface",
       )}
-      style={{ width: w, height: h }}
+      style={{ width: w, height: h, ...rotation }}
     />
   );
   const body = rotated ? (
-    <span className="relative inline-block" style={{ width: h, height: w }} aria-hidden>
-      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rotate-90">
-        {face}
-      </span>
+    <span className="block shrink-0" style={{ width: h, height: w }} aria-hidden>
+      {face}
     </span>
   ) : (
     face
