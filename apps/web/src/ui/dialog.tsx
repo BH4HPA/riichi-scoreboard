@@ -53,7 +53,10 @@ export function DialogContent({
             <X className="h-4 w-4" />
           </DialogPrimitive.Close>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">{children}</div>
+        {/* 下内边距放在最后一个子元素上：有底栏时底栏自带内边距，sticky 才能贴到滚动区底边 */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-3 [&>*:last-child]:pb-3">
+          {children}
+        </div>
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
   );
@@ -61,13 +64,13 @@ export function DialogContent({
 
 /**
  * 底部操作栏：贴在滚动区底部，长表单滚到中段时按钮依然可见。
- * 负外边距必须与上面滚动区的 `px-4 py-3` 一致，才能贴边且不产生横向滚动。
+ * 负外边距必须与上面滚动区的 `px-4` 一致，才能贴边且不产生横向滚动。
  */
 export function DialogFooter({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "sticky bottom-0 -mx-4 -mb-3 mt-4 flex flex-row justify-end gap-2 border-t border-border bg-surface px-4 py-3",
+        "sticky bottom-0 -mx-4 mt-4 flex flex-row justify-end gap-2 border-t border-border bg-surface px-4 py-3",
         className,
       )}
       {...props}

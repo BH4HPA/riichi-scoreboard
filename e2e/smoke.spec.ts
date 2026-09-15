@@ -40,6 +40,15 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await phones[0]!.getByRole("button", { name: "自摸", exact: true }).click();
   const dialog = phones[0]!.getByRole("dialog");
   await expect(dialog.getByText("自摸结算")).toBeVisible();
+  // 底部操作栏贴住对话框底边（滚动区无下内边距挡着 sticky）
+  const dialogBox = (await dialog.boundingBox())!;
+  const footerBox = (await dialog
+    .getByRole("button", { name: "确认自摸" })
+    .locator("..")
+    .boundingBox())!;
+  expect(Math.abs(footerBox.y + footerBox.height - (dialogBox.y + dialogBox.height))).toBeLessThan(
+    1,
+  );
   await dialog.getByRole("button", { name: "3", exact: true }).click();
   await dialog.getByRole("button", { name: "30", exact: true }).click();
   await expect(tv.getByText("正在录入自摸结算")).toBeVisible();
