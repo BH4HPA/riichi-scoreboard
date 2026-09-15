@@ -59,6 +59,15 @@ export function DialogContent({
   );
 }
 
+/** 底部操作栏：贴在滚动区底部，长表单滚到中段时按钮依然可见。 */
 export function DialogFooter({ className, ...props }: ComponentProps<"div">) {
-  return <div className={cn("mt-4 flex flex-row justify-end gap-2", className)} {...props} />;
+  return (
+    <div
+      className={cn(
+        "sticky bottom-0 -mx-4 -mb-3 mt-4 flex flex-row justify-end gap-2 border-t border-border bg-surface px-4 py-3",
+        className,
+      )}
+      {...props}
+    />
+  );
 }
