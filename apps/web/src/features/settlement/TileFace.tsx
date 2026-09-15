@@ -31,7 +31,7 @@ export function TileFace({
   const body = (
     <span
       className={cn(
-        "inline-flex flex-col items-center justify-center rounded-md border bg-white leading-none text-black shadow-sm dark:bg-zinc-100",
+        "inline-flex flex-col items-center justify-center rounded-md border bg-white leading-none text-black shadow-sm",
         size === "sm" ? "h-9 w-7 text-[11px]" : "h-12 w-9 text-sm",
         selected ? "border-accent ring-2 ring-accent/50" : "border-zinc-300",
         dim && "opacity-40",

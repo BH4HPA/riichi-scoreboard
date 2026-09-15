@@ -13,6 +13,7 @@ import { useSession } from "@/api/session";
 import { Button } from "@/ui/button";
 import { Input, Label, Select, Switch } from "@/ui/controls";
 import { useRoomStore } from "@/ws/store";
+import { cn } from "@/lib/utils";
 import { getPath, RULE_GROUPS, setPath, type RuleField } from "./fields";
 
 function FieldControl({
@@ -66,23 +67,26 @@ function displayValue(field: RuleField, value: unknown): string {
   return String(value);
 }
 
-/** 规则编辑器：预设选择/保存 + 分组开关。editable=false 时只读展示。 */
+/** 规则编辑器：预设选择/保存 + 分组开关。editable=false 时只读展示（不显示预设区）。 */
 export function RulesEditor({
   value,
   onChange,
   editable,
+  columns = 1,
 }: {
   value: RoomRules;
   onChange: (r: RoomRules) => void;
   editable: boolean;
+  /** 分组多列排版（电视大厅用） */
+  columns?: 1 | 2;
 }) {
   const { presets, loadPresets, savePreset, deletePreset } = useSession();
   const notify = useRoomStore((s) => s.notify);
   const [presetName, setPresetName] = useState("");
   const [selected, setSelected] = useState<string>("mleague");
   useEffect(() => {
-    loadPresets().catch(() => undefined);
-  }, [loadPresets]);
+    if (editable) loadPresets().catch(() => undefined);
+  }, [editable, loadPresets]);
 
   const all = [...BUILTIN_PRESETS, ...presets];
   const applyPreset = (id: string) => {
@@ -117,29 +121,28 @@ export function RulesEditor({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-border p-3">
-        <Label>预设</Label>
-        <div className="mt-1 flex gap-2">
-          <Select
-            value={selected}
-            onValueChange={applyPreset}
-            options={all.map((p) => ({ value: p.id, label: p.name }))}
-            disabled={!editable}
-            className="flex-1"
-          />
-          {editable && presets.some((p) => p.id === selected) && (
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-10 w-10"
-              aria-label="删除预设"
-              onClick={remove}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-        {editable && (
+      {editable ? (
+        <div className="rounded-lg border border-border p-3">
+          <Label>预设</Label>
+          <div className="mt-1 flex gap-2">
+            <Select
+              value={selected}
+              onValueChange={applyPreset}
+              options={all.map((p) => ({ value: p.id, label: p.name }))}
+              className="flex-1"
+            />
+            {presets.some((p) => p.id === selected) && (
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-10 w-10"
+                aria-label="删除预设"
+                onClick={remove}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
           <div className="mt-2 flex gap-2">
             <Input
               value={presetName}
@@ -151,31 +154,35 @@ export function RulesEditor({
               <Save className="h-4 w-4" /> 保存
             </Button>
           </div>
-        )}
-        <p className="mt-2 text-xs text-muted">{umaDescription(value)}</p>
-      </div>
-      {RULE_GROUPS.map((group) => (
-        <section key={group.title}>
-          <h4 className="mb-1 text-xs font-medium text-muted">{group.title}</h4>
-          <div className="divide-y divide-border rounded-lg border border-border">
-            {group.fields.map((field) => (
-              <div key={field.path} className="flex items-center justify-between gap-3 px-3 py-2">
-                <div className="min-w-0">
-                  <div className="text-sm">{field.label}</div>
-                  {field.hint && <div className="text-[11px] text-muted">{field.hint}</div>}
+          <p className="mt-2 text-xs text-muted">{umaDescription(value)}</p>
+        </div>
+      ) : (
+        <p className="text-xs text-muted">{umaDescription(value)}</p>
+      )}
+      <div className={cn(columns === 2 ? "columns-2 gap-4 [&>section]:mb-4" : "space-y-4")}>
+        {RULE_GROUPS.map((group) => (
+          <section key={group.title} className="break-inside-avoid">
+            <h4 className="mb-1 text-xs font-medium text-muted">{group.title}</h4>
+            <div className="divide-y divide-border rounded-lg border border-border">
+              {group.fields.map((field) => (
+                <div key={field.path} className="flex items-center justify-between gap-3 px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="text-sm">{field.label}</div>
+                    {field.hint && <div className="text-[11px] text-muted">{field.hint}</div>}
+                  </div>
+                  {editable ? (
+                    <FieldControl field={field} rules={value} onChange={onChange} />
+                  ) : (
+                    <span className="text-sm tabular text-muted">
+                      {displayValue(field, getPath(value, field.path))}
+                    </span>
+                  )}
                 </div>
-                {editable ? (
-                  <FieldControl field={field} rules={value} onChange={onChange} />
-                ) : (
-                  <span className="text-sm tabular text-muted">
-                    {displayValue(field, getPath(value, field.path))}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      ))}
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
     </div>
   );
 }

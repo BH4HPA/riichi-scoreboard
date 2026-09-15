@@ -1,7 +1,5 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
-
 @theme inline {
   --font-sans: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif;
   --color-bg: var(--bg);
@@ -28,20 +26,6 @@
   --pos: #059669;
   --neg: #e11d48;
   color-scheme: light;
-}
-
-.dark {
-  --bg: #0b0f14;
-  --surface: #121821;
-  --surface-2: #1a2230;
-  --border: #243040;
-  --fg: #f3f4f6;
-  --muted: #94a3b8;
-  --accent: #f59e0b;
-  --accent-fg: #111111;
-  --pos: #34d399;
-  --neg: #fb7185;
-  color-scheme: dark;
 }
 
 html,

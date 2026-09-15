@@ -5,7 +5,7 @@ import type { RoomView } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Dialog, DialogContent, DialogFooter } from "@/ui/dialog";
 import { useCommand } from "@/ws/useRoom";
-import { RulesEditor, RulesSummary } from "@/features/rules/RulesEditor";
+import { RulesEditor } from "@/features/rules/RulesEditor";
 import { SeatCards } from "./SeatCards";
 
 export function ConsoleLobby({ room, onNewRoom }: { room: RoomView; onNewRoom: () => void }) {
@@ -17,7 +17,7 @@ export function ConsoleLobby({ room, onNewRoom }: { room: RoomView; onNewRoom: (
   const url = `${window.location.origin}/r/${room.code}`;
 
   return (
-    <div className="grid min-h-dvh grid-cols-[minmax(320px,2fr)_3fr] gap-8 p-8">
+    <div className="grid h-dvh grid-cols-[minmax(320px,2fr)_3fr] gap-8 p-8">
       <section className="flex flex-col items-center justify-center gap-6 rounded-3xl border border-border bg-surface p-8">
         <div className="rounded-2xl bg-white p-4">
           <QRCodeSVG value={url} size={280} level="M" />
@@ -32,13 +32,13 @@ export function ConsoleLobby({ room, onNewRoom }: { room: RoomView; onNewRoom: (
         <p className="text-center text-sm text-muted">手机扫码加入，四人都点「准备」后即可开局。</p>
       </section>
 
-      <section className="flex flex-col gap-6">
+      <section className="flex min-h-0 flex-col gap-6">
         <div>
           <h2 className="mb-3 text-lg font-semibold">座位</h2>
           <SeatCards seats={room.seats} ready={room.ready} mySeat={null} tv />
         </div>
-        <div className="rounded-xl border border-border bg-surface p-4">
-          <div className="mb-2 flex items-center justify-between">
+        <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-border bg-surface p-4">
+          <div className="mb-3 flex items-center justify-between">
             <h2 className="text-base font-semibold">房间规则</h2>
             <Button
               variant="outline"
@@ -51,9 +51,16 @@ export function ConsoleLobby({ room, onNewRoom }: { room: RoomView; onNewRoom: (
               <Settings2 className="h-4 w-4" /> 修改规则
             </Button>
           </div>
-          <RulesSummary rules={room.rules} />
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <RulesEditor
+              value={room.rules}
+              onChange={() => undefined}
+              editable={false}
+              columns={2}
+            />
+          </div>
         </div>
-        <div className="mt-auto flex items-center gap-3">
+        <div className="flex items-center gap-3">
           <Button
             size="lg"
             variant="accent"

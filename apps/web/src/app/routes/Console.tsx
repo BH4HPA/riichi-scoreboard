@@ -80,11 +80,6 @@ export function Console() {
   const intents = useRoomStore((s) => s.intents);
   const [panelOpen, setPanelOpen] = useState(false);
 
-  useEffect(() => {
-    document.documentElement.classList.add("dark");
-    return () => document.documentElement.classList.remove("dark");
-  }, []);
-
   if (error) {
     return <div className="flex min-h-dvh items-center justify-center text-neg">{error}</div>;
   }
@@ -105,7 +100,7 @@ export function Console() {
         {room.phase === "lobby" || !game ? (
           <ConsoleLobby room={room} onNewRoom={newRoom} />
         ) : (
-          <div className="flex min-h-dvh flex-col gap-4 p-6">
+          <div className="flex h-dvh flex-col gap-4 p-6">
             <header className="flex items-center gap-4">
               <div className="flex-1">
                 <RoundHeader game={game.present} names={names} rules={room.rules} tv />
@@ -119,8 +114,8 @@ export function Console() {
               </Button>
             </header>
 
-            <main className="grid flex-1 grid-cols-[3fr_2fr] gap-4">
-              <div className="flex flex-col gap-4">
+            <main className="grid min-h-0 flex-1 grid-cols-[2fr_3fr] gap-4">
+              <div className="flex min-h-0 flex-col gap-4 overflow-y-auto">
                 <PointsGrid
                   game={game.present}
                   seats={room.seats}
@@ -128,11 +123,6 @@ export function Console() {
                   rules={room.rules}
                   tv
                 />
-                <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border bg-surface p-3">
-                  <HistoryTable history={game.present.history} tv />
-                </div>
-              </div>
-              <div className="flex flex-col gap-4">
                 <MirrorOverlay intents={intents} names={names} rules={room.rules} />
                 {game.present.status === "finished" && (
                   <div className="rounded-xl border border-pos/40 bg-surface p-4">
@@ -149,6 +139,9 @@ export function Console() {
                 <div className="rounded-xl border border-border bg-surface p-3">
                   <DiffMatrix game={game.present} names={names} rules={room.rules} tv />
                 </div>
+              </div>
+              <div className="min-h-0 overflow-y-auto rounded-xl border border-border bg-surface p-3">
+                <HistoryTable history={game.present.history} tv />
               </div>
             </main>
 
