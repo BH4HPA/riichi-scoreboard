@@ -55,7 +55,6 @@ test("截图：番符表与主控台", async ({ browser }) => {
   ]) {
     await keyboard.getByRole("button", { name: t, exact: true }).click();
   }
-  await ron.getByRole("button", { name: "计算番符" }).click();
   await ron.getByText("2 番 30 符").waitFor();
   await phones[2]!.screenshot({ path: `${OUT}/phone-ron-keyboard.png`, fullPage: true });
   await ron.getByRole("button", { name: "确认荣和" }).click();

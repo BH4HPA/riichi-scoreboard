@@ -89,7 +89,6 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   ]) {
     await keyboard.getByRole("button", { name: t, exact: true }).click();
   }
-  await ron.getByRole("button", { name: "计算番符" }).click();
   await expect(ron.getByText("2 番 30 符")).toBeVisible();
   await expect(ron.getByText("赤宝牌 1 番")).toBeVisible();
   await ron.getByRole("button", { name: "确认荣和" }).click();

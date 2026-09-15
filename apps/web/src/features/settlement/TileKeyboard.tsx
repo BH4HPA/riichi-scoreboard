@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Calculator, Trash2 } from "lucide-react";
+import { X } from "lucide-react";
 import {
   AKA_TILES,
   ALL_TILES,
@@ -19,12 +19,11 @@ import {
   type RoomRules,
   type Tile,
 } from "@riichi/core";
-import { Button } from "@/ui/button";
-import { CheckRow, ChipGroup, Label } from "@/ui/controls";
+import { CheckRow, Label } from "@/ui/controls";
 import { cn } from "@/lib/utils";
 import { TileFace } from "@/features/hand/TileFace";
 import { YakuChips } from "@/features/hand/YakuChips";
-import { tileLabel } from "@/features/hand/tileLabel";
+import { closedCapacity, isHandComplete } from "./valueDraft";
 
 type Target = "closed" | "dora" | "ura" | "chi" | "pon" | "kan" | "ankan";
 
@@ -41,10 +40,6 @@ const TARGET_LABELS: Record<Target, string> = {
 /** 同一基础牌（忽略赤标记）已录入张数。 */
 function countTile(hand: HandInput, tile: Tile): number {
   return allHandTiles(hand).filter((t) => sameTile(t, tile)).length;
-}
-
-function closedCapacity(hand: HandInput): number {
-  return 14 - hand.melds.length * 3;
 }
 
 /** 该赤五是否还能再录入：受规则总数与同花色上限约束。 */
@@ -64,18 +59,19 @@ export function TileKeyboard({
   rules,
   evaluated,
   evaluating,
-  onEvaluate,
+  evalError,
 }: {
   hand: HandInput;
   onChange: (next: HandInput) => void;
   rules: RoomRules;
+  /** 由 ValuePicker 在手牌录满后自动评估 */
   evaluated: EvaluatedHand | null;
   evaluating: boolean;
-  onEvaluate: () => void;
+  evalError: string | null;
 }) {
   const [target, setTarget] = useState<Target>("closed");
   const capacity = closedCapacity(hand);
-  const complete = hand.closed.length === capacity;
+  const complete = isHandComplete(hand);
   const akaEnabled = rules.hand.akaCount > 0;
 
   const update = (patch: Partial<HandInput>) => onChange({ ...hand, ...patch });
@@ -170,23 +166,22 @@ export function TileKeyboard({
           )}
         </div>
         <div
-          className="mt-1 flex min-h-12 flex-wrap items-end gap-1 rounded-lg border border-dashed border-border p-1.5"
+          className="mt-1 flex min-h-12 flex-wrap items-end gap-y-1.5 rounded-lg border border-dashed border-border p-1.5"
           data-testid="hand-area"
         >
-          {hand.closed.map((t, i) => (
-            <TileFace
-              key={`${t}-${i}`}
-              tile={t}
-              size="sm"
-              selected={t === hand.winTile}
-              onClick={() => removeClosed(i)}
-            />
-          ))}
+          <div className="flex items-end gap-px">
+            {hand.closed.map((t, i) => (
+              <TileFace
+                key={`${t}-${i}`}
+                tile={t}
+                size="sm"
+                selected={t === hand.winTile}
+                onClick={() => removeClosed(i)}
+              />
+            ))}
+          </div>
           {hand.melds.map((m, i) => (
-            <span
-              key={`m${i}`}
-              className="ml-1 inline-flex items-end gap-0.5 rounded-md bg-surface-2 p-1"
-            >
+            <div key={`m${i}`} className="relative ml-3 mr-1 flex items-end gap-px">
               {m.tiles.map((t, j) => (
                 <TileFace
                   key={j}
@@ -200,13 +195,13 @@ export function TileKeyboard({
               ))}
               <button
                 type="button"
-                className="ml-0.5 self-center p-0.5 text-muted hover:text-neg"
+                className="absolute -right-2 -top-2 rounded-full border border-border bg-surface p-0.5 text-muted shadow-sm hover:text-neg"
                 onClick={() => update({ melds: hand.melds.filter((_, k) => k !== i) })}
                 aria-label="删除副露"
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <X className="h-3 w-3" />
               </button>
-            </span>
+            </div>
           ))}
           {hand.closed.length === 0 && hand.melds.length === 0 && (
             <span className="px-1 text-xs text-muted">
@@ -260,12 +255,20 @@ export function TileKeyboard({
 
       <div>
         <Label>和张</Label>
-        <ChipGroup
-          value={hand.winTile || null}
-          onChange={(t) => update({ winTile: t })}
-          options={distinctClosed.map((t) => ({ value: t, label: tileLabel(t) }))}
-          className="mt-1"
-        />
+        <div className="mt-1 flex min-h-9 flex-wrap gap-1" role="radiogroup" aria-label="和张">
+          {distinctClosed.map((t) => (
+            <TileFace
+              key={t}
+              tile={t}
+              size="sm"
+              selected={t === hand.winTile}
+              onClick={() => update({ winTile: t })}
+            />
+          ))}
+          {distinctClosed.length === 0 && (
+            <span className="text-xs text-muted">录入手牌后在此选择和张（默认最后一张）</span>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2 text-xs">
@@ -342,28 +345,26 @@ export function TileKeyboard({
         </CheckRow>
       </div>
 
-      <div className="flex items-center gap-2">
-        <Button
-          variant="accent"
-          size="sm"
-          onClick={onEvaluate}
-          disabled={!complete || !hand.winTile || evaluating}
-        >
-          <Calculator className="h-4 w-4" /> {evaluating ? "计算中…" : "计算番符"}
-        </Button>
-        {evaluated && (
-          <span className="text-sm">
-            {!evaluated.isAgari ? (
-              <span className="text-neg">
-                {evaluated.reason === "noYaku" ? "该牌型无役" : "不是和牌形"}
-              </span>
-            ) : evaluated.yakuman > 0 ? (
-              <span className="font-semibold text-accent">{yakumanLabel(evaluated.yakuman)}</span>
-            ) : (
-              <span className="font-semibold">
-                {evaluated.han} 番 {evaluated.fu} 符
-              </span>
-            )}
+      <div className="flex min-h-8 items-center gap-2 text-sm" aria-live="polite">
+        {!complete ? (
+          <span className="text-muted">录入 {capacity} 张（含和张）后自动计算番符</span>
+        ) : evaluating ? (
+          <span className="text-muted">计算中…</span>
+        ) : evalError ? (
+          <span className="text-neg">{evalError}</span>
+        ) : !evaluated ? (
+          <span className="text-muted">计算中…</span>
+        ) : !evaluated.isAgari ? (
+          <span className="text-neg">
+            {evaluated.reason === "noYaku" ? "该牌型无役" : "不是和牌形"}
+          </span>
+        ) : evaluated.yakuman > 0 ? (
+          <span className="text-lg font-semibold text-accent">
+            {yakumanLabel(evaluated.yakuman)}
+          </span>
+        ) : (
+          <span className="text-lg font-semibold">
+            {evaluated.han} 番 {evaluated.fu} 符
           </span>
         )}
       </div>

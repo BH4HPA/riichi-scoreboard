@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   scoreTier,
   TIER_LABELS,
@@ -9,10 +9,9 @@ import {
 } from "@riichi/core";
 import { ChipGroup, Label, Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/controls";
 import { useSocket } from "@/ws/useRoom";
-import { useRoomStore } from "@/ws/store";
 import { CommandError } from "@/ws/socket";
 import { TileKeyboard } from "./TileKeyboard";
-import type { ValueDraft } from "./valueDraft";
+import { isHandComplete, type ValueDraft } from "./valueDraft";
 
 const HAN_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((n) => ({
   value: n,
@@ -23,6 +22,9 @@ const FU_OPTIONS = [20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110].map((n) => ({
   label: n,
 }));
 
+/** 手牌录满后自动评估的防抖时间 */
+const EVALUATE_DEBOUNCE_MS = 300;
+
 export function ValuePicker({
   draft,
   onChange,
@@ -30,33 +32,52 @@ export function ValuePicker({
   seat,
 }: {
   draft: ValueDraft;
-  onChange: (d: ValueDraft) => void;
+  /** 函数式更新：评估结果异步回来时只改仍然匹配的草稿 */
+  onChange: (update: (d: ValueDraft) => ValueDraft) => void;
   rules: RoomRules;
   seat: Seat;
 }) {
   const socket = useSocket();
-  const notify = useRoomStore((s) => s.notify);
   const [evaluating, setEvaluating] = useState(false);
+  const [evalError, setEvalError] = useState<string | null>(null);
   const manualValue: HandValue = { han: draft.han, fu: draft.fu, yakuman: draft.yakuman };
   const tier = scoreTier(manualValue, rules);
   const maxYakuman = rules.scoring.yakumanStacking ? 6 : 1;
 
-  const evaluate = async () => {
-    setEvaluating(true);
-    try {
-      const evaluated = await socket.evaluate(seat, draft.hand);
-      onChange({ ...draft, evaluated });
-    } catch (err) {
-      notify("error", err instanceof CommandError ? err.message : "计算失败");
-    } finally {
-      setEvaluating(false);
-    }
-  };
+  // 牌面完整即自动算番；回包只在手牌快照未变时写回（防乱序与覆盖期间改动）
+  const handKey = JSON.stringify(draft.hand);
+  const complete = isHandComplete(draft.hand);
+  useEffect(() => {
+    if (!complete) return;
+    const hand = JSON.parse(handKey) as ValueDraft["hand"];
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setEvaluating(true);
+      setEvalError(null);
+      socket
+        .evaluate(seat, hand)
+        .then((evaluated) => {
+          if (cancelled) return;
+          onChange((d) => (JSON.stringify(d.hand) === handKey ? { ...d, evaluated } : d));
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          setEvalError(err instanceof CommandError ? err.message : "计算失败");
+        })
+        .finally(() => {
+          if (!cancelled) setEvaluating(false);
+        });
+    }, EVALUATE_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [handKey, complete, seat, socket, onChange]);
 
   return (
     <Tabs
       value={draft.mode}
-      onValueChange={(v) => onChange({ ...draft, mode: v as ValueDraft["mode"] })}
+      onValueChange={(v) => onChange((d) => ({ ...d, mode: v as ValueDraft["mode"] }))}
     >
       <TabsList className="w-full">
         <TabsTrigger value="manual" className="flex-1">
@@ -76,7 +97,7 @@ export function ValuePicker({
           </div>
           <ChipGroup
             value={draft.yakuman === 0 ? draft.han : null}
-            onChange={(han) => onChange({ ...draft, han, yakuman: 0 })}
+            onChange={(han) => onChange((d) => ({ ...d, han, yakuman: 0 }))}
             options={HAN_OPTIONS}
             className="mt-1"
           />
@@ -85,7 +106,7 @@ export function ValuePicker({
           <Label>符数</Label>
           <ChipGroup
             value={draft.yakuman === 0 ? draft.fu : null}
-            onChange={(fu) => onChange({ ...draft, fu, yakuman: 0 })}
+            onChange={(fu) => onChange((d) => ({ ...d, fu, yakuman: 0 }))}
             options={FU_OPTIONS}
             className="mt-1"
           />
@@ -94,7 +115,7 @@ export function ValuePicker({
           <Label>役满</Label>
           <ChipGroup
             value={draft.yakuman || null}
-            onChange={(yakuman) => onChange({ ...draft, yakuman })}
+            onChange={(yakuman) => onChange((d) => ({ ...d, yakuman }))}
             options={Array.from({ length: maxYakuman }, (_, i) => ({
               value: i + 1,
               label: yakumanLabel(i + 1),
@@ -106,11 +127,11 @@ export function ValuePicker({
       <TabsContent value="hand" className="mt-3">
         <TileKeyboard
           hand={draft.hand}
-          onChange={(hand) => onChange({ ...draft, hand, evaluated: null })}
+          onChange={(hand) => onChange((d) => ({ ...d, hand, evaluated: null }))}
           rules={rules}
           evaluated={draft.evaluated}
           evaluating={evaluating}
-          onEvaluate={evaluate}
+          evalError={evalError}
         />
       </TabsContent>
     </Tabs>

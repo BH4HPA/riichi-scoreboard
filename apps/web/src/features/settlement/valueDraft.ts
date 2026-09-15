@@ -26,6 +26,16 @@ export function emptyHand(tsumo: boolean): HandInput {
   };
 }
 
+/** 暗牌容量：14 减去副露折算的 3 张/组。 */
+export function closedCapacity(hand: Pick<HandInput, "melds">): number {
+  return 14 - hand.melds.length * 3;
+}
+
+/** 手牌是否录满且已指定和张（可以送引擎评估）。 */
+export function isHandComplete(hand: HandInput): boolean {
+  return hand.closed.length === closedCapacity(hand) && hand.winTile > 0;
+}
+
 export function createValueDraft(tsumo: boolean): ValueDraft {
   return { mode: "manual", han: 3, fu: 40, yakuman: 0, hand: emptyHand(tsumo), evaluated: null };
 }

@@ -240,6 +240,9 @@ function RonForm({ game, names, rules, mirror, defaultSeat, onDone }: FormProps)
 
   const setWin = (i: number, patch: Partial<RonWinDraftState>) =>
     setWins(wins.map((w, k) => (k === i ? { ...w, ...patch } : w)));
+  /** 评估结果异步回来时用函数式更新，避免覆盖期间的改动 */
+  const updateDraft = (i: number, update: (d: ValueDraft) => ValueDraft) =>
+    setWins((ws) => ws.map((w, k) => (k === i ? { ...w, draft: update(w.draft) } : w)));
 
   return (
     <>
@@ -270,7 +273,7 @@ function RonForm({ game, names, rules, mirror, defaultSeat, onDone }: FormProps)
             <div className="mt-2">
               <ValuePicker
                 draft={w.draft}
-                onChange={(draft) => setWin(i, { draft })}
+                onChange={(update) => updateDraft(i, update)}
                 rules={rules}
                 seat={w.winner}
               />
