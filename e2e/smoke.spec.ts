@@ -1,8 +1,9 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { newContext } from "./helpers";
 
 /** 每台"手机"用独立的浏览器上下文，拥有各自的设备 token。 */
 async function phone(browser: Browser, code: string): Promise<Page> {
-  const ctx = await browser.newContext({ viewport: { width: 400, height: 800 } });
+  const ctx = await newContext(browser, { viewport: { width: 400, height: 800 } });
   const page = await ctx.newPage();
   await page.goto(`/r/${code}`);
   await expect(page.getByTestId("seat-0")).toBeVisible();
@@ -10,7 +11,7 @@ async function phone(browser: Browser, code: string): Promise<Page> {
 }
 
 test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步电视 → 镜像 → 撤销", async ({ browser }) => {
-  const tvCtx = await browser.newContext({ viewport: { width: 1600, height: 900 } });
+  const tvCtx = await newContext(browser, { viewport: { width: 1600, height: 900 } });
   const tv = await tvCtx.newPage();
   await tv.goto("/console");
   const code = (await tv.getByTestId("room-code").textContent())?.trim() ?? "";
@@ -152,7 +153,7 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
 });
 
 test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手机可让本地玩家离座", async ({ browser }) => {
-  const tvCtx = await browser.newContext({ viewport: { width: 1600, height: 900 } });
+  const tvCtx = await newContext(browser, { viewport: { width: 1600, height: 900 } });
   const tv = await tvCtx.newPage();
   await tv.goto("/console"); // 新的浏览器上下文没有保存的房间码，会自动新建房间
   const code = (await tv.getByTestId("room-code").textContent())?.trim() ?? "";
@@ -218,13 +219,13 @@ test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手�
 });
 
 test("离线的设备玩家座位可被他人回收；手机可退出房间回首页", async ({ browser }) => {
-  const tvCtx = await browser.newContext({ viewport: { width: 1600, height: 900 } });
+  const tvCtx = await newContext(browser, { viewport: { width: 1600, height: 900 } });
   const tv = await tvCtx.newPage();
   await tv.goto("/console");
   const code = (await tv.getByTestId("room-code").textContent())?.trim() ?? "";
 
   // 手机 A 入座并准备，然后整个浏览器上下文关闭（相当于手机被杀掉/换了浏览器）
-  const ctxA = await browser.newContext({ viewport: { width: 400, height: 800 } });
+  const ctxA = await newContext(browser, { viewport: { width: 400, height: 800 } });
   const a = await ctxA.newPage();
   await a.goto(`/r/${code}`);
   await a.getByLabel("昵称").fill("旧身份");

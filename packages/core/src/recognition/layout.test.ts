@@ -442,7 +442,7 @@ describe("layoutHand", () => {
     );
     const t0 = Date.now();
     expect(() => layoutHand(adversarial)).not.toThrow();
-    expect(Date.now() - t0).toBeLessThan(50);
+    expect(Date.now() - t0).toBeLessThan(500); // 本机 ≈ 15 ms，留给慢 CI 的余量
     // 退化框：零面积、反向、单张、全牌背
     expect(layoutHand([{ cls: 0, conf: 0.9, box: [5, 5, 5, 5] }]).warnings[0]!.code).toBe(
       "no_tiles",

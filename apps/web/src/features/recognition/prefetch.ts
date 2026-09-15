@@ -9,5 +9,8 @@ import { loadDetector } from "./ort";
 export function prefetchDetector(): void {
   const model = RECOGNITION_MANIFEST.model;
   if (!model) return;
+  // 省流量模式不预热，识别时再按需下载
+  const nav = navigator as Navigator & { connection?: { saveData?: boolean } };
+  if (nav.connection?.saveData) return;
   loadDetector(model.id).catch(() => undefined);
 }

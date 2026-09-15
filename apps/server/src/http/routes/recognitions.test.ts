@@ -39,8 +39,8 @@ async function register(app: ReturnType<typeof createApp>["app"]): Promise<strin
   return ((await res.json()) as { token: string }).token;
 }
 
-async function post(bytes: Uint8Array, tok = token, query = ""): Promise<Response> {
-  return ctx.app.request(`/api/recognitions${query}`, {
+async function post(bytes: Uint8Array, tok = token): Promise<Response> {
+  return ctx.app.request("/api/recognitions", {
     method: "POST",
     headers: tok ? { Authorization: `Bearer ${tok}` } : {},
     body: bytes,

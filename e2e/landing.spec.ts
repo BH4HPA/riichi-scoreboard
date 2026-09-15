@@ -1,7 +1,8 @@
 import { devices, expect, test } from "@playwright/test";
+import { newContext } from "./helpers";
 
 test("桌面 UA 打开首页直接进主控台；?stay=1 留在首页", async ({ browser }) => {
-  const ctx = await browser.newContext({ ...devices["Desktop Chrome"] });
+  const ctx = await newContext(browser, { ...devices["Desktop Chrome"] });
   const page = await ctx.newPage();
   await page.goto("/");
   await expect(page).toHaveURL(/\/console$/);
@@ -12,7 +13,7 @@ test("桌面 UA 打开首页直接进主控台；?stay=1 留在首页", async ({
 });
 
 test("平板 UA 二选一：可进主控台，也可作为玩家输码加入", async ({ browser }) => {
-  const ctx = await browser.newContext({ ...devices["iPad Pro 11"] });
+  const ctx = await newContext(browser, { ...devices["iPad Pro 11"] });
   const page = await ctx.newPage();
   await page.goto("/");
   await expect(page.getByRole("link", { name: /打开主控台/ })).toBeVisible();
@@ -24,12 +25,12 @@ test("平板 UA 二选一：可进主控台，也可作为玩家输码加入", a
 });
 
 test("手机 UA 直接看到加入面板；HTTP 下扫码入口隐藏并提示；输码跳转房间", async ({ browser }) => {
-  const tvCtx = await browser.newContext({ ...devices["Desktop Chrome"] });
+  const tvCtx = await newContext(browser, { ...devices["Desktop Chrome"] });
   const tv = await tvCtx.newPage();
   await tv.goto("/console");
   const code = (await tv.getByTestId("room-code").textContent())?.trim() ?? "";
 
-  const ctx = await browser.newContext({ ...devices["iPhone 13"] });
+  const ctx = await newContext(browser, { ...devices["iPhone 13"] });
   const page = await ctx.newPage();
   await page.goto("/");
   await expect(page.getByLabel("房间码")).toBeAttached();
@@ -49,7 +50,7 @@ test("手机 UA 直接看到加入面板；HTTP 下扫码入口隐藏并提示�
 });
 
 test("未知路径（如少了房间码的 /r/）回首页", async ({ browser }) => {
-  const ctx = await browser.newContext({ viewport: { width: 400, height: 800 } });
+  const ctx = await newContext(browser, { viewport: { width: 400, height: 800 } });
   const page = await ctx.newPage();
   await page.goto("/r/");
   await expect(page).not.toHaveURL(/\/r\//);

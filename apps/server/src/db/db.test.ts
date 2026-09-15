@@ -42,6 +42,23 @@ describe("数据库迁移", () => {
     expect(players.byToken("")).toBeNull();
   });
 
+  it("v3 库里已有识别记录 → v4 删 engine 列后行仍在", () => {
+    const db = new DatabaseSync(":memory:");
+    for (const m of MIGRATIONS.slice(0, 3)) db.exec(m);
+    db.exec("PRAGMA user_version = 3");
+    db.prepare(
+      "INSERT INTO recognitions (id, player_id, photo_key, model_id, engine, created_at, updated_at) VALUES ('r1', 'p1', 'k', 'm', 'browser', 1, 1)",
+    ).run();
+    migrate(db);
+    expect(schemaVersion(db)).toBe(MIGRATIONS.length);
+    const row = db.prepare("SELECT * FROM recognitions WHERE id = 'r1'").get()!;
+    expect(row).toMatchObject({ player_id: "p1", model_id: "m" });
+    expect(row).not.toHaveProperty("engine");
+    expect(
+      db.prepare("SELECT name FROM sqlite_master WHERE name = 'idx_recognitions_player'").get(),
+    ).toBeTruthy();
+  });
+
   it("v3/v4：识别记录表（engine 列已删），JSON 列往返，归属校验", () => {
     const db = new DatabaseSync(":memory:");
     migrate(db);

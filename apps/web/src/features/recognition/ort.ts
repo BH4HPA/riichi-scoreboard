@@ -31,10 +31,12 @@ function start(modelId: string): Promise<Detector> {
   if (pending && pendingId === modelId) return pending;
   pendingId = modelId;
   fraction = 0;
-  pending = (async () => {
+  const attempt = (async () => {
     const loaded = [0, 0];
     const total = [0, 0];
     const report = (i: number) => (l: number, t: number) => {
+      // 失败后的重试会开新一轮下载；上一轮还在流式读取的 fetch 不能再写进度
+      if (pending !== attempt) return;
       loaded[i] = l;
       total[i] = t;
       const sum = total[0]! + total[1]!;
@@ -46,20 +48,21 @@ function start(modelId: string): Promise<Detector> {
       import("onnxruntime-web/wasm"),
       wasmBinary
         ? Promise.resolve(wasmBinary)
-        : fetchBytes(wasmUrl, report(0)).then((r) => r.bytes),
+        : fetchBytes(wasmUrl, report(0)).then((r) => (wasmBinary = r.bytes)),
       fetchBytes(modelUrl(modelId), report(1)).then((r) => r.bytes),
     ]);
-    wasmBinary = wasm;
     ort.env.wasm.numThreads = 1;
     ort.env.wasm.wasmBinary = wasm;
     const session = await ort.InferenceSession.create(model, { executionProviders: ["wasm"] });
     return { ort, session };
   })();
-  pending.catch(() => {
+  pending = attempt;
+  attempt.catch(() => {
+    if (pending !== attempt) return;
     pending = null;
     pendingId = null;
   });
-  return pending;
+  return attempt;
 }
 
 export function loadDetector(modelId: string, onProgress?: LoadProgress): Promise<Detector> {

@@ -38,6 +38,11 @@ describe("validateRecognitionPatch", () => {
     expect(validateRecognitionPatch({ corrected: hand }).corrected?.winTile).toBe(9);
   });
 
+  it("未知字段忽略而不是 400：旧版手机还会带 engine，检测框与识别结果照收", () => {
+    const p = validateRecognitionPatch({ engine: "browser", ms: 1 });
+    expect(p).toEqual({ ms: 1 });
+  });
+
   it("拒绝：空体、坏模型 id、负耗时、检测框过多/NaN/越界类、非法手牌", () => {
     expect(() => validateRecognitionPatch({})).toThrow();
     expect(() => validateRecognitionPatch({ modelId: "v1" })).toThrow();

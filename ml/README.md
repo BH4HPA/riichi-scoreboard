@@ -1,6 +1,6 @@
 # 牌面检测模型训练工作台
 
-拍照识别牌型的模型侧：把照片里的每张牌检测出来（YOLO11n，38 类）。检测框→手牌的布局规则、手机/服务端推理、照片留存与回流都属于应用侧，在后续 PR 里接入，这里只管数据、训练、导出、发布。
+拍照识别牌型的模型侧：把照片里的每张牌检测出来（YOLO11n，38 类）。检测框→手牌的布局规则（`packages/core/src/recognition/layout.ts`）、手机浏览器推理与照片留存在应用侧（`apps/web/src/features/recognition`），训练数据回流待做，这里只管数据、训练、导出、发布。
 
 类目录的唯一真源是 `packages/core/src/recognition/manifest.json` 的 `classes`（下标 = 类 id）：`1m…9m 0m 1p…9p 0p 1s…9s 0s 1z…7z back`，`0` = 赤五，`z` 依次 东南西北白发中，`back` = 牌背。`configs/tiles.yaml` 与 `configs/label_studio.xml` 由 `scripts/gen_classes.py` 生成，CI 用 `--check` 校验它们与 manifest 一致；`configs/remap/*.json` 是手工维护的来源类名映射，入库。
 
@@ -48,13 +48,17 @@ QCLOUD_SECRET_ID=… QCLOUD_SECRET_KEY=… ../ci/upload-model.sh runs/v0/weights
 
 ```bash
 uv run scripts/family_check.py runs/v0/weights/best.pt data/family/*.jpg   # 先看 v0 认不认你的牌（每张全家福 38 类各一枚）
-uv run scripts/sprites.py runs/v0/weights/best.pt data/family             # 抠贴图 → data/sprites/<class>/；看 contact_*.jpg 核对，认错的挪目录
+uv run scripts/sprites.py runs/v0/weights/best.pt data/family             # 抠贴图 → data/sprites/<class>/；看 contact_*.jpg 核对，认错的挪目录或删掉
+uv run scripts/sprites.py --contact-only                                   # 手工改完贴图目录后按现状重画 contact_*.jpg 再核对
 uv run scripts/synth.py --n 5000                                           # 合成 → data/raw/synth/（只进 train）
+uv run scripts/bench_dets.py runs/v1/weights/best.onnx data/bench/dets-v1.json   # 评估集出检测框 →
+(cd .. && yarn workspace @riichi/server exec tsx scripts/recognize-bench.ts "$PWD/data/bench/truth.txt" "$PWD/data/bench/dets-v1.json")  # 布局 + 真值 → 整手牌正确率；--dump IMG_xxxx 看单张
+uv run scripts/e2e_detector.py                                             # 改了 e2e 的固定手牌时重建 e2e/fixtures/detector.onnx
 uv run scripts/remap.py                                                    # 与公开集合并
 scripts/train.sh v1 model=runs/v0/weights/best.pt epochs=60
 ```
 
-要拍的真图：全家福 6–10 张（换光线/角度/背景，每张 38 类各一枚，是贴图来源）；空背景 10–15 张放 `data/backgrounds/`（桌面/桌布/麻将垫的空镜头，**上面不能有牌**，可带风位盒、点棒）；评估集 30–50 张放 `data/bench/`，按裁剪后的样子拍（只有手牌和指示牌），每张配同名 `.hand.json` 真值（评估脚本随应用侧一起来）。另外 20–30 张带牌河的真实全景放 `data/own/`，走下面的预标注流程混进训练集，校正合成与真实的差距。
+要拍的真图：全家福 6–10 张（换光线/角度/背景，每张 38 类各一枚，是贴图来源）；空背景 10–15 张放 `data/backgrounds/`（桌面/桌布/麻将垫的空镜头，**上面不能有牌**，可带风位盒、点棒）；评估集 30–50 张放 `data/bench/`，按裁剪后的样子拍（只有手牌、副露和指示牌），真值写在 `data/bench/truth.txt`（一行一张，格式见文件头注释；认不出的 token 视为备注 = 负例，不计入正确率）。另外 20–30 张带牌河的真实全景放 `data/own/`，走下面的预标注流程混进训练集，校正合成与真实的差距。
 
 ```bash
 uv run scripts/prelabel.py runs/v0/weights/best.pt data/own      # → data/own_prelabel.json
@@ -77,7 +81,7 @@ scripts/export.sh runs/v1/weights/best.pt
 ## 指标
 
 - `yolo val` 的 mAP50 / mAP50-95：单牌检测质量，选 epoch、比较 v0/v1 用。
-- 整手牌完全正确率：真实推理管线在 `data/bench/` 上的精确匹配比例，是上线门槛（目标 ≥ 90%）；评估脚本随应用侧接入一起来。
+- 整手牌完全正确率：`bench_dets.py` + `recognize-bench.ts` 在 `data/bench/` 上的精确匹配比例（暗牌 + 和张 + 副露 + 指示牌全对），是上线门槛（目标 ≥ 90%）。v1 + 当前布局规则：32/33（唯一失败是没裁剪、带牌河的照片），v0：18/33。
 
 ## 目录
 

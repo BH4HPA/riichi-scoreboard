@@ -1,11 +1,12 @@
 import { test, type Browser, type Page } from "@playwright/test";
+import { newContext } from "./helpers";
 
 /** 视觉检查用截图脚本：`SHOTS_DIR=/tmp/riichi-shots yarn e2e e2e/shots.spec.ts`；默认不跑。 */
 const OUT = process.env.SHOTS_DIR;
 test.skip(!OUT, "仅在设置 SHOTS_DIR 时运行");
 
 async function phone(browser: Browser, code: string, name: string): Promise<Page> {
-  const ctx = await browser.newContext({ viewport: { width: 400, height: 860 } });
+  const ctx = await newContext(browser, { viewport: { width: 400, height: 860 } });
   const page = await ctx.newPage();
   await page.goto(`/r/${code}`);
   const nameInput = page.getByLabel("昵称");
@@ -15,7 +16,7 @@ async function phone(browser: Browser, code: string, name: string): Promise<Page
 }
 
 test("截图：番符表与主控台", async ({ browser }) => {
-  const tvCtx = await browser.newContext({ viewport: { width: 1600, height: 900 } });
+  const tvCtx = await newContext(browser, { viewport: { width: 1600, height: 900 } });
   const tv = await tvCtx.newPage();
   await tv.goto("/console");
   const code = (await tv.getByTestId("room-code").textContent())?.trim() ?? "";
@@ -121,7 +122,7 @@ test("截图：Pad 横屏/竖屏的大厅与对局页", async ({ browser }) => {
     [1024, 768, "pad-landscape"],
     [768, 1024, "pad-portrait"],
   ] as const) {
-    const ctx = await browser.newContext({ viewport: { width: w, height: h } });
+    const ctx = await newContext(browser, { viewport: { width: w, height: h } });
     const tv = await ctx.newPage();
     await tv.goto("/console");
     await tv.getByText("扫码加入").waitFor();

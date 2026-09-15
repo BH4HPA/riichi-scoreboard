@@ -6,7 +6,7 @@
 # 需要：ml/ 的 uv 环境（校验脚本 ml/scripts/check_onnx.py 会检查类顺序与 manifest 一致，不一致不上传）；
 #       coscmd 已在 PATH（pipx install coscmd）；QCLOUD_SECRET_ID / QCLOUD_SECRET_KEY 必填，
 #       QCLOUD_COS_BUCKET / QCLOUD_COS_REGION 默认为 bite-go 的 static 桶。
-# 桶内前缀与下载地址常量（接入识别的 apps 侧，下一阶段）须一致，改一处必须改另一处。
+# 桶内前缀与下载地址常量 apps/web/src/features/recognition/modelUrl.ts 须一致，改一处必须改另一处。
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

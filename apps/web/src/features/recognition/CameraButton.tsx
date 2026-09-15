@@ -101,7 +101,9 @@ export function CameraButton({
       />
       <div className="text-xs text-muted" aria-live="polite" data-testid="recognize-status">
         {phase === "loading-model"
-          ? `模型还在下载 ${Math.round(progress * 100)}%（约 25 MB，只下一次）`
+          ? progress >= 1
+            ? "模型加载中…"
+            : `模型还在下载 ${Math.round(progress * 100)}%（约 25 MB，只下一次）`
           : phase
             ? PHASE_TEXT[phase]
             : rec

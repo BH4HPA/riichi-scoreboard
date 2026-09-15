@@ -1,5 +1,6 @@
 import path from "node:path";
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
+import { newContext } from "./helpers";
 
 const FIXTURE = path.join(import.meta.dirname, "fixtures/hand.jpg");
 /** 假检测器（ml/scripts/e2e_detector.py）：恒定输出下面这副手牌的检测框，链路其余部分都是真的 */
@@ -11,7 +12,7 @@ const CLOSED = [1, 2, 3, 13, 36, 15, 25, 26, 27, 7, 8, 11, 11, 9];
 type Setup = (page: Page) => Promise<void>;
 
 async function phone(browser: Browser, code: string, setup?: Setup): Promise<Page> {
-  const ctx = await browser.newContext({ viewport: { width: 400, height: 800 } });
+  const ctx = await newContext(browser, { viewport: { width: 400, height: 800 } });
   const page = await ctx.newPage();
   await setup?.(page);
   await page.goto(`/r/${code}`);
@@ -27,7 +28,7 @@ async function openRonHandTab(
   browser: Browser,
   setup?: Setup,
 ): Promise<{ phone: Page; dialog: Locator }> {
-  const tvCtx = await browser.newContext({ viewport: { width: 1600, height: 900 } });
+  const tvCtx = await newContext(browser, { viewport: { width: 1600, height: 900 } });
   const tv = await tvCtx.newPage();
   await tv.goto("/console");
   const code = (await tv.getByTestId("room-code").textContent())?.trim() ?? "";
