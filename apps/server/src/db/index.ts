@@ -74,6 +74,23 @@ ALTER TABLE players_v2 RENAME TO players;
 CREATE INDEX idx_players_created_by ON players (created_by, created_at);
 ALTER TABLE rooms ADD COLUMN closed_at INTEGER;
 `,
+  // v3：拍照识别记录（照片对象 key、检测框、识别结果、用户最终确认的手牌），作训练数据。
+  `
+CREATE TABLE recognitions (
+  id TEXT PRIMARY KEY,
+  player_id TEXT NOT NULL,
+  photo_key TEXT NOT NULL,
+  model_id TEXT NOT NULL,
+  engine TEXT,
+  ms INTEGER,
+  detections TEXT,
+  recognized TEXT,
+  corrected TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX idx_recognitions_player ON recognitions (player_id, created_at);
+`,
 ];
 
 export type Database = DatabaseSync;

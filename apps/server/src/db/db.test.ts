@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { MIGRATIONS, migrate, schemaVersion } from "./index";
 import { PlayersRepo } from "./players";
+import { RecognitionsRepo } from "./recognitions";
 
 describe("数据库迁移", () => {
   it("新库直接迁到最新版本", () => {
@@ -26,7 +27,7 @@ describe("数据库迁移", () => {
       1,
     );
     migrate(db);
-    expect(schemaVersion(db)).toBe(2);
+    expect(schemaVersion(db)).toBe(3);
     const players = new PlayersRepo(db);
     const row = players.byToken("tok");
     expect(row).toMatchObject({ id: "p1", name: "老玩家", kind: "device", avatar: null });
@@ -39,5 +40,24 @@ describe("数据库迁移", () => {
     expect(local.token).toBeNull();
     expect(players.localsOf("p1").map((p) => p.id)).toEqual([local.id]);
     expect(players.byToken("")).toBeNull();
+  });
+
+  it("v3：识别记录表，JSON 列往返，归属校验", () => {
+    const db = new DatabaseSync(":memory:");
+    migrate(db);
+    const repo = new RecognitionsRepo(db);
+    const id = repo.create("p1", "hands/p1/x.jpg", "model-1", 100);
+    expect(repo.get(id)).toMatchObject({ player_id: "p1", engine: null, detections: null });
+    const detections = [
+      { cls: 3, conf: 0.9, box: [1, 2, 3, 4] as [number, number, number, number] },
+    ];
+    expect(repo.patch(id, "p1", { engine: "browser", ms: 812, detections }, 200)).toBe(true);
+    expect(repo.patch(id, "someone-else", { ms: 1 }, 300)).toBe(false);
+    const row = repo.get(id)!;
+    expect(row.engine).toBe("browser");
+    expect(row.ms).toBe(812);
+    expect(JSON.parse(row.detections!)).toEqual(detections);
+    expect(row.updated_at).toBe(200);
+    expect(repo.patch(id, "p1", {}, 400)).toBe(false);
   });
 });

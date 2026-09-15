@@ -1,0 +1,166 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { RecognitionResult } from "@riichi/core";
+import { createApp } from "../../app";
+import { loadConfig } from "../../config";
+import type { RecognitionRow } from "../../db/recognitions";
+import { PHOTO_MAX_BYTES } from "../photos";
+
+/** 最小合法 JPEG 头（只需通过魔数嗅探） */
+const JPEG = new Uint8Array([
+  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0xff, 0xd9,
+]);
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+const HAND = {
+  closed: [1, 2, 3, 13, 36, 15, 25, 26, 27, 7, 8, 11, 11, 9],
+  melds: [],
+  winTile: 9,
+  tsumo: false,
+  doraIndicators: [24],
+  uraIndicators: [],
+  riichi: false,
+  doubleRiichi: false,
+  ippatsu: false,
+  afterKan: false,
+  lastTile: false,
+  firstTake: false,
+};
+
+let dataDir: string;
+let ctx: ReturnType<typeof createApp>;
+let token = "";
+let other = "";
+
+async function register(app: ReturnType<typeof createApp>["app"]): Promise<string> {
+  const res = await app.request("/api/me/register", { method: "POST", body: "{}" });
+  return ((await res.json()) as { token: string }).token;
+}
+
+async function post(bytes: Uint8Array, tok = token, query = ""): Promise<Response> {
+  return ctx.app.request(`/api/recognitions${query}`, {
+    method: "POST",
+    headers: tok ? { Authorization: `Bearer ${tok}` } : {},
+    body: bytes,
+  });
+}
+
+async function patch(id: string, body: unknown, tok = token): Promise<Response> {
+  return ctx.app.request(`/api/recognitions/${id}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+function row(id: string): RecognitionRow | undefined {
+  return ctx.db.prepare("SELECT * FROM recognitions WHERE id = ?").get(id) as
+    RecognitionRow | undefined;
+}
+
+beforeAll(async () => {
+  dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "riichi-rec-"));
+  const config = { ...loadConfig({}), dataDir, corsOrigins: [], webDist: "/nonexistent" };
+  ctx = createApp({ config, dbFile: ":memory:", quiet: true });
+  token = await register(ctx.app);
+  other = await register(ctx.app);
+});
+
+afterAll(() => {
+  ctx.db.close();
+  fs.rmSync(dataDir, { recursive: true, force: true });
+});
+
+describe("POST /api/recognitions", () => {
+  it("无 token → 401；非 JPEG → 400", async () => {
+    expect((await post(JPEG, "")).status).toBe(401);
+    const res = await post(PNG);
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe("bad_photo");
+  });
+
+  it("JPEG → 201 {id, result:null}，照片落在本地对象目录", async () => {
+    const res = await post(JPEG);
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { id: string; result: null };
+    expect(body.result).toBeNull();
+    const r = row(body.id)!;
+    expect(r.photo_key).toMatch(/^hands\/[0-9a-f]+\/\d{8}-[0-9a-f]{12}\.jpg$/);
+    expect(fs.existsSync(path.join(dataDir, "objects", r.photo_key))).toBe(true);
+    expect(r.model_id).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it("?infer=1 且无服务器引擎 → 503，且不落库", async () => {
+    const before = (ctx.db.prepare("SELECT COUNT(*) AS n FROM recognitions").get() as { n: number })
+      .n;
+    const res = await post(JPEG, token, "?infer=1");
+    expect(res.status).toBe(503);
+    expect(((await res.json()) as { error: string }).error).toBe("recognition_unavailable");
+    expect(
+      (ctx.db.prepare("SELECT COUNT(*) AS n FROM recognitions").get() as { n: number }).n,
+    ).toBe(before);
+  });
+
+  it("超过 2MB → 413（HTTPException 透传，不再变成 500）", async () => {
+    const big = new Uint8Array(PHOTO_MAX_BYTES + 1);
+    big.set(JPEG);
+    expect((await post(big)).status).toBe(413);
+  });
+
+  it("注入的服务器引擎：?infer=1 → 201 带结果，记录写入 engine=server", async () => {
+    const result: RecognitionResult = {
+      engine: "server",
+      modelId: "m",
+      ms: 321,
+      detections: [{ cls: 0, conf: 0.9, box: [0, 0, 10, 14] }],
+      hand: { closed: [1], melds: [], winTile: 1, doraIndicators: [], uraIndicators: [] },
+      warnings: [],
+    };
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "riichi-rec2-"));
+    const app2 = createApp({
+      config: { ...loadConfig({}), dataDir: dir, corsOrigins: [], webDist: "/nonexistent" },
+      dbFile: ":memory:",
+      quiet: true,
+      recognizer: { ready: () => true, recognize: async () => result },
+    });
+    const tok = await register(app2.app);
+    const res = await app2.app.request("/api/recognitions?infer=1", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${tok}` },
+      body: JPEG,
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { id: string; result: RecognitionResult };
+    expect(body.result.ms).toBe(321);
+    const r = app2.db.prepare("SELECT engine, ms FROM recognitions WHERE id = ?").get(body.id);
+    expect(r).toEqual({ engine: "server", ms: 321 });
+    app2.db.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe("PATCH /api/recognitions/:id", () => {
+  it("回填识别结果与确认手牌 → 204；他人 → 404；畸形 → 400", async () => {
+    const { id } = (await (await post(JPEG)).json()) as { id: string };
+    const res = await patch(id, {
+      engine: "browser",
+      ms: 812,
+      detections: [{ cls: 3, conf: 0.9, box: [1, 2, 3, 4] }],
+      recognized: { closed: [1, 2], melds: [], winTile: 2, doraIndicators: [], uraIndicators: [] },
+    });
+    expect(res.status).toBe(204);
+    expect((await patch(id, { corrected: HAND })).status).toBe(204);
+    const r = row(id)!;
+    expect(r.engine).toBe("browser");
+    expect(JSON.parse(r.recognized!).winTile).toBe(2);
+    expect(JSON.parse(r.corrected!).winTile).toBe(9);
+    expect((await patch(id, { ms: 1 }, other)).status).toBe(404);
+    expect((await patch("nope", { ms: 1 })).status).toBe(404);
+    const bad = await patch(id, { engine: "gpu" });
+    expect(bad.status).toBe(400);
+    expect(((await bad.json()) as { error: string }).error).toBe("bad_recognition");
+    expect((await patch(id, {})).status).toBe(400);
+  });
+});

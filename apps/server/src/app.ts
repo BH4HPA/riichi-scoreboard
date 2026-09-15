@@ -3,18 +3,22 @@ import path from "node:path";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { createMiddleware } from "hono/factory";
+import { HTTPException } from "hono/http-exception";
 import { logger } from "hono/logger";
 import type { UpgradeWebSocket } from "hono/ws";
 import type { ServerConfig } from "./config";
 import { openDatabase, type Database } from "./db";
 import { PlayersRepo } from "./db/players";
 import { PresetsRepo } from "./db/presets";
+import { RecognitionsRepo } from "./db/recognitions";
 import { ResultsRepo } from "./db/results";
 import { RoomsRepo } from "./db/rooms";
 import { localRoutes } from "./http/routes/locals";
 import { meRoutes } from "./http/routes/me";
+import { recognitionRoutes } from "./http/routes/recognitions";
 import { roomRoutes } from "./http/routes/rooms";
 import { mountStatic } from "./http/static";
+import type { ServerRecognizer } from "./recognition/recognizer";
 import { RoomRegistry } from "./rooms/registry";
 import { mountWebSocket } from "./rooms/ws";
 import type { ObjectStore } from "./storage";
@@ -36,6 +40,8 @@ export interface CreateAppOptions {
   timings?: { wsIdleMs?: number; autoStartMs?: number };
   /** 测试时关闭请求日志 */
   quiet?: boolean;
+  /** 服务器端识别引擎；不给则 `?infer=1` 一律 503 */
+  recognizer?: ServerRecognizer | null;
 }
 
 const OBJECT_TYPES: Record<string, string> = {
@@ -71,12 +77,14 @@ export function createApp({
   upgradeWebSocket,
   timings,
   quiet = false,
+  recognizer = null,
 }: CreateAppOptions): AppContext {
   const db = openDatabase(dbFile ?? path.join(config.dataDir, "riichi.sqlite"));
   const players = new PlayersRepo(db);
   const rooms = new RoomsRepo(db);
   const results = new ResultsRepo(db);
   const presets = new PresetsRepo(db);
+  const recognitions = new RecognitionsRepo(db);
   const registry = new RoomRegistry(rooms, results, players, Date.now, timings?.autoStartMs);
   const local = config.cos ? null : new LocalStore(path.join(config.dataDir, "objects"));
   const store: ObjectStore = config.cos ? new CosStore(config.cos) : local!;
@@ -104,9 +112,12 @@ export function createApp({
   app.route("/api/me/locals", localRoutes({ players, results, registry, store }));
   app.route("/api/me", meRoutes({ players, presets, results, registry, store }));
   app.route("/api/rooms", roomRoutes({ registry, players }));
+  app.route("/api/recognitions", recognitionRoutes({ players, recognitions, store, recognizer }));
   if (local) mountLocalObjects(app, local);
   app.notFound((c) => c.json({ error: "not_found", message: "接口不存在" }, 404));
   app.onError((err, c) => {
+    // bodyLimit 等中间件用 HTTPException 表达 413 之类的状态，原样透传
+    if (err instanceof HTTPException) return err.getResponse();
     console.error(`[http] ${c.req.method} ${c.req.path}`, err);
     return c.json({ error: "internal", message: "服务器内部错误" }, 500);
   });
