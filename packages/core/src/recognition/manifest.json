@@ -39,5 +39,11 @@
     "7z",
     "back"
   ],
-  "model": null
+  "model": {
+    "id": "12b2722c-cbce-4e9b-9bd1-341280bd0204",
+    "sha256": "08bebb44f5c2400f2984d56faf04d1f1cbf9dc6754c5c1d3b3f677923dda673c",
+    "imgsz": 640,
+    "publishedAt": "2026-09-15",
+    "note": "v0: public datasets only (hust + riichimahjongdetection + yolo_mahjong), 100 epochs T4"
+  }
 }
