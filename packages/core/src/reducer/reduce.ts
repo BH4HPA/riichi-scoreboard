@@ -3,7 +3,7 @@ import { validateRules } from "../rules/validate";
 import { isGameCommand, type LobbyCommand } from "../types/commands";
 import type { RoomEvent } from "../types/events";
 import type { RoomRules } from "../types/rules";
-import { seatNames, type PlayerRef, type RoomState } from "../types/state";
+import { isLocalPlayer, seatNames, type PlayerRef, type RoomState } from "../types/state";
 import { applyGameCommand, createGame } from "./game";
 import { createUndoable, push, redo, undo } from "./undoable";
 import { assertSeat } from "./validateCommand";
@@ -83,7 +83,8 @@ function applyLobbyCommand(room: RoomState, cmd: LobbyCommand): RoomState {
     }
     case "toLobby": {
       if (room.phase === "playing") throw new DomainError("locked", "对局进行中不能返回大厅");
-      return { ...room, phase: "lobby", game: null, ready: [false, false, false, false] };
+      // 设备玩家回大厅后重新点「准备」；本地玩家没有手机，入座即准备，回大厅也保持
+      return { ...room, phase: "lobby", game: null, ready: room.seats.map(isLocalPlayer) };
     }
     case "dissolve":
       return { ...room, phase: "closed" };

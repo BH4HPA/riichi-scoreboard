@@ -74,6 +74,23 @@ describe("reduceRoom / lobby", () => {
       }),
     ).toThrow(/开局后/);
   });
+  it("终局回大厅：本地玩家保持已准备，设备玩家需重新准备", () => {
+    const local: PlayerRef = { id: "l", name: "本地", avatar: null, kind: "local" };
+    const cmds = lobbyCommands(true);
+    cmds[3] = { type: "sit", seat: 3, player: local, ready: true };
+    const room = replay(createRoom("X", MLEAGUE_RULES), events(cmds));
+    expect(room.phase).toBe("playing");
+    const at = (seq: number, command: Command): RoomEvent => ({
+      seq,
+      at: 0,
+      actor: { playerId: null, clientId: "t" },
+      command,
+    });
+    const finished = reduceRoom(room, at(90, { type: "endGame" }));
+    const lobby = reduceRoom(finished, at(91, { type: "toLobby" }));
+    expect(lobby.phase).toBe("lobby");
+    expect(lobby.ready).toEqual([false, false, false, true]);
+  });
   it("同一玩家换座会离开原座位", () => {
     const room = replay(
       createRoom("X", MLEAGUE_RULES),
