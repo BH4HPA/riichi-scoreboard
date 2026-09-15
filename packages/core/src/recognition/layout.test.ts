@@ -160,9 +160,14 @@ describe("layoutHand", () => {
     const a = layoutHand(row([...CLOSED13, "9m"], 10, 200).dets);
     expect(a.warnings.map((w) => w.code)).toEqual(["no_win_tile"]);
     expect(a.hand.winTile).toBe(TILE.M9);
-    const b = layoutHand(row(["1m~", ...CLOSED13.slice(1), "9m~"], 10, 200).dets);
+    // 两张横放且拆不出合法副露（1m 5p 9s 不成组）→ 整组当暗牌，取最后一张横放并告警
+    const b = layoutHand(row(["1m~", "5p", "9s", ...CLOSED13.slice(3), "9m~"], 10, 200).dets);
     expect(b.warnings.map((w) => w.code)).toEqual(["multi_win"]);
     expect(b.hand.winTile).toBe(TILE.M9);
+    // 两张横放但能拆成「吃 123m + 暗牌」→ 按副露解释，不告警
+    const c = layoutHand(row(["1m~", ...CLOSED13.slice(1), "9m~"], 10, 200).dets);
+    expect(c.warnings).toEqual([]);
+    expect(c.hand.melds).toEqual([{ open: true, tiles: [TILE.M1, TILE.M2, TILE.M3] }]);
   });
 
   it("漏认一张牌把暗牌切成两段：取最大的一段并告警，指示牌行不会被当成暗牌", () => {
@@ -232,7 +237,7 @@ describe("layoutHand", () => {
     expect(layoutHand(twelve.dets).warnings.map((w) => w.code)).toContain("count");
     expect(layoutHand([]).warnings.map((w) => w.code)).toEqual(["no_tiles"]);
     const low = row([...CLOSED13, "9m~"], 10, 200).dets;
-    low[0] = { ...low[0]!, conf: 0.3 };
+    low[0] = { ...low[0]!, conf: 0.45 };
     expect(layoutHand(low).warnings.map((w) => w.code)).toEqual(["low_conf"]);
   });
 
@@ -250,6 +255,133 @@ describe("layoutHand", () => {
     expect(warnings.map((w) => w.code)).toEqual(["extra_rows"]);
     expect(h.doraIndicators).toEqual([TILE.S6]);
     expect(h.closed).toHaveLength(14);
+  });
+
+  it("副露之间不留空：碰与吃连成一排，靠横置与牌型拆开（实拍 IMG_1829）", () => {
+    const closed = row(["2p", "3p", "4p", "6p", "7p", "5s", "5s", "8p~"], 10, 300);
+    const melds = row(["2s", "2s~", "2s", "3m~", "2m", "4m"], 30, 400); // 碰 222s 紧接 吃 234m
+    const dora = row(["6p"], 20, 200);
+    const { hand: h, warnings } = layoutHand([...closed.dets, ...melds.dets, ...dora.dets]);
+    expect(warnings).toEqual([]);
+    expect(h.winTile).toBe(TILE.P8);
+    expect(h.melds).toEqual([
+      { open: true, tiles: [TILE.S2, TILE.S2, TILE.S2] },
+      { open: true, tiles: [TILE.M3, TILE.M2, TILE.M4] },
+    ]);
+    expect(h.doraIndicators).toEqual([TILE.P6]);
+  });
+
+  it("暗牌与副露连在一排不留空：暗牌段 + 副露段一起拆", () => {
+    const line = row(
+      [
+        "2m",
+        "3m",
+        "4m",
+        "5s",
+        "5s",
+        "6p",
+        "7p",
+        "8p~",
+        "8m",
+        "8m~",
+        "8m",
+        "back",
+        "1z",
+        "1z",
+        "back",
+      ],
+      10,
+      300,
+    );
+    const { hand: h, warnings } = layoutHand(line.dets);
+    expect(warnings).toEqual([]);
+    // 「6p 7p 8p~」既可当吃也可当暗牌末尾，取暗牌段更长的解释
+    expect(h.closed).toEqual([
+      TILE.M2,
+      TILE.M3,
+      TILE.M4,
+      TILE.S5,
+      TILE.S5,
+      TILE.P6,
+      TILE.P7,
+      TILE.P8,
+    ]);
+    expect(h.winTile).toBe(TILE.P8);
+    expect(h.melds).toEqual([
+      { open: true, tiles: [TILE.M8, TILE.M8, TILE.M8] },
+      { open: false, tiles: [TILE.East, TILE.East, TILE.East, TILE.East] },
+    ]);
+  });
+
+  it("加杠两张横置叠放也是杠；斜拍压扁的横置牌（宽略大于高）仍算横置；手牌行里的误检牌背被跳过", () => {
+    const closed = row(["1p", "2p", "3p", "4p", "4p", "6p", "7p", "5p~"], 10, 300);
+    const kakan = [
+      det("7z", 30, 400),
+      det("7z", 72, 380, { side: true }),
+      det("7z", 72, 420, { side: true }),
+      det("7z", 130, 400),
+    ];
+    const pon = row(["8p", "8p~", "8p"], 260, 400).dets.map((d, i) =>
+      i === 1
+        ? { ...d, box: [d.box[0], d.box[1], d.box[0] + 46, d.box[1] + 42] as Detection["box"] }
+        : d,
+    );
+    const stray = det("back", 178, 300, { conf: 0.45 }); // 手牌行中间的误检（过了硬门槛）
+    const dropped = det("5z", 60, 240, { conf: 0.3 }); // 指示牌区域的误检（低于硬门槛，不参与）
+    const narrow: Detection = { ...det("8p", 120, 210), box: [120, 210, 140, 266] }; // 形状异常的框
+    const dora = row(["5p"], 20, 200);
+    const { hand: h, warnings } = layoutHand([
+      ...closed.dets,
+      ...kakan,
+      ...pon,
+      stray,
+      dropped,
+      narrow,
+      ...dora.dets,
+    ]);
+    expect(warnings.map((w) => w.code)).toEqual(["low_conf", "odd_box", "back_in_hand"]);
+    expect(h.closed).toHaveLength(8);
+    expect(h.winTile).toBe(TILE.P5);
+    expect(h.melds).toEqual([
+      { open: true, tiles: [TILE.Chun, TILE.Chun, TILE.Chun, TILE.Chun] },
+      { open: true, tiles: [TILE.P8, TILE.P8, TILE.P8] },
+    ]);
+    expect(h.doraIndicators).toEqual([TILE.P5]);
+  });
+
+  it("白板被认成牌背的明杠按同一张补齐；暗杠里的赤五记进杠", () => {
+    const closed = row(["1m", "6m", "6m", "6m", "2p", "3p", "4p", "1m~"], 10, 300);
+    const kan = row(["5z", "5z~", "5z~", "back"], 20, 400); // 加杠形状，第四张白板认成了牌背
+    const ankan = row(["back", "5p", "0p", "back"], kan.end + GAP, 400);
+    const { hand: h, warnings } = layoutHand([...closed.dets, ...kan.dets, ...ankan.dets]);
+    expect(warnings.map((w) => w.code)).toEqual(["back_in_hand"]);
+    expect(h.melds).toEqual([
+      { open: true, tiles: [TILE.Haku, TILE.Haku, TILE.Haku, TILE.Haku] },
+      { open: false, tiles: [TILE.P5, TILE.P5, TILE.P5, AKA.P5] },
+    ]);
+  });
+
+  it("明杠第四张叠在横置牌上（高出一张牌宽）仍归入同一组", () => {
+    const closed = row(["2s", "3s", "4s", "5p", "6p", "7p", "1z", "4s~"], 10, 300);
+    const kan = row(["7z~", "7z", "7z"], 20, 420); // 第一张横置，第四张叠在它上面
+    const stacked = det("7z", 22, 420 - W + 2, { side: true });
+    const pon = row(["3m", "3m~", "3m"], kan.end + GAP, 420);
+    const dora = row(["6s"], 20, 200);
+    const { hand: h, warnings } = layoutHand([
+      ...closed.dets,
+      ...kan.dets,
+      stacked,
+      ...pon.dets,
+      ...dora.dets,
+    ]);
+    expect(warnings).toEqual([]);
+    expect(h.closed).toHaveLength(8);
+    expect(h.winTile).toBe(TILE.S4);
+    expect(h.melds).toEqual([
+      { open: true, tiles: [TILE.Chun, TILE.Chun, TILE.Chun, TILE.Chun] },
+      { open: true, tiles: [TILE.M3, TILE.M3, TILE.M3] },
+    ]);
+    expect(h.doraIndicators).toEqual([TILE.S6]);
   });
 
   it("赤五按类名映射为 35/36/37", () => {

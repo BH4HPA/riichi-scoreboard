@@ -26,6 +26,7 @@ export type RecognitionWarningCode =
   | "extra_rows"
   | "too_many_dora"
   | "kan_mismatch"
+  | "odd_box"
   | "low_conf";
 
 export interface RecognitionWarning {
