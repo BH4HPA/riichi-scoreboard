@@ -142,6 +142,13 @@ export function mountWebSocket(app: Hono, upgradeWebSocket: UpgradeWebSocket, de
                 fail(ws, null, err);
               }
               return;
+            case "music":
+              try {
+                deps.registry.setMusic(room, client, msg.track);
+              } catch (err) {
+                fail(ws, null, err);
+              }
+              return;
             case "evaluate": {
               const id = messageId(msg);
               const game = room.state.game?.present;

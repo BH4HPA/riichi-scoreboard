@@ -12,14 +12,17 @@ import {
   replay,
   seatOfPlayer,
   seatsOnline,
+  STOPS_MUSIC,
   toRoomView,
   validateCommand,
+  validateMusicTrack,
   validateUiIntent,
   type ClientCommand,
   type ClientWinValue,
   type Command,
   type EventActor,
   type GameCommand,
+  type MusicState,
   type PlayerRef,
   type RoomEvent,
   type RoomRules,
@@ -52,6 +55,8 @@ export interface LiveRoom {
   seq: number;
   clients: Map<string, RoomClient>;
   ui: Map<string, UiState>;
+  /** 电视正在播放的立直音乐；随 state 广播，结算类命令提交后清空 */
+  music: MusicState | null;
   lastActivity: number;
   /** 自动开局倒计时；null = 未在倒计时 */
   autoStart: { at: number; timer: ReturnType<typeof setTimeout> } | null;
@@ -107,6 +112,7 @@ export class RoomRegistry {
       seq: 0,
       clients: new Map(),
       ui: new Map(),
+      music: null,
       lastActivity: at,
       autoStart: null,
     };
@@ -133,6 +139,7 @@ export class RoomRegistry {
       seq: events.length ? events[events.length - 1]!.seq : 0,
       clients: new Map(),
       ui: new Map(),
+      music: null,
       lastActivity: row.updated_at,
       autoStart: null,
     };
@@ -147,7 +154,7 @@ export class RoomRegistry {
 
   view(room: LiveRoom): RoomView {
     const autoStartIn = room.autoStart ? Math.max(0, room.autoStart.at - this.now()) : null;
-    return toRoomView(room.state, room.seq, this.onlineIds(room), autoStartIn);
+    return toRoomView(room.state, room.seq, this.onlineIds(room), autoStartIn, room.music);
   }
 
   /** 校验 baseSeq → 形状校验 → 按 actor 补全/鉴权 → reduce → 事务落库 → 广播。 */
@@ -199,6 +206,7 @@ export class RoomRegistry {
     room.state = next;
     room.seq = event.seq;
     room.lastActivity = event.at;
+    if (STOPS_MUSIC[command.type]) room.music = null;
     this.reconcileAutoStart(room);
     this.broadcastState(room);
     return event;
@@ -323,6 +331,28 @@ export class RoomRegistry {
       });
     }
     this.broadcastUi(room);
+  }
+
+  /** 立直音乐：只在对局进行中可播；null = 停止。变化随 state 广播给所有端。 */
+  setMusic(room: LiveRoom, client: RoomClient, rawTrack: unknown): void {
+    const track = validateMusicTrack(rawTrack);
+    if (track !== null) {
+      const game = room.state.game?.present;
+      if (room.state.phase !== "playing" || !game || game.status === "finished") {
+        throw new DomainError("no_game", "对局未在进行中");
+      }
+      room.music = {
+        track,
+        seat: seatOfPlayer(room.state.seats, client.playerId),
+        name: client.name,
+        at: this.now(),
+      };
+    } else if (room.music === null) {
+      return;
+    } else {
+      room.music = null;
+    }
+    this.broadcastState(room);
   }
 
   uiList(room: LiveRoom): UiState[] {

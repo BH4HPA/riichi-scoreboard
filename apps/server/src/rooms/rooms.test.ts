@@ -2,7 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { serve, type ServerType } from "@hono/node-server";
 import { createNodeWebSocket } from "@hono/node-ws";
 import { Hono } from "hono";
-import type { ClientMessage, RoomView, ServerMessage, UiState } from "@riichi/core";
+import {
+  MUSIC_TRACKS,
+  type ClientMessage,
+  type RoomView,
+  type ServerMessage,
+  type UiState,
+} from "@riichi/core";
 import { createApp } from "../app";
 import { loadConfig } from "../config";
 import { PlayersRepo } from "../db/players";
@@ -334,11 +340,34 @@ describe("rooms end-to-end", () => {
     phones[3]!.close();
     await tv.waitUi((u) => u.length === 0);
 
-    // 终局 → 战绩落库；返回大厅不删战绩
+    // 立直音乐：按下 → 全员收到；他人再按 → 替换；停止；后加入者直接拿到；曲目不存在被拒
+    const trackA = MUSIC_TRACKS[0]!.id;
+    const trackB = MUSIC_TRACKS[1]!.id;
+    phones[0]!.send({ type: "music", track: trackA });
+    const playing = await tv.waitState((r) => r.music?.track === trackA);
+    expect(playing.music).toMatchObject({ seat: 0, name: "东" });
+    phones[1]!.send({ type: "music", track: trackB });
+    const replaced = await phones[2]!.waitState((r) => r.music?.track === trackB);
+    expect(replaced.music?.seat).toBe(1);
+    expect(replaced.music!.at).toBeGreaterThanOrEqual(playing.music!.at);
+    const late = new Client(room.code, console_.token);
+    await late.open();
+    expect((await late.waitState(() => true)).music?.track).toBe(trackB);
+    late.close();
+    phones[0]!.send({ type: "music", track: "nope" });
+    expect(await phones[0]!.until("error")).toMatchObject({ code: "bad_music" });
+    phones[1]!.send({ type: "music", track: null });
+    await tv.waitState((r) => r.music === null);
+    phones[1]!.send({ type: "music", track: trackB });
+    await tv.waitState((r) => r.music?.track === trackB);
+
+    // 终局 → 音乐停、战绩落库；返回大厅不删战绩；大厅里不能放音乐
     const cur = await tv.waitState(() => true);
     tv.send({ type: "command", id: "end", baseSeq: cur.seq, command: { type: "endGame" } });
     const endAck = await tv.outcome();
     expect(endAck).toMatchObject({ type: "ack" });
+    const ended = await tv.waitState((r) => r.seq === (endAck as { seq: number }).seq);
+    expect(ended.music).toBeNull();
     const statsOf = async (token: string) =>
       (
         (await (
@@ -359,6 +388,8 @@ describe("rooms end-to-end", () => {
     expect(await tv.outcome()).toMatchObject({ type: "ack" });
     stats = await statsOf(players[0]!.token);
     expect(stats.games).toBe(1);
+    tv.send({ type: "music", track: trackA });
+    expect(await tv.until("error")).toMatchObject({ code: "no_game" });
 
     // 重启等价：从数据库重新回放得到的房间状态与在线注册表一致
     const online = ctx.registry.get(room.code);
