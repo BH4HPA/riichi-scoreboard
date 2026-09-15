@@ -58,7 +58,9 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   persisted engine result) but such hands render without red-five marks.
 - `RoomRules` fields and their consumers are documented in `packages/core/src/types/rules.ts`. Built-in
   presets live in `packages/core/src/rules/presets.ts` (M-League default, Majsoul ranked, Tenhou Houou,
-  Saikouisen, WRC); differences the model cannot express are stated in each preset's `note`.
+  Saikouisen, WRC); differences the model cannot express are stated in each preset's `note`. Rooms store
+  only the rules; the preset name shown in lobbies is derived by exact match (`findPreset`, canonical key =
+  `validateRules` output), otherwise 自定义. Personal presets only take part in the editor's select.
 - Win input has two shapes: `manual` (han/fu) and `hand` (tiles; evaluated server-side; the hand is kept
   in `WinRecord.hand` for history display; also the input shape for the future photo-recognition feature).
 - Room phases: `lobby` → `playing` → `finished` (→ `lobby` via `toLobby`), plus `closed` after `dissolve`
