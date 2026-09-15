@@ -311,7 +311,15 @@ describe("rooms end-to-end", () => {
     // ui 镜像：手机打开结算框 → 电视收到；断开 → 清理
     phones[3]!.send({
       type: "ui",
-      intent: { kind: "settlement", mode: "draw", deltas: null, summary: null },
+      intent: {
+        kind: "settlement",
+        mode: "draw",
+        deltas: null,
+        summary: null,
+        loser: null,
+        riichi: [],
+        wins: [],
+      },
     });
     const intents = await tv.waitUi((u) => u.length > 0);
     expect(intents[0]!.seat).toBe(3);

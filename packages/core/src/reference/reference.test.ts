@@ -5,6 +5,7 @@ import { AKA, TILE } from "../types/tiles";
 import { parseTiles } from "./notation";
 import { buildPointsTable, cellValidity, limitCards, pointsFromBase } from "./pointsTable";
 import { YAKU_PAGES } from "./yakuTable";
+import { validateUiIntent } from "../protocol";
 
 const R = MLEAGUE_RULES;
 
@@ -89,5 +90,73 @@ describe("点数表布局", () => {
     expect(cards[0]!.cell).toEqual({ ron: 8000, tsumo: { ko: 2000, oya: 4000 } });
     const kazoe = { ...R, scoring: { ...R.scoring, kazoeYakuman: true } };
     expect(limitCards(kazoe, "ko")[4]!.label).toBe("累计役满");
+  });
+});
+
+describe("validateUiIntent：结算镜像", () => {
+  const hand = {
+    closed: [1, 2, 3, 13, 36, 15, 25, 26, 27, 7, 8, 9, 11, 11],
+    melds: [],
+    winTile: 9,
+    tsumo: false,
+    doraIndicators: [],
+    uraIndicators: [],
+    riichi: false,
+    doubleRiichi: false,
+    ippatsu: false,
+    afterKan: false,
+    lastTile: false,
+    firstTake: false,
+  };
+  const evaluated = { han: 2, fu: 30, yakuman: 0, yaku: { "33": 1, "55": 1 }, isAgari: true };
+  const base = { kind: "settlement", mode: "ron", deltas: [0, 2000, 0, -2000], summary: "x" };
+
+  it("接受带牌面与评估结果的和牌者，裁剪过长文案", () => {
+    const out = validateUiIntent({
+      ...base,
+      loser: 3,
+      riichi: [1],
+      wins: [{ winner: 1, valueText: "a".repeat(300), hand, evaluated }],
+    });
+    expect(out.kind).toBe("settlement");
+    if (out.kind !== "settlement") return;
+    expect(out.wins[0]!.hand).toEqual(hand);
+    expect(out.wins[0]!.evaluated).toEqual(evaluated);
+    expect(out.wins[0]!.valueText).toHaveLength(200);
+    expect(out.loser).toBe(3);
+  });
+
+  it.each([
+    [
+      {
+        ...base,
+        loser: null,
+        riichi: [],
+        wins: [{ winner: 9, valueText: null, hand: null, evaluated: null }],
+      },
+    ],
+    [{ ...base, loser: null, riichi: [0, 0, 0, 0, 0], wins: [] }],
+    [
+      {
+        ...base,
+        loser: null,
+        riichi: [],
+        wins: [{ winner: 0, valueText: null, hand: { ...hand, winTile: 0 }, evaluated: null }],
+      },
+    ],
+    [
+      {
+        ...base,
+        loser: null,
+        riichi: [],
+        wins: [
+          { winner: 0, valueText: null, hand: null, evaluated: { ...evaluated, yaku: { a: 1.5 } } },
+        ],
+      },
+    ],
+    [{ ...base, loser: null, riichi: [], wins: [1, 2, 3, 4] }],
+    [{ ...base, loser: null, riichi: [] }],
+  ])("拒绝畸形结算意图 %#", (input) => {
+    expect(() => validateUiIntent(input)).toThrow(/镜像意图|无效/);
   });
 });

@@ -1,4 +1,5 @@
 import { DomainError } from "./progress/advance";
+import { assertSeat, validateHandShape } from "./reducer/validateCommand";
 import { YAKU_PAGES } from "./reference/yakuTable";
 import type { ClientCommand } from "./types/commands";
 import type { RoomRules } from "./types/rules";
@@ -42,6 +43,14 @@ export function toRoomView(state: RoomState, seq: number): RoomView {
   };
 }
 
+/** 结算镜像里的一位和牌者：牌面只在录满并算出结果后才携带。 */
+export interface SettlementWinView {
+  winner: Seat;
+  valueText: string | null;
+  hand: HandInput | null;
+  evaluated: EvaluatedHand | null;
+}
+
 /** 手机端当前打开的界面，供电视镜像。 */
 export type UiIntent =
   | { kind: "none" }
@@ -50,6 +59,9 @@ export type UiIntent =
       mode: "tsumo" | "ron" | "draw" | "abortive" | "chombo";
       deltas: number[] | null;
       summary: string | null;
+      loser: Seat | null;
+      riichi: Seat[];
+      wins: SettlementWinView[];
     }
   | { kind: "reference"; tab: ReferenceTab; sub: string }
   | { kind: "rules" }
@@ -79,11 +91,48 @@ const REFERENCE_SUBS: Record<ReferenceTab, readonly string[]> = {
 };
 const SUMMARY_MAX = 200;
 
+const MAX_YAKU_ENTRIES = 20;
+
+function badIntent(): never {
+  throw new DomainError("bad_intent", "镜像意图格式错误");
+}
+
+function seatListOrBad(v: unknown): Seat[] {
+  if (!Array.isArray(v) || v.length > 4) return badIntent();
+  for (const s of v) assertSeat(s);
+  return v as Seat[];
+}
+
+/** 引擎结果的形状校验（镜像用，不做业务判断）。 */
+function evaluatedOrBad(v: unknown): EvaluatedHand {
+  if (typeof v !== "object" || v === null) return badIntent();
+  const r = v as Record<string, unknown>;
+  const int = (x: unknown, max: number) =>
+    typeof x === "number" && Number.isInteger(x) && x >= 0 && x <= max ? x : badIntent();
+  if (typeof r.isAgari !== "boolean") return badIntent();
+  if (typeof r.yaku !== "object" || r.yaku === null) return badIntent();
+  const entries = Object.entries(r.yaku as Record<string, unknown>);
+  if (entries.length > MAX_YAKU_ENTRIES) return badIntent();
+  const yaku: Record<string, number> = {};
+  for (const [k, n] of entries) {
+    if (k.length > 32) return badIntent();
+    yaku[k] = int(n, 200);
+  }
+  const reason = r.reason;
+  if (reason !== undefined && reason !== "noYaku" && reason !== "notAgari") return badIntent();
+  return {
+    han: int(r.han, 200),
+    fu: int(r.fu, 110),
+    yakuman: int(r.yakuman, 6),
+    yaku,
+    isAgari: r.isAgari,
+    ...(reason === undefined ? {} : { reason }),
+  };
+}
+
 /** 校验并规范化客户端发来的镜像意图；形状不对即抛 DomainError。 */
 export function validateUiIntent(input: unknown): UiIntent {
-  const bad = (): never => {
-    throw new DomainError("bad_intent", "镜像意图格式错误");
-  };
+  const bad = badIntent;
   if (typeof input !== "object" || input === null) return bad();
   const v = input as Record<string, unknown>;
   switch (v.kind) {
@@ -108,11 +157,29 @@ export function validateUiIntent(input: unknown): UiIntent {
       }
       const summary = v.summary;
       if (summary !== null && typeof summary !== "string") return bad();
+      if (v.loser !== null) assertSeat(v.loser);
+      const riichi = seatListOrBad(v.riichi);
+      if (!Array.isArray(v.wins) || v.wins.length > 3) return bad();
+      const wins = v.wins.map((w): SettlementWinView => {
+        if (typeof w !== "object" || w === null) return bad();
+        const r = w as Record<string, unknown>;
+        assertSeat(r.winner);
+        if (r.valueText !== null && typeof r.valueText !== "string") return bad();
+        return {
+          winner: r.winner,
+          valueText: typeof r.valueText === "string" ? r.valueText.slice(0, SUMMARY_MAX) : null,
+          hand: r.hand === null ? null : validateHandShape(r.hand),
+          evaluated: r.evaluated === null ? null : evaluatedOrBad(r.evaluated),
+        };
+      });
       return {
         kind: "settlement",
         mode: v.mode as (typeof SETTLEMENT_MODES)[number],
         deltas: deltas as number[] | null,
         summary: typeof summary === "string" ? summary.slice(0, SUMMARY_MAX) : null,
+        loser: v.loser as Seat | null,
+        riichi,
+        wins,
       };
     }
     default:

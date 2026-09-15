@@ -7,6 +7,7 @@ import {
   type GameState,
   type RoomRules,
   type Seat,
+  type SettlementWinView,
 } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Label, Select } from "@/ui/controls";
@@ -64,6 +65,17 @@ function PaoPicker({
   );
 }
 
+/** 镜像用的和牌者视图：牌面模式且已算出结果时才带手牌（半手牌会被服务端拒绝）。 */
+function mirrorWin(winner: Seat, draft: ValueDraft, valueText: string | null): SettlementWinView {
+  const evaluated = draft.mode === "hand" ? draft.evaluated : null;
+  return {
+    winner,
+    valueText,
+    hand: evaluated ? draft.hand : null,
+    evaluated,
+  };
+}
+
 function description(game: GameState, names: string[]): string {
   return `${roundLabel(game.kyoku, game.honba)}，庄家：${names[dealerOf(game.kyoku)]}`;
 }
@@ -99,7 +111,15 @@ function TsumoForm({ game, names, rules, mirror, defaultSeat, onDone }: FormProp
     : null;
   useMirror(
     true,
-    { kind: "settlement", mode: "tsumo", deltas: preview?.payment.deltas ?? null, summary },
+    {
+      kind: "settlement",
+      mode: "tsumo",
+      deltas: preview?.payment.deltas ?? null,
+      summary,
+      loser: null,
+      riichi: seatsOf(riichi),
+      wins: [mirrorWin(winner, draft, preview?.valueText ?? null)],
+    },
     mirror,
   );
 
@@ -218,7 +238,15 @@ function RonForm({ game, names, rules, mirror, defaultSeat, onDone }: FormProps)
     : null;
   useMirror(
     true,
-    { kind: "settlement", mode: "ron", deltas: preview?.deltas ?? null, summary },
+    {
+      kind: "settlement",
+      mode: "ron",
+      deltas: preview?.deltas ?? null,
+      summary,
+      loser,
+      riichi: seatsOf(riichi),
+      wins: wins.map((w, i) => mirrorWin(w.winner, w.draft, preview?.wins[i]?.valueText ?? null)),
+    },
     mirror,
   );
 

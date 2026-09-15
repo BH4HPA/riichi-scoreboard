@@ -71,7 +71,19 @@ function DrawForm({ game, names, rules, mirror, onDone }: FormProps) {
       .map((s) => names[s])
       .join("、") || "无"
   }${preview.nagashi.length ? `；流局满贯：${preview.nagashi.map((s) => names[s]).join("、")}` : ""}；本局立直棒 ${formatDiff(preview.riichiIncome)} 点计入场供`;
-  useMirror(true, { kind: "settlement", mode: "draw", deltas: preview.deltas, summary }, mirror);
+  useMirror(
+    true,
+    {
+      kind: "settlement",
+      mode: "draw",
+      deltas: preview.deltas,
+      summary,
+      loser: null,
+      riichi: seatsOf(riichi),
+      wins: [],
+    },
+    mirror,
+  );
 
   const confirm = async () => {
     setBusy(true);
@@ -160,6 +172,9 @@ function AbortiveForm({ names, mirror, onDone }: FormProps) {
       mode: "abortive",
       deltas,
       summary: ABORTIVE_OPTIONS.find((o) => o.value === reason)?.label ?? null,
+      loser: null,
+      riichi: seatsOf(riichi),
+      wins: [],
     },
     mirror,
   );
@@ -239,7 +254,15 @@ function ChomboForm({
   const [busy, setBusy] = useState(false);
   useMirror(
     true,
-    { kind: "settlement", mode: "chombo", deltas: null, summary: `${names[offender]} 错和` },
+    {
+      kind: "settlement",
+      mode: "chombo",
+      deltas: null,
+      summary: `${names[offender]} 错和`,
+      loser: offender,
+      riichi: [],
+      wins: [],
+    },
     mirror,
   );
   const confirm = async () => {

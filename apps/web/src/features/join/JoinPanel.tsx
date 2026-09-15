@@ -72,12 +72,14 @@ export function JoinPanel() {
             disabled={checking}
           />
         </div>
-        <p
-          className={error ? "mt-2 text-sm text-neg" : "mt-2 text-xs text-muted"}
-          aria-live="polite"
-        >
-          {error ?? (checking ? "正在确认房间…" : "输满 6 位后自动加入")}
-        </p>
+        {(error || checking) && (
+          <p
+            className={error ? "mt-2 text-sm text-neg" : "mt-2 text-xs text-muted"}
+            aria-live="polite"
+          >
+            {error ?? "正在确认房间…"}
+          </p>
+        )}
       </div>
     </div>
   );

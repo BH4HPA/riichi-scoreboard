@@ -57,6 +57,9 @@ test("截图：番符表与主控台", async ({ browser }) => {
   }
   await ron.getByText("2 番 30 符").waitFor();
   await phones[2]!.screenshot({ path: `${OUT}/phone-ron-keyboard.png`, fullPage: true });
+  await tv.getByText("正在录入荣和结算").waitFor();
+  await tv.waitForTimeout(300);
+  await tv.screenshot({ path: `${OUT}/tv-mirror-settlement.png` });
   await ron.getByRole("button", { name: "确认荣和" }).click();
   await tv.getByTestId("points-2").filter({ hasText: "27,000" }).waitFor();
   await tv.screenshot({ path: `${OUT}/tv-game.png` });
