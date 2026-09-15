@@ -23,4 +23,5 @@ export * from "./reference/yakuTable";
 export * from "./reference/fuTable";
 export * from "./reference/pointsTable";
 export * from "./music";
+export * from "./recognition";
 export * from "./protocol";

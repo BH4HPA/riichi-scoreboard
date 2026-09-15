@@ -1,0 +1,43 @@
+# 由 scripts/gen_classes.py 生成，勿手改；类 id 顺序 = packages/core/src/recognition/manifest.json
+path: ../data/merged
+train: images/train
+val: images/val
+names:
+  0: 1m
+  1: 2m
+  2: 3m
+  3: 4m
+  4: 5m
+  5: 6m
+  6: 7m
+  7: 8m
+  8: 9m
+  9: 0m
+  10: 1p
+  11: 2p
+  12: 3p
+  13: 4p
+  14: 5p
+  15: 6p
+  16: 7p
+  17: 8p
+  18: 9p
+  19: 0p
+  20: 1s
+  21: 2s
+  22: 3s
+  23: 4s
+  24: 5s
+  25: 6s
+  26: 7s
+  27: 8s
+  28: 9s
+  29: 0s
+  30: 1z
+  31: 2z
+  32: 3z
+  33: 4z
+  34: 5z
+  35: 6z
+  36: 7z
+  37: back

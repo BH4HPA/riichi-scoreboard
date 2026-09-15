@@ -79,6 +79,15 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   the system actor; any change that breaks the condition cancels it. Four locals never auto-start.
 - Deployed split-hosted: `WEB_DIST=` (empty) disables the SPA in the server image; app paths then 302 to
   the first `CORS_ORIGINS` entry.
+- Photo recognition (in progress): a YOLO11n detector over 38 classes; the class list (index = class id)
+  and the currently published model live in `packages/core/src/recognition/manifest.json` (`model: null`
+  = nothing published yet, clients hide the entry point). `ml/` is the Python/uv training workbench
+  (public datasets → remap → train → export ONNX with embedded NMS, `[1,300,6]` output → publish with
+  `ci/upload-model.sh` to `riichi/models/<uuid>.onnx`); `ml/configs/*` are generated from the
+  manifest by `ml/scripts/gen_classes.py` (CI runs it with `--check`). Layout convention for photos: hand
+  row = closed tiles, gap, win tile, gap, melds (4 tiles with backs at both ends = closed kan); dora
+  indicators on the row above (a second row above = ura). Layout post-processing is pure TS in core
+  (shared by the phone's onnxruntime-web engine and the server's onnxruntime-node engine).
 - Riichi music: `RoomView.music` (`{track, seat, at}`) is memory-only room state like `online`; a client
   sends `{type:"music", track: id | null}` (the section lives in the shared `ControlPanel`, so the console
   can press it for local players with `seat: null`), the TV plays the track from the static bucket

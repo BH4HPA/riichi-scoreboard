@@ -1,0 +1,17 @@
+[project]
+name = "riichi-ml"
+version = "0.1.0"
+description = "牌面检测模型（YOLO11n）的训练、导出与预标注脚本"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "ultralytics>=8.3.67",
+  "onnx>=1.16",
+  "onnxslim>=0.1.34",
+  "onnxruntime>=1.18",
+  "roboflow>=1.1",
+  "pillow>=10",
+  "pyyaml>=6",
+]
+
+[tool.uv]
+package = false

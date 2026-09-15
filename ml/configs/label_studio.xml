@@ -1,0 +1,44 @@
+<!-- 由 scripts/gen_classes.py 生成；Label Studio 项目 Labeling Interface 粘贴本文件 -->
+<View>
+  <Image name="image" value="$image" zoom="true"/>
+  <RectangleLabels name="label" toName="image">
+    <Label value="1m"/>
+    <Label value="2m"/>
+    <Label value="3m"/>
+    <Label value="4m"/>
+    <Label value="5m"/>
+    <Label value="6m"/>
+    <Label value="7m"/>
+    <Label value="8m"/>
+    <Label value="9m"/>
+    <Label value="0m"/>
+    <Label value="1p"/>
+    <Label value="2p"/>
+    <Label value="3p"/>
+    <Label value="4p"/>
+    <Label value="5p"/>
+    <Label value="6p"/>
+    <Label value="7p"/>
+    <Label value="8p"/>
+    <Label value="9p"/>
+    <Label value="0p"/>
+    <Label value="1s"/>
+    <Label value="2s"/>
+    <Label value="3s"/>
+    <Label value="4s"/>
+    <Label value="5s"/>
+    <Label value="6s"/>
+    <Label value="7s"/>
+    <Label value="8s"/>
+    <Label value="9s"/>
+    <Label value="0s"/>
+    <Label value="1z"/>
+    <Label value="2z"/>
+    <Label value="3z"/>
+    <Label value="4z"/>
+    <Label value="5z"/>
+    <Label value="6z"/>
+    <Label value="7z"/>
+    <Label value="back"/>
+  </RectangleLabels>
+</View>

@@ -14,3 +14,9 @@ coverage/
 .e2e-data/
 test-results/
 playwright-report/
+
+# ml/ 训练工作台：数据与训练产物不入库
+ml/runs/
+ml/.venv/
+ml/*.pt
+__pycache__/
