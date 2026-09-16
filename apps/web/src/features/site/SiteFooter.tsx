@@ -20,3 +20,13 @@ export function SiteFooter({ className }: { className?: string }) {
     </footer>
   );
 }
+
+/** Logo + 站名：宽屏主控台大厅左栏右下角。 */
+export function SiteBrand({ className }: { className?: string }) {
+  return (
+    <span className={cn("flex items-center gap-2 text-sm font-semibold", className)}>
+      <img src="/icon-192.png" alt="" className="h-7 w-7 rounded-lg" />
+      立直麻将计分板
+    </span>
+  );
+}

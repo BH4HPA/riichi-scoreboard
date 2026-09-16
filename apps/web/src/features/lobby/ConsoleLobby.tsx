@@ -9,7 +9,7 @@ import { useCommand } from "@/ws/useRoom";
 import { cn } from "@/lib/utils";
 import { RoomQr, RoomQrDialog } from "@/features/console/RoomQr";
 import { RulesEditor } from "@/features/rules/RulesEditor";
-import { SiteFooter } from "@/features/site/SiteFooter";
+import { SiteBrand, SiteFooter } from "@/features/site/SiteFooter";
 import { LocalPlayerDialog } from "./LocalPlayerDialog";
 import { SeatCards } from "./SeatCards";
 import { useCountdown } from "./useCountdown";
@@ -104,6 +104,12 @@ export function ConsoleLobby({
         强制开局
       </Button>
       <span className="ml-auto flex items-center gap-2">
+        {/* 窄屏的「本地玩家」在顶栏 */}
+        {wide && (
+          <Button size="lg" variant="ghost" onClick={() => openLocals(null)}>
+            <Users className="h-5 w-5" /> 本地玩家
+          </Button>
+        )}
         {extraActions}
         <Button size="lg" variant="ghost" onClick={onNewRoom}>
           新房间
@@ -127,7 +133,10 @@ export function ConsoleLobby({
               手机扫码加入，四人都点「准备」后即可开局。
             </p>
           </div>
-          <SiteFooter />
+          <div className="flex items-center justify-between gap-4">
+            <SiteFooter />
+            <SiteBrand className="shrink-0" />
+          </div>
         </section>
       ) : (
         <div className="flex items-center gap-3">
@@ -145,16 +154,7 @@ export function ConsoleLobby({
       )}
 
       <section className="flex min-h-0 flex-1 flex-col gap-4">
-        <div>
-          {wide && (
-            <div className="mb-2 flex justify-end">
-              <Button variant="ghost" size="sm" onClick={() => openLocals(null)}>
-                <Users className="h-4 w-4" /> 本地玩家
-              </Button>
-            </div>
-          )}
-          {seats}
-        </div>
+        {seats}
         {rulesCard}
         {actions}
       </section>
