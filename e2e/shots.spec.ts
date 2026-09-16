@@ -176,7 +176,12 @@ test("截图：取景框、确认态与标注页", async ({ browser }) => {
   if ((await sheet.count()) > 0)
     await lab.screenshot({ path: `${OUT}/phone-label-viewfinder.png` });
   await lab.getByTestId("hand-confirm").waitFor({ timeout: 30_000 });
+  await lab.getByTestId("annotated-shot").waitFor({ timeout: 15_000 });
   await lab.screenshot({ path: `${OUT}/phone-label-confirm.png` });
+  await lab.getByTestId("annotated-shot").click();
+  await lab.getByTestId("annotated-lightbox").waitFor();
+  await lab.waitForTimeout(200);
+  await lab.screenshot({ path: `${OUT}/phone-label-lightbox.png` });
   await labelCtx.close();
 
   // 房间里的结算确认态：识别通过时键盘收起，只剩一排牌

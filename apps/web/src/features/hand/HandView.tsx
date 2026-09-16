@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import type { RecognizedHand } from "@riichi/core";
 import { cn } from "@/lib/utils";
 import { HandStrip, IndicatorRow } from "./HandStrip";
@@ -36,11 +37,26 @@ export function HandView({
   onAddDora?: (() => void) | undefined;
   className?: string;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [overflowing, setOverflowing] = useState(false);
+  // 牌变了、容器宽度变了都要重新量：牌越多越会溢出，副露多的手牌反而可能放得下
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const measure = () => setOverflowing(el.scrollWidth - el.clientWidth > 1);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [hand, size, scroll]);
+
   return (
     <div className={cn("space-y-2", className)}>
-      {/* 横滑时右侧渐隐：和张与副露在最右端，不给提示用户会以为牌就这些 */}
-      <div className={scroll ? "relative" : undefined}>
-        <div className={scroll ? "-mx-1 overflow-x-auto px-1" : undefined}>
+      {/* 横滑时右侧渐隐：和张与副露在最右端，不给提示用户会以为牌就这些。
+          负边距要挂在外层：挂在滚动容器上的话它比外层宽 4px，渐变停在外层右沿，
+          最右那 4px 内容（正好是和张的描边）会从渐变里探出来，看着就是没对齐。 */}
+      <div className={scroll ? "relative -mx-1" : undefined}>
+        <div ref={scrollRef} className={scroll ? "overflow-x-auto px-1" : undefined}>
           <HandStrip
             closed={hand.closed}
             melds={hand.melds}
@@ -51,7 +67,8 @@ export function HandView({
             onTileClick={onTileClick}
           />
         </div>
-        {scroll && (
+        {/* 放得下就不画：否则渐变会白白把最后一张牌压暗，看着像渲染坏了 */}
+        {scroll && overflowing && (
           <span
             className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-surface to-transparent"
             aria-hidden

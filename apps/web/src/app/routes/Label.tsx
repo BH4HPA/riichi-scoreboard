@@ -1,11 +1,12 @@
 import { useCallback, useState } from "react";
 import { Camera } from "lucide-react";
 import { Link } from "react-router";
-import { MLEAGUE_RULES } from "@riichi/core";
+import { MLEAGUE_RULES, type Detection } from "@riichi/core";
 import { useSession } from "@/api/session";
 import { Button } from "@/ui/button";
 import { Notice } from "@/ui/notice";
 import { canUseCamera } from "@/lib/device";
+import { AnnotatedShot } from "@/features/recognition/AnnotatedShot";
 import { CameraSheet, type Capture } from "@/features/recognition/camera/CameraSheet";
 import { applyRecognized } from "@/features/recognition/applyRecognized";
 import { patchRecognition } from "@/features/recognition/api";
@@ -24,11 +25,14 @@ const RULES = MLEAGUE_RULES;
 export function Label() {
   const [shooting, setShooting] = useState(false);
   const [draft, setDraft] = useState<ValueDraft>(() => createValueDraft(false));
+  /** 这一张的定格帧与检测框：确认界面回看用，提交后清掉 */
+  const [shot, setShot] = useState<{ photo: Blob; detections: Detection[] } | null>(null);
   const [saved, setSaved] = useState(0);
   const notify = useRoomStore((s) => s.notify);
 
   const onCapture = useCallback(({ blob, result }: Capture) => {
     setShooting(false);
+    setShot({ photo: blob, detections: result.detections });
     const key = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
     setDraft((d) => applyRecognized(d, result, RULES, key));
     void useSession
@@ -63,6 +67,7 @@ export function Label() {
     }
     setSaved((n) => n + 1);
     setDraft(createValueDraft(false));
+    setShot(null);
     notify("info", "已记下，接着拍");
     setShooting(true);
   };
@@ -91,6 +96,7 @@ export function Label() {
 
       {draft.recognition && (
         <>
+          {shot && <AnnotatedShot photo={shot.photo} detections={shot.detections} />}
           <HandEditor
             draft={draft}
             onChange={(update) => setDraft(update)}
