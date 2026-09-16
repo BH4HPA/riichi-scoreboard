@@ -37,16 +37,12 @@ type Resolution = "keep" | number | null;
 /**
  * 逐位比对模型认的牌与用户改正的牌，决定这个框最终该标什么：
  * - 牌没变 → 用户看过没动，模型原来那个类就是对的。
- * - 只有赤五标记变了（基础牌相同）→ 是房间规则把赤五折回了普通五（applyRecognized 干的），
- *   不是模型认错。**不能**按 corrected 改，否则会把照片里的赤五标成普通五。
- * - 基础牌变了 → 模型认错，按 corrected 重标；没有对应的框（暗杠补出来的那几张）就标不了。
+ * - 牌变了 → 模型认错，按 corrected 重标；没有对应的框（暗杠补出来的那几张）就标不了。
+ *   包括「普通五 → 赤五」：用户在替换面板里改成赤五是真纠正，必须重标。
+ * 「赤五 → 普通五」到不了这里，在 align 里整条送人工（见那里的说明）。
  */
 export function resolve(origin: TileOrigin, predicted: Tile, truth: Tile): Resolution {
   if (predicted === truth) return "keep";
-  // **只有赤 → 普通这一个方向**是规则折返（applyRecognized 的 fold）。
-  // 反过来（模型认成普通五、用户在替换面板里改成赤五）是真纠正，必须重标，
-  // 否则照片里明明是红五、标注却写成普通五。
-  if (baseTile(predicted) === baseTile(truth) && isAka(predicted) && !isAka(truth)) return "keep";
   if (origin.det < 0) return null;
   return CLASS_OF_TILE.get(truth) ?? null;
 }
@@ -91,7 +87,8 @@ function inPlace(pairs: ReadonlyArray<[unknown, Tile, Tile]>): boolean {
  * Python 只负责拉照片与写文件。
  *
  * 只有**严格对齐**的记录才标成 auto：改动确实是逐位替换（见 inPlace）、
- * 每个框要么被布局采信要么被判为误检、改到的位置都有对应的框。
+ * 每个框要么被布局采信要么被判为误检、改到的位置都有对应的框，
+ * 且没有「赤五改成普通五」、没有布局猜过的补牌（两者都分不清框该标什么）。
  */
 export function align(
   detections: Detection[],
@@ -146,6 +143,20 @@ export function align(
   row(hand.uraIndicators, corrected.uraIndicators, provenance.uraIndicators);
 
   if (!inPlace(pairs)) return manual("牌的位置整体错开了（编辑态删牌再补牌会这样）");
+  /*
+   * 「赤五 → 同一张普通五」有两种成因，从记录里分不开（recognitions 没存房间规则）：
+   * - 不用赤五的房间，applyRecognized 把照片里的赤五折回了普通五 —— 照片里就是赤，该保留 0p；
+   * - 用户在纠错，或 applyRecognized 按每色上限折掉了超额的赤五 —— 照片里是普通五，该重标。
+   * 猜错任一边都是把错标签写进没人复核的 auto 队列，所以整条交给人。
+   */
+  if (pairs.some(([, p, t]) => isAka(p) && !isAka(t) && baseTile(p) === baseTile(t))) {
+    return manual("赤五改成了普通五：分不清是房间规则折回还是纠正认错");
+  }
+  // 布局猜过的补出来的牌（暗杠中间两张不一致、白板杠里一张认成牌背）：落选或认错的那个框
+  // 被采信了却没有对应位置，用户照单确认它也会带着模型原判进 auto（例如白板框标成 back）
+  if (pairs.some(([o]) => o.det < 0 && o.guessed)) {
+    return manual("布局猜过的牌（暗杠两张不一致、白板杠补齐）：落选或认错的那个框标不出来");
+  }
 
   // 中途放弃时不能留下改了一半的标注：先在副本上写，全部通过再落地
   const fixed = labels.map((l) => ({ ...l }));
