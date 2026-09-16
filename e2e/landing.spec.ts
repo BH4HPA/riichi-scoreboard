@@ -34,6 +34,8 @@ test("手机 UA 直接看到加入面板；HTTP 下扫码入口隐藏并提示�
   const page = await ctx.newPage();
   await page.goto("/");
   await expect(page.getByLabel("房间码")).toBeAttached();
+  await expect(page.getByRole("link", { name: /^© Ray 2014-\d{4}$/ })).toBeInViewport();
+  await expect(page.getByRole("link", { name: "浙ICP备2022018560号-2" })).toBeInViewport();
   // 测试环境是 http://127.0.0.1（浏览器视为安全上下文）且 Chromium 有 mediaDevices → 显示扫码入口
   await expect(page.getByRole("button", { name: /扫描主控台二维码/ })).toBeVisible();
   await expect(page.getByText(/无法在网页里调用相机/)).toHaveCount(0);

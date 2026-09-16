@@ -9,6 +9,7 @@ import { useCommand } from "@/ws/useRoom";
 import { cn } from "@/lib/utils";
 import { RoomQr, RoomQrDialog } from "@/features/console/RoomQr";
 import { RulesEditor } from "@/features/rules/RulesEditor";
+import { IcpRecord } from "@/features/site/SiteFooter";
 import { LocalPlayerDialog } from "./LocalPlayerDialog";
 import { SeatCards } from "./SeatCards";
 import { useCountdown } from "./useCountdown";
@@ -119,11 +120,14 @@ export function ConsoleLobby({
       )}
     >
       {wide ? (
-        <section className="flex flex-col items-center justify-center gap-6 rounded-3xl border border-border bg-surface p-8">
-          <RoomQr code={room.code} size={240} />
-          <p className="text-center text-sm text-muted">
-            手机扫码加入，四人都点「准备」后即可开局。
-          </p>
+        <section className="flex flex-col rounded-3xl border border-border bg-surface p-8">
+          <div className="flex flex-1 flex-col items-center justify-center gap-6">
+            <RoomQr code={room.code} size={240} />
+            <p className="text-center text-sm text-muted">
+              手机扫码加入，四人都点「准备」后即可开局。
+            </p>
+          </div>
+          <IcpRecord className="self-start" />
         </section>
       ) : (
         <div className="flex items-center gap-3">
@@ -154,6 +158,7 @@ export function ConsoleLobby({
         {rulesCard}
         {actions}
       </section>
+      {!wide && <IcpRecord className="shrink-0 self-start" />}
 
       <LocalPlayerDialog
         seat={localSeat}

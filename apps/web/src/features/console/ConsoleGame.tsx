@@ -13,6 +13,7 @@ import { HistoryTable } from "@/features/history/HistoryTable";
 import { FinalPanel } from "@/features/final/FinalPanel";
 import { ControlPanel } from "@/features/settlement/ControlPanel";
 import { MirrorOverlay } from "@/features/mirror/MirrorOverlay";
+import { IcpRecord } from "@/features/site/SiteFooter";
 
 /** 主控台对局页：宽屏双栏（左记分右历史），窄屏（Pad）单栏 + 历史抽屉 + 二维码弹窗。 */
 export function ConsoleGame({
@@ -58,30 +59,33 @@ export function ConsoleGame({
       <main
         className={wide ? "grid min-h-0 flex-1 grid-cols-[2fr_3fr] gap-4" : "flex flex-col gap-3"}
       >
-        <div className={wide ? "flex min-h-0 flex-col gap-4 overflow-y-auto" : "contents"}>
-          <PointsGrid
-            game={game.present}
-            seats={room.seats}
-            names={names}
-            rules={room.rules}
-            tv={wide}
-          />
-          <MirrorOverlay intents={intents} names={names} rules={room.rules} />
-          {game.present.status === "finished" && (
-            <div className="rounded-xl border border-pos/40 bg-surface p-4">
-              <h2 className="mb-2 text-lg font-semibold">终局结算</h2>
-              <FinalPanel
-                game={game.present}
-                seats={room.seats}
-                names={names}
-                rules={room.rules}
-                tv={wide}
-              />
+        <div className={wide ? "flex min-h-0 flex-col gap-2" : "contents"}>
+          <div className={wide ? "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto" : "contents"}>
+            <PointsGrid
+              game={game.present}
+              seats={room.seats}
+              names={names}
+              rules={room.rules}
+              tv={wide}
+            />
+            <MirrorOverlay intents={intents} names={names} rules={room.rules} />
+            {game.present.status === "finished" && (
+              <div className="rounded-xl border border-pos/40 bg-surface p-4">
+                <h2 className="mb-2 text-lg font-semibold">终局结算</h2>
+                <FinalPanel
+                  game={game.present}
+                  seats={room.seats}
+                  names={names}
+                  rules={room.rules}
+                  tv={wide}
+                />
+              </div>
+            )}
+            <div className="rounded-xl border border-border bg-surface p-3">
+              <DiffMatrix game={game.present} names={names} rules={room.rules} tv={wide} />
             </div>
-          )}
-          <div className="rounded-xl border border-border bg-surface p-3">
-            <DiffMatrix game={game.present} names={names} rules={room.rules} tv={wide} />
           </div>
+          <IcpRecord className="shrink-0 self-start" />
         </div>
         {wide && (
           <div className="min-h-0 overflow-y-auto rounded-xl border border-border bg-surface p-3">
