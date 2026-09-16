@@ -4,7 +4,7 @@ import { Monitor, Smartphone } from "lucide-react";
 import { deviceKind } from "@/lib/device";
 import { Button } from "@/ui/button";
 import { JoinPanel } from "@/features/join/JoinPanel";
-import { Copyright, IcpRecord } from "@/features/site/SiteFooter";
+import { SiteFooter } from "@/features/site/SiteFooter";
 
 /**
  * 欢迎页按设备分流：桌面直接进主控台（`?stay=1` 可留在本页）；平板二选一；手机直接进加入面板。
@@ -70,10 +70,7 @@ export function Landing() {
           </Link>
         </p>
       </div>
-      <footer className="flex shrink-0 flex-wrap justify-center gap-x-4 gap-y-1">
-        <Copyright />
-        <IcpRecord />
-      </footer>
+      <SiteFooter className="shrink-0 justify-center" />
     </main>
   );
 }
