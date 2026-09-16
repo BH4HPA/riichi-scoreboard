@@ -49,6 +49,45 @@ test("手机 UA 直接看到加入面板；HTTP 下扫码入口隐藏并提示�
   await tvCtx.close();
 });
 
+test("输入法组词中输房间码：组词期间不改写 input，输满即校验，组词结束后清理成规范码", async ({
+  browser,
+}) => {
+  // Chromium 不会复现 WebKit 的「改值打断组词 → 重复插入」，这条只防回归：组词路径照样能输码进房
+  const tvCtx = await newContext(browser, { ...devices["Desktop Chrome"] });
+  const tv = await tvCtx.newPage();
+  await tv.goto("/console");
+  const code = (await tv.getByTestId("room-code").textContent())?.trim() ?? "";
+
+  const ctx = await newContext(browser, { ...devices["iPhone 13"] });
+  const page = await ctx.newPage();
+  const cdp = await ctx.newCDPSession(page);
+  const input = page.getByLabel("房间码");
+  const compose = (text: string) =>
+    cdp.send("Input.imeSetComposition", {
+      text,
+      selectionStart: text.length,
+      selectionEnd: text.length,
+    });
+  await page.goto("/");
+  await input.focus();
+
+  // 不存在的房间：组词中输满就校验；组词期间 input 保持原样（小写 + 拼音分隔符）
+  for (const text of ["z", "zz", "zz'z", "zz'zz", "zz'zzz", "zz'zzzz"]) await compose(text);
+  await expect(page.getByText("房间不存在，请核对房间码")).toBeVisible();
+  await expect(input).toHaveValue("zz'zzzz");
+  // 结束组词（上屏原文）→ 清理成规范码
+  await cdp.send("Input.insertText", { text: "zz'zzzz" });
+  await expect(input).toHaveValue("ZZZZZZ");
+
+  // 退格清空（组词结束后没有隐形字符，六下正好删完；光标恒在末尾，fill 的全选删不掉）后组词输入正确房间码 → 进房
+  for (let i = 0; i < 6; i++) await page.keyboard.press("Backspace");
+  await expect(input).toHaveValue("");
+  for (let i = 1; i <= code.length; i++) await compose(code.slice(0, i).toLowerCase());
+  await expect(page).toHaveURL(new RegExp(`/r/${code}$`));
+  await ctx.close();
+  await tvCtx.close();
+});
+
 test("未知路径（如少了房间码的 /r/）回首页", async ({ browser }) => {
   const ctx = await newContext(browser, { viewport: { width: 400, height: 800 } });
   const page = await ctx.newPage();
