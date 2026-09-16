@@ -4,7 +4,7 @@
 # 而开发机本身是纯 HTTP。线上不用这个文件（HTTPS 由腾讯云 CDN 终结）。
 #
 # 证书不入库：本机 `mkcert <开发机 IP> localhost <本机局域网 IP>`，产物 rsync 到
-# ci/dev-tls/certs/{cert.pem,key.pem}；手机装一次 mkcert 根证书（见 README）。
+# ci/dev-tls/certs/{cert.pem,key.pem}；手机装一次 mkcert 根证书（见 docs/development.md）。
 services:
   tls:
     image: caddy:2-alpine

@@ -48,6 +48,8 @@ docker compose up -d --build   # 单容器，:8787，数据卷 /data（SQLite + 
 - 用 SW 缓存 index 反而可能把用户卡在旧版本；
 - 「添加到主屏幕」不依赖 SW。
 
+图标文件名是固定的，根目录文件只走 CDN 默认缓存，浏览器对 favicon 的缓存也很顽固，iOS 主屏图标在添加时就定下了。以后再换 Logo，给 `index.html` 里的图标链接加 `?v=2`，或者换个文件名。Logo 母版在 `docs/brand/`。
+
 iOS 从主屏打开的应用和 Safari 的 localStorage 互不相通，所以同一台手机在两边是两个玩家身份。扫描二维码时，系统相机总是用 Safari 打开链接。丢了身份的手机可以让离线的旧座位离座，再重新坐回去。
 
 ## 用户文件与数据库
