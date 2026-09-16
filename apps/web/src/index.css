@@ -83,3 +83,13 @@ body {
 .animate-shake {
   animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
+
+/* 取景框定格的视觉回执：iOS 全系没有 navigator.vibrate，只靠震动等于没有反馈 */
+@keyframes riichi-flash {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}

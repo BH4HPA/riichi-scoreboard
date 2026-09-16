@@ -1,3 +1,4 @@
+import path from "node:path";
 import { test, type Browser, type Page } from "@playwright/test";
 import { newContext } from "./helpers";
 
@@ -150,4 +151,61 @@ test("截图：Pad 横屏/竖屏的大厅与对局页", async ({ browser }) => {
     await tv.screenshot({ path: `${OUT}/${tag}-history-drawer.png` });
     await ctx.close();
   }
+});
+
+test("截图：取景框、确认态与标注页", async ({ browser }) => {
+  const DETECTOR = path.join(import.meta.dirname, "fixtures/detector.onnx");
+  const withDetector = async (page: Page) => {
+    await page.route("**/riichi/models/*.onnx", (route) =>
+      route.fulfill({ path: DETECTOR, contentType: "application/octet-stream" }),
+    );
+    await page.route("**/api/recognitions/*", (route) => route.fulfill({ status: 204 }));
+  };
+
+  // 标注页：取景框（带检测框与牌图标签）→ 定格后的确认态
+  const labelCtx = await newContext(browser, { viewport: { width: 400, height: 860 } });
+  const lab = await labelCtx.newPage();
+  await withDetector(lab);
+  await lab.goto("/label");
+  await lab.screenshot({ path: `${OUT}/phone-label-entry.png` });
+  await lab.getByRole("button", { name: /开始拍/ }).click();
+  const sheet = lab.getByTestId("camera-sheet");
+  await sheet.waitFor();
+  // 抢在自动定格之前拍一张取景中的样子；来不及就只留确认态
+  await lab.waitForTimeout(120);
+  if ((await sheet.count()) > 0)
+    await lab.screenshot({ path: `${OUT}/phone-label-viewfinder.png` });
+  await lab.getByTestId("hand-confirm").waitFor({ timeout: 30_000 });
+  await lab.screenshot({ path: `${OUT}/phone-label-confirm.png` });
+  await labelCtx.close();
+
+  // 房间里的结算确认态：识别通过时键盘收起，只剩一排牌
+  const tvCtx = await newContext(browser, { viewport: { width: 1600, height: 900 } });
+  const tv = await tvCtx.newPage();
+  await tv.goto("/console");
+  const code = (await tv.getByTestId("room-code").textContent())?.trim() ?? "";
+  const phones: Page[] = [];
+  for (const [i, name] of ["Ray", "小明", "阿花", "老王"].entries()) {
+    const p = await phone(browser, code, name);
+    if (i === 2) await withDetector(p);
+    await p.getByTestId(`seat-${i}`).click();
+    await p.getByRole("button", { name: "准备", exact: true }).click();
+    phones.push(p);
+  }
+  const p = phones[2]!;
+  await p.getByTestId("points-0").waitFor();
+  await p.getByRole("button", { name: "荣和", exact: true }).click();
+  const dialog = p.getByRole("dialog");
+  await dialog.getByRole("combobox").first().click();
+  await p.getByRole("option", { name: "老王" }).click();
+  await dialog.getByRole("tab", { name: "牌面" }).click();
+  await dialog.getByTestId("recognize-button").click();
+  await dialog.getByTestId("hand-confirm").waitFor({ timeout: 30_000 });
+  await p.screenshot({ path: `${OUT}/phone-ron-confirm.png` });
+  // 点一张牌 → 替换面板（顶部可改和张）
+  await dialog.getByTestId("hand-confirm").getByRole("button", { name: "1萬" }).click();
+  await p.getByRole("dialog").filter({ hasText: "换掉 1萬" }).waitFor();
+  await p.waitForTimeout(300);
+  await p.screenshot({ path: `${OUT}/phone-tile-replace.png` });
+  await tvCtx.close();
 });

@@ -1,10 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { Detector } from "../worker/client";
 import type { FrameResult } from "../worker/protocol";
 import { bandRect, type Rect, type Viewport } from "./band";
-
-/** 上一帧的结果保留这么久再算过期：逐帧重画框会闪 */
-export const HOLD_MS = 500;
 
 interface Options {
   detector: Detector | null;
@@ -21,11 +18,14 @@ interface Options {
  * **背压不排队**——上一帧还在推理就直接跳过这一帧，否则 300 ms 的推理会堆出越来越大的延迟，
  * 用户看到的框会慢慢落后于画面。
  */
-export function useLiveDetect({ detector, videoRef, band, active, onFrame, onCrop }: Options): {
-  /** 已经送出去推理的帧数，用来判断「相机开了但一直没认出东西」 */
-  frames: number;
-} {
-  const [frames, setFrames] = useState(0);
+export function useLiveDetect({
+  detector,
+  videoRef,
+  band,
+  active,
+  onFrame,
+  onCrop,
+}: Options): void {
   const bandRef = useRef(band);
   const onFrameRef = useRef(onFrame);
   const onCropRef = useRef(onCrop);
@@ -43,9 +43,10 @@ export function useLiveDetect({ detector, videoRef, band, active, onFrame, onCro
     let inFlight = false;
     let handle = 0;
 
+    // r === null 表示这一帧被 Worker 背压丢掉了：闸门照样要放开，否则循环永久停摆
     const off = detector.onResult((r) => {
       inFlight = false;
-      if (!stopped) onFrameRef.current(r);
+      if (r && !stopped) onFrameRef.current(r);
     });
 
     const step = () => {
@@ -66,7 +67,6 @@ export function useLiveDetect({ detector, videoRef, band, active, onFrame, onCro
         .then((bitmap) => {
           if (stopped) return bitmap.close();
           detector.infer(bitmap);
-          setFrames((n) => n + 1);
         })
         .catch(() => {
           inFlight = false;
@@ -90,6 +90,4 @@ export function useLiveDetect({ detector, videoRef, band, active, onFrame, onCro
       else cancelAnimationFrame(handle);
     };
   }, [detector, videoRef, active]);
-
-  return { frames };
 }

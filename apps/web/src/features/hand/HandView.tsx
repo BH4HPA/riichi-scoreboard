@@ -15,6 +15,7 @@ export function HandView({
   marks,
   onTileClick,
   showUra = true,
+  scroll = false,
   keepEmptyDora = false,
   onAddDora,
   className,
@@ -25,6 +26,11 @@ export function HandView({
   marks?: readonly TileLoc[] | undefined;
   onTileClick?: ((loc: TileLoc) => void) | undefined;
   showUra?: boolean;
+  /**
+   * 手牌不换行，超出部分横滑。手机上 14 张大牌放不下一行，换行会把和张单独甩到第二行，
+   * 跟暗牌断开——那正是最该和暗牌挨着看的一张。
+   */
+  scroll?: boolean;
   /** 确认态：一张宝牌指示牌都没认出来时也要留个空位，否则缺口看不见 */
   keepEmptyDora?: boolean;
   onAddDora?: (() => void) | undefined;
@@ -32,14 +38,26 @@ export function HandView({
 }) {
   return (
     <div className={cn("space-y-2", className)}>
-      <HandStrip
-        closed={hand.closed}
-        melds={hand.melds}
-        winTile={hand.winTile > 0 ? hand.winTile : null}
-        size={size}
-        marks={marks}
-        onTileClick={onTileClick}
-      />
+      {/* 横滑时右侧渐隐：和张与副露在最右端，不给提示用户会以为牌就这些 */}
+      <div className={scroll ? "relative" : undefined}>
+        <div className={scroll ? "-mx-1 overflow-x-auto px-1" : undefined}>
+          <HandStrip
+            closed={hand.closed}
+            melds={hand.melds}
+            winTile={hand.winTile > 0 ? hand.winTile : null}
+            size={size}
+            wrap={!scroll}
+            marks={marks}
+            onTileClick={onTileClick}
+          />
+        </div>
+        {scroll && (
+          <span
+            className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-surface to-transparent"
+            aria-hidden
+          />
+        )}
+      </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1">
         <IndicatorRow
           label="宝牌指示"

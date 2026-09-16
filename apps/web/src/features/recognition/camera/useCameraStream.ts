@@ -23,7 +23,11 @@ function reason(err: unknown): string {
  * 否则会被强制全屏播放（`QrScan` 同样的写法）。
  * `active=false` 时停流：熄屏、切后台、60 秒没认出牌面都走这条路，省电防烫。
  */
-export function useCameraStream(active: boolean): {
+export function useCameraStream(
+  active: boolean,
+  /** 相机被别的应用抢走 / 权限中途撤销：画面会冻住，必须停下来，否则会对着死画面误定格 */
+  onLost?: () => void,
+): {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   error: string | null;
   ready: boolean;
@@ -31,6 +35,10 @@ export function useCameraStream(active: boolean): {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const onLostRef = useRef(onLost);
+  useEffect(() => {
+    onLostRef.current = onLost;
+  });
 
   useEffect(() => {
     if (!active) return;
@@ -42,9 +50,19 @@ export function useCameraStream(active: boolean): {
       .then(async (s) => {
         if (cancelled) return s.getTracks().forEach((t) => t.stop());
         stream = s;
-        if (!video) return;
+        if (!video) {
+          setError("页面还没准备好，请重试");
+          return;
+        }
+        s.getVideoTracks().forEach((t) => t.addEventListener("ended", () => onLostRef.current?.()));
         video.srcObject = s;
-        await video.play().catch(() => undefined);
+        try {
+          await video.play();
+        } catch (err) {
+          // 播不起来就不会有帧，rVFC 永远不回调：必须报出来，否则用户只看到不动的黑屏
+          if (!cancelled) setError(reason(err));
+          return;
+        }
         if (cancelled) return;
         setError(null);
         setReady(true);

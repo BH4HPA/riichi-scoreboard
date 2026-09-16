@@ -35,10 +35,18 @@ export function Label() {
       .getState()
       .ensure()
       .then(({ token }) =>
-        uploadRecognition(key, blob, result, token, "label", (id) =>
-          setDraft((d) =>
-            d.recognition?.key === key ? { ...d, recognition: { ...d.recognition, id } } : d,
-          ),
+        uploadRecognition(
+          key,
+          blob,
+          result,
+          token,
+          "label",
+          (id) =>
+            setDraft((d) =>
+              d.recognition?.key === key ? { ...d, recognition: { ...d.recognition, id } } : d,
+            ),
+          (message) =>
+            useRoomStore.getState().notify("error", `照片上传失败（${message}），这张先不算`),
         ),
       )
       .catch(() => useRoomStore.getState().notify("error", "照片上传失败，这张先不算"));

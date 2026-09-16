@@ -17,13 +17,18 @@ export function uploadRecognition(
   token: string,
   source: RecognitionSource,
   onId?: (id: string) => void,
+  /** 上传失败要能被看见：否则记录 id 永远为 null，标注页会一直提示「照片还在上传」 */
+  onFail?: (message: string) => void,
 ): void {
   const upload = createRecognition(blob, token, source).then((created) => {
     onId?.(created.id);
     return created.id;
   });
   uploads.set(key, upload);
-  upload.catch(() => uploads.delete(key));
+  upload.catch((err: unknown) => {
+    uploads.delete(key);
+    onFail?.(err instanceof Error ? err.message : "照片上传失败");
+  });
   void upload
     .then((id) =>
       patchRecognition(

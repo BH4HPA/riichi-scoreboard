@@ -7,10 +7,17 @@
  * 牌局录进系统——「触发了结算」本身就是一次人力校验，不看用户改没改过。
  * 标注模式（`source=label`）的 corrected 是用户显式提交的真值。
  *
- * 用法（线上）：
- *   docker exec riichi-scoreboard-riichi-1 node --experimental-strip-types \
- *     /app/scripts/export-recognitions.ts /data/riichi.sqlite > records.ndjson
- * 本机：yarn workspace @riichi/server exec tsx scripts/export-recognitions.ts <db 路径>
+ * **在本机跑，不在容器里跑**：运行镜像只装了打包后的 server，没有脚本、没有源码、
+ * 也没有 `@riichi/core`（align 对它是值导入）。先把库拷出来：
+ *
+ *   ssh bitego "docker exec riichi-scoreboard-riichi-1 node --input-type=module -e \
+ *     \"const {DatabaseSync} = await import('node:sqlite'); const d = new DatabaseSync('/data/riichi.sqlite'); \
+ *     d.exec('PRAGMA wal_checkpoint(TRUNCATE)'); d.close()\" \
+ *     && docker cp riichi-scoreboard-riichi-1:/data/riichi.sqlite /tmp/riichi.sqlite"
+ *   scp bitego:/tmp/riichi.sqlite /tmp/
+ *   yarn workspace @riichi/server exec tsx scripts/export-recognitions.ts /tmp/riichi.sqlite > records.ndjson
+ *
+ * 先 checkpoint 再拷是必要的：WAL 模式下最近的写还在 -wal 里，直接拷主库会丢掉刚打的那几局。
  */
 import { DatabaseSync } from "node:sqlite";
 import type { Detection, HandInput, RecognizedHand } from "@riichi/core";

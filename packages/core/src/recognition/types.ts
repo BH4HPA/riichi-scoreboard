@@ -59,6 +59,12 @@ export interface HandProvenance {
   uraIndicators: TileOrigin[];
   /** 布局真正采信的全部检测框下标（升序，含被当作牌背消费掉的）；回流据此判断照片里有没有没标注的牌 */
   usedDetections: number[];
+  /**
+   * 按噪声剔除的框（升序）：置信度低于 minConf、面积退化、宽高比明显异常。
+   * 它们不对应真实的牌（评估集里误检在 0.32–0.34，真牌最低 0.60），所以回流时**不该标注**，
+   * 也不该因为它们的存在把整条记录降级人工 —— 否则「有框被丢掉」这个常态会让自动入库几乎永不命中。
+   */
+  rejectedDetections: number[];
 }
 
 /** 手机浏览器推理（onnxruntime-web）的一次结果 */

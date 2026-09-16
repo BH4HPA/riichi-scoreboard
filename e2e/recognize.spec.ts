@@ -109,6 +109,17 @@ test("取景 → 自动定格 → 填入牌面并自动算番 → 检测框与�
   expect(corrected.winTile).toBe(9);
 });
 
+test("连拍两张：第二次打开取景框仍能识别（模型字节被转移过就会在这里挂）", async ({ browser }) => {
+  const { phone: p, dialog } = await openRonHandTab(browser, withDetector());
+  await shoot(p, dialog);
+  await expect(dialog.getByTestId("hand-confirm")).toBeVisible();
+
+  // 第二次：Worker 重建，用的是同一份缓存的模型字节
+  await shoot(p, dialog);
+  await expect(dialog.getByTestId("hand-confirm")).toBeVisible();
+  await expect(dialog.getByTestId("recognize-status")).toHaveText(/^识别完成 · \d+ ms$/);
+});
+
 test("模型加载失败 → 取景页给出错误，牌面不变", async ({ browser }) => {
   const { phone: p, dialog } = await openRonHandTab(browser, (page) =>
     page.route("**/riichi/models/*.onnx", (route) => route.abort()),

@@ -91,6 +91,51 @@ describe("align", () => {
     expect(out.labels.map((l) => l.cls)).toEqual(twoDora.map((d) => d.cls));
   });
 
+  it("编辑态删一张再补一张 → 下标整体错位，必须送人工（照单全收会把十几个框全标错）", () => {
+    // TileKeyboard 的语义：removeClosed 把后面的牌整体左移，tap 追加到末尾
+    const closed = [...base.hand.closed];
+    closed.splice(2, 1);
+    closed.push(TILE.S3);
+    expect(closed).toHaveLength(base.hand.closed.length);
+    const out = align(DETS, base.hand, emptyHand(closed, [TILE.S6]));
+    expect(out.status).toBe("manual");
+    expect(out.reason).toContain("错开");
+    // 预标注保持模型原样，没有被改了一半
+    expect(out.labels.map((l) => l.cls)).toEqual(DETS.map((d) => d.cls));
+  });
+
+  it("两张牌互换位置 → 无法判断谁是谁，送人工", () => {
+    const closed = [...base.hand.closed];
+    const [a, b] = [closed[0]!, closed[3]!];
+    closed[0] = b;
+    closed[3] = a;
+    const out = align(DETS, base.hand, emptyHand(closed, [TILE.S6]));
+    expect(out.status).toBe("manual");
+  });
+
+  it("把普通五改成赤五是真纠正，必须重标（只有赤→普通才是规则折返）", () => {
+    // 模型认成普通 5p 的那种情形：用 5p 版本的检测框重跑
+    const plain = DETS.map((d) =>
+      RECOGNITION_CLASSES[d.cls] === "0p" ? { ...d, cls: RECOGNITION_CLASSES.indexOf("5p") } : d,
+    );
+    const b = layoutHand(plain);
+    const closed = b.hand.closed.map((t) => (t === TILE.P5 ? AKA.P5 : t));
+    const out = align(plain, b.hand, emptyHand(closed, [...b.hand.doraIndicators]));
+    expect(out.status).toBe("auto");
+    const i = plain.findIndex((d) => RECOGNITION_CLASSES[d.cls] === "5p");
+    expect(clsOf(out.labels, i)).toBe("0p");
+  });
+
+  it("低置信度的误检框不阻止自动入库：它不是牌，本来就不该标注", () => {
+    // 0.3 低于 minConf 0.4，layoutHand 直接剔除
+    const noisy = [...DETS, { ...det("5z", 600, 600), conf: 0.3 }];
+    const out = align(noisy, base.hand, emptyHand([...base.hand.closed], [TILE.S6]));
+    expect(out.status).toBe("auto");
+    // 误检那个框不产出标注
+    expect(out.labels).toHaveLength(noisy.length);
+    expect(out.labels[noisy.length - 1]!.cls).toBe(noisy[noisy.length - 1]!.cls);
+  });
+
   it("用户增删过牌 → 位置对不上，送人工", () => {
     const out = align(DETS, base.hand, emptyHand(base.hand.closed.slice(0, 5), [TILE.S6]));
     expect(out.status).toBe("manual");
@@ -103,7 +148,7 @@ describe("align", () => {
     const b = layoutHand(stray);
     const out = align(stray, b.hand, emptyHand([...b.hand.closed], [...b.hand.doraIndicators]));
     expect(out.status).toBe("manual");
-    expect(out.reason).toContain("没被布局采信");
+    expect(out.reason).toContain("既没被采信也不算误检");
     // 送人工也带预标注，人只要改错的那几个
     expect(out.labels).toHaveLength(stray.length);
   });

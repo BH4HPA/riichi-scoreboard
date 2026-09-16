@@ -44,15 +44,34 @@ export function BandOverlay({
         )}
       </div>
       <div
-        className="pointer-events-auto absolute inset-x-0 flex h-8 items-center justify-center"
+        // touch-none 必不可少：不声明的话浏览器会把纵向拖拽当成页面滚动手势接管，
+        // 派发 pointercancel，setPointerCapture 也拦不住，拖到一半就掉线。
+        // z-10 压在检测框之上：标注模式下带沿附近的框会抢走把手的触摸。
+        className="pointer-events-auto absolute inset-x-0 z-10 flex h-8 touch-none items-center justify-center"
         style={{ bottom: `calc(${outside} - 1rem)` }}
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           drag(e.clientY);
         }}
         onPointerMove={(e) => e.currentTarget.hasPointerCapture(e.pointerId) && drag(e.clientY)}
+        onKeyDown={(e) => {
+          const step =
+            e.key === "ArrowUp"
+              ? -0.05
+              : e.key === "ArrowDown"
+                ? 0.05
+                : e.key === "Home"
+                  ? -1
+                  : e.key === "End"
+                    ? 1
+                    : 0;
+          if (step === 0) return;
+          e.preventDefault();
+          onBandChange(clampBand(band + step));
+        }}
         role="slider"
         aria-label="取景带高度"
+        aria-orientation="vertical"
         aria-valuemin={BAND_MIN * 100}
         aria-valuemax={BAND_MAX * 100}
         aria-valuenow={Math.round(band * 100)}

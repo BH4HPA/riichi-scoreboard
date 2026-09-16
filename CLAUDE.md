@@ -108,7 +108,9 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   Settlement shows `HandConfirm` (read-only strip + flag chips + tap-to-replace) when the result is
   self-consistent, `TileKeyboard` otherwise (`settlement/hand/HandEditor.tsx`). Inference runs only on the
   phone (a server engine was considered and dropped: phone WASM is fast enough); WebGPU is deliberately
-  not used (iOS "Chrome" is WKWebView, and ORT's WebGPU path crashes after ~500 inferences on iOS Safari).
+  not used: WASM already runs <300 ms/frame on an iPhone 15, iOS "Chrome" is WKWebView so it cannot use
+  Chromium's implementation anyway, and ORT's WebGPU path has an open crash report on iOS Safari
+  (microsoft/onnxruntime#27584) that a continuous viewfinder would hit within minutes.
   `getUserMedia` needs a secure context: `yarn dev` serves HTTPS via `vite-plugin-mkcert`, and the dev
   machine gets TLS from `docker-compose.dev.yml` (caddy, `:8443`, certs not in the repo).
   `/label` (linked from the landing page) is the same viewfinder + `HandEditor` outside any room: it adds
