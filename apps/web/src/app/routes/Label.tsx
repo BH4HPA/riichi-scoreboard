@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { Camera } from "lucide-react";
 import { Link } from "react-router";
-import { MLEAGUE_RULES, type EvaluatedHand } from "@riichi/core";
+import { MLEAGUE_RULES } from "@riichi/core";
 import { useSession } from "@/api/session";
 import { Button } from "@/ui/button";
 import { Notice } from "@/ui/notice";
@@ -16,9 +16,6 @@ import { useRoomStore } from "@/ws/store";
 
 /** 标注用全量规则（赤五、杠宝、里宝都开），免得房间村规把认出来的牌截掉 */
 const RULES = MLEAGUE_RULES;
-/** 番符与标注无关；给编辑器一个恒定的空结果，省掉一条 WebSocket 依赖 */
-const NO_EVAL: EvaluatedHand | null = null;
-
 /**
  * 给模型标牌：不进房间，取景 → 定格 → 改到全对 → 「就是这手」把真值传回去。
  * 与房间里那条路共用取景框和牌面编辑器，区别只有两个——多画检测框与牌图标签、
@@ -50,11 +47,12 @@ export function Label() {
   const submit = async () => {
     const rec = draft.recognition;
     if (!rec?.id) return notify("error", "照片还在上传，稍等一下");
-    const { token } = await useSession.getState().ensure();
-    await patchRecognition(rec.id, { corrected: draft.hand }, token).catch(() => {
-      notify("error", "提交失败");
-      throw new Error("patch failed");
-    });
+    try {
+      const { token } = await useSession.getState().ensure();
+      await patchRecognition(rec.id, { corrected: draft.hand }, token);
+    } catch {
+      return notify("error", "提交失败，这张先留着再试一次");
+    }
     setSaved((n) => n + 1);
     setDraft(createValueDraft(false));
     notify("info", "已记下，接着拍");
@@ -89,10 +87,11 @@ export function Label() {
             draft={draft}
             onChange={(update) => setDraft(update)}
             rules={RULES}
-            evaluated={NO_EVAL}
+            evaluated={null}
             evaluating={false}
             evalError={null}
             camera={null}
+            showValue={false}
           />
           <Button variant="accent" onClick={() => void submit()} data-testid="label-submit">
             就是这手

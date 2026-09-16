@@ -61,6 +61,7 @@ export function TileKeyboard({
   evaluating,
   evalError,
   uncertain = [],
+  showValue = true,
 }: {
   hand: HandInput;
   onChange: (next: HandInput) => void;
@@ -71,6 +72,8 @@ export function TileKeyboard({
   evalError: string | null;
   /** 识别没把握的位置，给对应的牌打记号 */
   uncertain?: readonly TileLoc[];
+  /** 标注模式不算番，不显示番符与役种 */
+  showValue?: boolean;
 }) {
   const marked = (loc: TileLoc) => hasLoc(uncertain, loc);
   const [target, setTarget] = useState<Target>("closed");
@@ -355,13 +358,15 @@ export function TileKeyboard({
         </CheckRow>
       </div>
 
-      <ValueResult
-        complete={complete}
-        evaluated={evaluated}
-        evaluating={evaluating}
-        evalError={evalError}
-        hint={`录入 ${capacity} 张（含和张）后自动计算番符`}
-      />
+      {showValue && (
+        <ValueResult
+          complete={complete}
+          evaluated={evaluated}
+          evaluating={evaluating}
+          evalError={evalError}
+          hint={`录入 ${capacity} 张（含和张）后自动计算番符`}
+        />
+      )}
     </div>
   );
 }
