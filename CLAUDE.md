@@ -52,7 +52,8 @@ Yarn workspaces monorepo:
   columns ≥ 1280px, otherwise single column with history drawer + QR dialog), `/r/:code` (phone).
   Phone settlement dialogs mirror to the TV as a full-screen modal (`features/mirror/SettlementMirror`),
   carrying the hand only once the engine has evaluated it. Site credits (copyright, ICP record) live in
-  `features/site/`: landing and the narrow console center them at the page bottom, the wide console pins them
+  `features/site/`: landing centers them at the page bottom, the narrow console lobby puts them in its button row, the narrow
+  console game centers them at the page bottom, the wide console pins them
   left-aligned at the bottom of its left column; the phone game nav shows the ICP number as plain grey text. PWA = `public/manifest.json` + icons only, deliberately no Service Worker (the app is useless
   without its WebSocket, and caching index would pin stale versions); logo master in `docs/brand/`. Tile images are flat SVGs from mahjong_graphic (`src/assets/tiles`, see NOTICE.md), rendered by
   `features/hand/TileFace`.

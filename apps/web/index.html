@@ -3,15 +3,37 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <!-- PWA：只有 manifest 与图标，刻意不注册 Service Worker（离开 WebSocket 页面不可用，缓存 index 只会卡旧版本） -->
+    <title>立直麻将计分板 · 日麻在线计分、手机扫码记分算番</title>
+    <meta
+      name="description"
+      content="免费的立直麻将（日本麻将）在线计分板：电视或电脑显示房间二维码，四人手机扫码入座远程记分，自动计算番符与点数，支持拍照识别手牌、立直音乐，内置 M-League、雀魂、天凤等村规预设。"
+    />
+    <meta
+      name="keywords"
+      content="立直麻将,日本麻将,日麻,麻将计分,麻将计分板,日麻计分器,番符计算,算番,算符,点数计算,M-League,雀魂,天凤,最高位战,WRC,村规,手牌识别,麻将记分,riichi mahjong,mahjong scoreboard"
+    />
+    <meta name="author" content="Ray" />
+    <meta name="application-name" content="立直计分" />
+    <link rel="canonical" href="https://riichi.ruivon.cn/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="立直麻将计分板" />
+    <meta property="og:title" content="立直麻将计分板" />
+    <meta
+      property="og:description"
+      content="电视显示房间二维码，手机扫码入座，四人各自记分、算番，所有屏幕实时同步。"
+    />
+    <meta property="og:url" content="https://riichi.ruivon.cn/" />
+    <meta property="og:image" content="https://riichi.ruivon.cn/icon-512.png" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta name="twitter:card" content="summary" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="theme-color" content="#f4f5f7" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="立直计分" />
-    <title>立直麻将计分板</title>
   </head>
   <body>
     <div id="root"></div>

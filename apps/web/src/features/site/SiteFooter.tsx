@@ -21,7 +21,7 @@ export function SiteFooter({ className }: { className?: string }) {
   );
 }
 
-/** Logo + 站名：宽屏主控台大厅左栏右下角。 */
+/** Logo + 站名：宽屏主控台大厅左栏右下角、二维码弹窗顶部。 */
 export function SiteBrand({ className }: { className?: string }) {
   return (
     <span className={cn("flex items-center gap-2 text-sm font-semibold", className)}>
