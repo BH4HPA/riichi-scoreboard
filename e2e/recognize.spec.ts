@@ -79,9 +79,13 @@ test("拍照 → 裁剪 → 本机推理填入牌面并自动算番 → 检测�
   await expect(dialog.getByTestId("recognize-status")).toHaveText(/^识别完成 · \d+ ms$/, {
     timeout: 30_000,
   });
-  await expect(dialog.getByText("1 张牌置信度较低，请核对")).toBeVisible();
   const handArea = dialog.getByTestId("hand-area");
-  await expect(handArea.getByRole("button", { name: "赤5筒" })).toBeVisible();
+  // 假检测器给赤5筒 0.45 的置信度：不再报红字，改成那张牌自己带「请核对」记号
+  const aka = handArea.getByRole("button", { name: "赤5筒" });
+  await expect(aka).toBeVisible();
+  await expect(aka).toHaveAttribute("data-mark", "true");
+  await expect(handArea.getByRole("button", { name: "1萬" })).not.toHaveAttribute("data-mark");
+  await expect(dialog.getByText(/置信度/)).toHaveCount(0);
   await expect(dialog.getByText("2 番 30 符")).toBeVisible();
   await expect(dialog.getByText("赤宝牌 1 番")).toBeVisible();
 

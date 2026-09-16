@@ -3,7 +3,8 @@
 形状与真模型一致（输入 images [1,3,640,640]，输出 output0 [1,300,6]，letterbox 640 坐标），
 所以 Playwright 只需把 CDN 的模型 URL 换成这个文件，手机端从 onnxruntime-web 到布局、算番、回填真值
 整条链路都是真的跑。手牌：123m 4筒 赤5筒 6筒 789s 789m 22p，和张 9m 横放右端（平和 + 赤 = 2 番 30 符），
-赤 5 筒置信度 0.45 触发 low_conf 提示。改了手牌要同步改 e2e/recognize.spec.ts。
+赤 5 筒置信度 0.45（介于 layout 的 minConf 0.4 与 lowConf 0.5 之间）：仍参与布局，但界面会给它打「请核对」记号。
+改了手牌要同步改 e2e/recognize.spec.ts。
 用法：uv run scripts/e2e_detector.py"""
 
 import json

@@ -2,9 +2,12 @@ import { baseTile, isAka, isHonor, TILE, tileSuit, type Meld, type Tile } from "
 import { tileOfClassId } from "./classes";
 import type {
   Detection,
+  HandProvenance,
   RecognizedHand,
+  RecognitionSeverity,
   RecognitionWarning,
   RecognitionWarningCode,
+  TileOrigin,
 } from "./types";
 
 /**
@@ -23,7 +26,7 @@ export interface LayoutOptions {
   groupGap: number;
   /** 横置判定：框宽 > 框高 × sideAspect */
   sideAspect: number;
-  /** 低于此置信度的框记 low_conf 警告 */
+  /** 低于此置信度的牌由界面打记号提示核对（评估集里真牌最低 0.60，这条线已验证） */
   lowConf: number;
   /** 低于此置信度的框不参与布局（评估集里误检在 0.32–0.34，真牌最低 0.60） */
   minConf: number;
@@ -41,13 +44,19 @@ export const DEFAULT_LAYOUT: LayoutOptions = {
 export interface LayoutResult {
   hand: RecognizedHand;
   warnings: RecognitionWarning[];
+  provenance: HandProvenance;
 }
 
 const MAX_MELDS = 4;
 const MAX_INDICATORS = 5;
 
+/** 补出来的牌（暗杠只露中间两张、杠里一张认成牌背）没有对应的框 */
+const NO_DET = -1;
+
 interface Item {
   det: Detection;
+  /** det 在入参 detections 里的下标，用于回填来源 */
+  detIndex: number;
   /** null = 牌背 */
   tile: Tile | null;
   cx: number;
@@ -56,6 +65,9 @@ interface Item {
   h: number;
   side: boolean;
 }
+
+const originOf = (i: Item, guessed = false): TileOrigin => ({ det: i.detIndex, guessed });
+const synthetic = (guessed: boolean): TileOrigin => ({ det: NO_DET, guessed });
 
 interface Row {
   cy: number;
@@ -68,21 +80,27 @@ function median(values: number[]): number {
   return s[Math.floor(s.length / 2)]!;
 }
 
-/** 主轴：正放的牌是竖长的；照片里多数框「宽 > 高」说明手机竖拍没转，交换坐标按列读。 */
-function isPortrait(dets: readonly Detection[]): boolean {
-  const wide = dets.filter((d) => d.box[2] - d.box[0] > d.box[3] - d.box[1]).length;
-  return wide > dets.length - wide;
+/** 通过置信度与面积筛选后保留下来的框，带着它在入参里的下标 */
+interface Kept {
+  det: Detection;
+  detIndex: number;
 }
 
-function toItems(dets: readonly Detection[], swap: boolean, sideAspect: number): Item[] {
-  return dets.map((det) => {
+/** 主轴：正放的牌是竖长的；照片里多数框「宽 > 高」说明手机竖拍没转，交换坐标按列读。 */
+function isPortrait(kept: readonly Kept[]): boolean {
+  const wide = kept.filter(({ det: d }) => d.box[2] - d.box[0] > d.box[3] - d.box[1]).length;
+  return wide > kept.length - wide;
+}
+
+function toItems(kept: readonly Kept[], swap: boolean, sideAspect: number): Item[] {
+  return kept.map(({ det, detIndex }) => {
     const [x1, y1, x2, y2] = det.box;
     const w0 = x2 - x1;
     const h0 = y2 - y1;
     const [cx, cy, w, h] = swap
       ? [(y1 + y2) / 2, (x1 + x2) / 2, h0, w0]
       : [(x1 + x2) / 2, (y1 + y2) / 2, w0, h0];
-    return { det, tile: tileOfClassId(det.cls), cx, cy, w, h, side: w > h * sideAspect };
+    return { det, detIndex, tile: tileOfClassId(det.cls), cx, cy, w, h, side: w > h * sideAspect };
   });
 }
 
@@ -242,11 +260,14 @@ export function layoutHand(
 ): LayoutResult {
   const opts = { ...DEFAULT_LAYOUT, ...options };
   // 与 decodeNmsOutput 同一约定，只收正面积的框：零面积框会让宽高比中位数变 NaN、把所有框滤光
-  const detections = allDetections.filter(
-    (d) => d.conf >= opts.minConf && d.box[2] > d.box[0] && d.box[3] > d.box[1],
-  );
+  const kept: Kept[] = [];
+  allDetections.forEach((det, detIndex) => {
+    if (det.conf >= opts.minConf && det.box[2] > det.box[0] && det.box[3] > det.box[1])
+      kept.push({ det, detIndex });
+  });
   const warnings: RecognitionWarning[] = [];
-  const warn = (code: RecognitionWarningCode, message: string) => warnings.push({ code, message });
+  const warn = (code: RecognitionWarningCode, severity: RecognitionSeverity, message: string) =>
+    warnings.push({ code, message, severity });
   const empty: RecognizedHand = {
     closed: [],
     melds: [],
@@ -254,26 +275,25 @@ export function layoutHand(
     doraIndicators: [],
     uraIndicators: [],
   };
-  if (detections.length === 0) {
-    warn("no_tiles", "照片里没有认出任何牌");
-    return { hand: empty, warnings };
+  const emptyProvenance: HandProvenance = {
+    closed: [],
+    melds: [],
+    doraIndicators: [],
+    uraIndicators: [],
+    usedDetections: [],
+  };
+  if (kept.length === 0) {
+    warn("no_tiles", "blocking", "照片里没有认出任何牌");
+    return { hand: empty, warnings, provenance: emptyProvenance };
   }
 
-  const low = detections.filter((d) => d.conf < opts.lowConf).length;
-  const tooLow = allDetections.length - detections.length;
-  const lowNotes = [
-    ...(low > 0 ? [`${low} 张牌置信度较低，请核对`] : []),
-    ...(tooLow > 0 ? [`${tooLow} 个置信度过低或形状无效的框已忽略`] : []),
-  ];
-  if (lowNotes.length > 0) warn("low_conf", lowNotes.join("；"));
-
-  const swap = isPortrait(detections);
+  const swap = isPortrait(kept);
   // 牌是刚性的，同一张照片里正放牌的框比例高度一致；明显更窄的框是误检（残缺、杂物），剔除
-  const all = toItems(detections, swap, opts.sideAspect);
+  const all = toItems(kept, swap, opts.sideAspect);
   const ratioRef = median(all.filter((i) => !i.side).map((i) => i.w / i.h));
   const items = all.filter((i) => i.side || i.w / i.h >= 0.85 * ratioRef);
   if (items.length < all.length)
-    warn("odd_box", `${all.length - items.length} 个检测框形状异常，已忽略`);
+    warn("odd_box", "info", `${all.length - items.length} 个检测框形状异常，已忽略`);
   const upright = items.filter((i) => !i.side);
   const medH = median((upright.length ? upright : items).map((i) => i.h));
   const medW = median((upright.length ? upright : items).map((i) => i.w));
@@ -332,56 +352,76 @@ export function layoutHand(
     closedSeg = [];
   }
   if (closedSeg.length % 3 !== 2)
-    warn("bad_group", `暗牌组应为 3n+2 张，实际 ${closedSeg.length} 张`);
+    warn("bad_group", "blocking", `暗牌组应为 3n+2 张，实际 ${closedSeg.length} 张`);
   let droppedBacks = parts.get(closedGroup)?.dropped ?? 0;
+  // 采信的框：暗牌组整组（含被忽略的牌背，它们也是照片里的实物）
+  const used = new Set<number>(closedSeg.map((i) => i.detIndex));
 
   // 暗牌 + 和张
   const closedTiles = closedSeg.filter((i) => i.tile !== null);
-  if (closedTiles.length < closedSeg.length) warn("back_in_hand", "暗牌里有牌背，已忽略");
+  if (closedTiles.length < closedSeg.length) warn("back_in_hand", "info", "暗牌里有牌背，已忽略");
   const sideTiles = closedTiles.filter((i) => i.side);
   let winItem: Item | undefined;
+  let winGuessed = false;
   if (sideTiles.length === 1) winItem = sideTiles[0];
   else if (sideTiles.length > 1) {
     winItem = sideTiles[sideTiles.length - 1];
-    warn("multi_win", "暗牌里有多张横放的牌，已取最后一张为和张");
+    winGuessed = true;
+    warn("multi_win", "info", "暗牌里有多张横放的牌，已取最后一张为和张");
   } else if (closedTiles.length > 0) {
     winItem = closedTiles[closedTiles.length - 1];
-    warn("no_win_tile", "没有横放的和张，已取暗牌最后一张");
+    winGuessed = true;
+    warn("no_win_tile", "info", "没有横放的和张，已取暗牌最后一张");
   }
-  const closed = closedTiles.filter((i) => i !== winItem).map((i) => i.tile!);
+  const restTiles = closedTiles.filter((i) => i !== winItem);
+  const closed = restTiles.map((i) => i.tile!);
+  const closedOrigins = restTiles.map((i) => originOf(i));
   const winTile = winItem?.tile ?? 0;
-  if (winItem) closed.push(winTile);
+  if (winItem) {
+    closed.push(winTile);
+    closedOrigins.push(originOf(winItem, winGuessed));
+  }
 
   // 副露：暗牌所在组拆出来的副露段 + 其他任何行里能拆成纯副露的组
   const melds: Meld[] = [];
+  const meldOrigins: TileOrigin[][] = [];
   const consumed = new Set<Item[]>([closedGroup]);
   const addMeld = (seg: Item[]) => {
     if (melds.length >= MAX_MELDS) {
-      warn("bad_group", "副露超过 4 组，多出的已忽略");
+      warn("bad_group", "blocking", "副露超过 4 组，多出的已忽略");
       return;
     }
+    seg.forEach((i) => used.add(i.detIndex));
     if (isAnkan(seg)) {
       const [a, b] = [seg[1]!, seg[2]!];
       if (a.tile === null || b.tile === null) {
-        warn("bad_group", "暗杠中间不是牌面，已忽略该组");
+        warn("bad_group", "blocking", "暗杠中间不是牌面，已忽略该组");
         return;
       }
       let t = baseTile(a.tile);
+      let mismatch = false;
       if (baseTile(a.tile) !== baseTile(b.tile)) {
         t = baseTile(a.det.conf >= b.det.conf ? a.tile : b.tile);
-        warn("kan_mismatch", "暗杠中间两张不一致，已取置信度高的");
+        mismatch = true;
+        warn("kan_mismatch", "info", "暗杠中间两张不一致，已取置信度高的");
       }
       // 暗杠只露中间两张：其中有赤五就记一张赤五（一副牌每色只有一张）
       const aka = [a.tile, b.tile].find((x) => isAka(x) && baseTile(x) === t);
       melds.push({ open: false, tiles: [t, t, t, aka ?? t] });
+      // 四张牌与两个可见框不是一一对应（首尾是牌背、末位携带赤标记），整组记为补出来的
+      meldOrigins.push([0, 1, 2, 3].map(() => synthetic(mismatch)));
       return;
     }
-    const faces = seg.filter((i) => i.tile !== null).map((i) => i.tile!);
+    const faceItems = seg.filter((i) => i.tile !== null);
+    const faces = faceItems.map((i) => i.tile!);
+    const origins = faceItems.map((i) => originOf(i));
     if (faces.length < seg.length) {
-      warn("back_in_hand", "杠里有一张认成了牌背，按同一张牌补齐");
+      warn("back_in_hand", "info", "杠里有一张认成了牌背，按同一张牌补齐");
       faces.push(baseTile(faces[0]!));
+      origins.push(synthetic(true));
     }
     melds.push({ open: true, tiles: faces });
+    meldOrigins.push(origins);
   };
   for (const seg of parts.get(closedGroup)?.melds ?? []) addMeld(seg);
   for (const row of rows) {
@@ -392,7 +432,8 @@ export function layoutHand(
       for (const seg of parts.get(g)!.melds) addMeld(seg);
     }
   }
-  if (droppedBacks > 0) warn("back_in_hand", `手牌与副露之间有 ${droppedBacks} 张牌背，已忽略`);
+  if (droppedBacks > 0)
+    warn("back_in_hand", "info", `手牌与副露之间有 ${droppedBacks} 张牌背，已忽略`);
 
   // 指示牌行：手牌行之外、剩余的组不含横置/牌背且 ≤5 张的行。横拍只看上方；竖拍分不清哪边是「上」，
   // 两侧都收集、取有干净行的那一侧（两侧都有取行数多的）。离手牌近的是里宝，远的是表宝牌。
@@ -413,23 +454,47 @@ export function layoutHand(
   const up = candidates(-1);
   const down = swap ? candidates(1) : [];
   const indicatorRows = (down.length > up.length ? down : up).map((c) => c.tiles);
-  const used = new Set(indicatorRows.slice(0, 2).flat());
-  const extra = leftover.reduce((n, { tiles }) => n + tiles.filter((t) => !used.has(t)).length, 0);
-  if (extra > 0) warn("extra_rows", `有 ${extra} 张牌不在手牌、副露或指示牌的位置，已忽略`);
+  const usedIndicators = indicatorRows.slice(0, 2).flat();
+  usedIndicators.forEach((i) => used.add(i.detIndex));
+  const takenRows = new Set(usedIndicators);
+  const extra = leftover.reduce(
+    (n, { tiles }) => n + tiles.filter((t) => !takenRows.has(t)).length,
+    0,
+  );
+  if (extra > 0) warn("extra_rows", "info", `有 ${extra} 张牌不在手牌、副露或指示牌的位置，已忽略`);
   let doraIndicators: Tile[] = [];
   let uraIndicators: Tile[] = [];
-  if (indicatorRows.length === 1) doraIndicators = indicatorRows[0]!.map((i) => i.tile!);
-  else if (indicatorRows.length >= 2) {
-    uraIndicators = indicatorRows[0]!.map((i) => i.tile!);
-    doraIndicators = indicatorRows[1]!.map((i) => i.tile!);
+  let doraOrigins: TileOrigin[] = [];
+  let uraOrigins: TileOrigin[] = [];
+  const tilesOf = (row: Item[]) => row.map((i) => i.tile!);
+  const originsOf = (row: Item[]) => row.map((i) => originOf(i));
+  if (indicatorRows.length === 1) {
+    doraIndicators = tilesOf(indicatorRows[0]!);
+    doraOrigins = originsOf(indicatorRows[0]!);
+  } else if (indicatorRows.length >= 2) {
+    uraIndicators = tilesOf(indicatorRows[0]!);
+    uraOrigins = originsOf(indicatorRows[0]!);
+    doraIndicators = tilesOf(indicatorRows[1]!);
+    doraOrigins = originsOf(indicatorRows[1]!);
   }
   if (uraIndicators.length > doraIndicators.length) {
-    warn("too_many_dora", "里宝指示牌多于表宝牌，已截断");
+    warn("too_many_dora", "info", "里宝指示牌多于表宝牌，已截断");
     uraIndicators = uraIndicators.slice(0, doraIndicators.length);
+    uraOrigins = uraOrigins.slice(0, doraIndicators.length);
   }
 
   const total = closed.length + melds.length * 3;
-  if (total !== 14) warn("count", `暗牌与副露合计应为 14 张，实际 ${total} 张`);
+  if (total !== 14) warn("count", "blocking", `暗牌与副露合计应为 14 张，实际 ${total} 张`);
 
-  return { hand: { closed, melds, winTile, doraIndicators, uraIndicators }, warnings };
+  return {
+    hand: { closed, melds, winTile, doraIndicators, uraIndicators },
+    warnings,
+    provenance: {
+      closed: closedOrigins,
+      melds: meldOrigins,
+      doraIndicators: doraOrigins,
+      uraIndicators: uraOrigins,
+      usedDetections: [...used].sort((a, b) => a - b),
+    },
+  };
 }

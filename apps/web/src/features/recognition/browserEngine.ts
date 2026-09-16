@@ -25,12 +25,13 @@ export async function recognizeInBrowser(
   const { data, geom } = toModelInput(bitmap, model.imgsz);
   const output = await runDetector(detector, data, model.imgsz);
   const detections = decodeNmsOutput(output, geom, RECOGNITION_CLASSES.length);
-  const { hand, warnings } = layoutHand(detections);
+  const { hand, warnings, provenance } = layoutHand(detections);
   return {
     modelId: model.id,
     ms: Math.round(performance.now() - t0),
     detections,
     hand,
     warnings,
+    provenance,
   };
 }

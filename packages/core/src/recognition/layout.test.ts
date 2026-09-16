@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AKA, TILE } from "../types/tiles";
-import { RECOGNITION_CLASSES } from "./classes";
+import { RECOGNITION_CLASSES, tileOfClassId } from "./classes";
 import { layoutHand } from "./layout";
 import type { Detection } from "./types";
 
@@ -232,13 +232,17 @@ describe("layoutHand", () => {
     });
   });
 
-  it("张数不对 → count；零检测 → no_tiles；低置信 → low_conf", () => {
+  it("张数不对 → count；零检测 → no_tiles；低置信度不再告警，只体现在来源里", () => {
     const twelve = row([...CLOSED13.slice(0, 11), "9m~"], 10, 200);
     expect(layoutHand(twelve.dets).warnings.map((w) => w.code)).toContain("count");
     expect(layoutHand([]).warnings.map((w) => w.code)).toEqual(["no_tiles"]);
     const low = row([...CLOSED13, "9m~"], 10, 200).dets;
     low[0] = { ...low[0]!, conf: 0.45 };
-    expect(layoutHand(low).warnings.map((w) => w.code)).toEqual(["low_conf"]);
+    const { warnings, provenance } = layoutHand(low);
+    expect(warnings).toEqual([]);
+    // 低置信的那张仍然参与布局，界面按 detections[det].conf 自己决定打不打记号
+    expect(provenance.closed.map((o) => o.det)).toContain(0);
+    expect(provenance.closed.every((o) => !o.guessed)).toBe(true);
   });
 
   it("裁剪没裁干净：上方多出的整齐一行（6 张）被忽略并告警；有牌背的行不当指示牌", () => {
@@ -339,7 +343,7 @@ describe("layoutHand", () => {
       narrow,
       ...dora.dets,
     ]);
-    expect(warnings.map((w) => w.code)).toEqual(["low_conf", "odd_box", "back_in_hand"]);
+    expect(warnings.map((w) => w.code)).toEqual(["odd_box", "back_in_hand"]);
     expect(h.closed).toHaveLength(8);
     expect(h.winTile).toBe(TILE.P5);
     expect(h.melds).toEqual([
@@ -461,5 +465,125 @@ describe("layoutHand", () => {
       });
       expect(() => layoutHand(dets)).not.toThrow();
     }
+  });
+
+  it("来源：每张牌都指回原始下标，采信的框覆盖全部输入", () => {
+    const hand = row([...CLOSED13.slice(0, 10), "9m~"], 10, 400);
+    const pon = row(["8p", "8p~", "8p"], hand.end + GAP, 400);
+    const ura = row(["1z"], 30, 280);
+    const dora = row(["6s"], 30, 200);
+    const dets = [...hand.dets, ...pon.dets, ...ura.dets, ...dora.dets];
+    const { hand: h, provenance: p, warnings } = layoutHand(dets);
+    expect(warnings).toEqual([]);
+
+    // 逐位指回去，取出来的类就是布局给出的那张牌
+    const tileAt = (o: { det: number }) =>
+      tileOfClassId(dets[o.det]!.cls as Detection["cls"]) ?? null;
+    expect(p.closed).toHaveLength(h.closed.length);
+    h.closed.forEach((t, i) => expect(tileAt(p.closed[i]!)).toBe(t));
+    expect(p.melds).toHaveLength(1);
+    h.melds[0]!.tiles.forEach((t, j) => expect(tileAt(p.melds[0]![j]!)).toBe(t));
+    expect(tileAt(p.doraIndicators[0]!)).toBe(TILE.S6);
+    expect(tileAt(p.uraIndicators[0]!)).toBe(TILE.East);
+    expect(p.closed.every((o) => !o.guessed)).toBe(true);
+
+    // 这张照片里每一个框都被采信，回流可以自动打标
+    expect(p.usedDetections).toEqual(dets.map((_, i) => i));
+  });
+
+  it("来源：猜出来的位置标 guessed —— 和张歧义、和张缺失、暗杠不一致、杠里补齐", () => {
+    // 两张横置且拆不出合法副露 → 和张取最后一张，标 guessed
+    const multi = row(["1m~", "5p", "9s", ...CLOSED13.slice(3), "9m~"], 10, 200);
+    const mw = layoutHand(multi.dets).provenance;
+    expect(mw.closed[mw.closed.length - 1]!.guessed).toBe(true);
+    expect(mw.closed.slice(0, -1).every((o) => !o.guessed)).toBe(true);
+
+    // 没有横置 → 取末张，标 guessed
+    const none = row([...CLOSED13, "9m"], 10, 200);
+    const nw = layoutHand(none.dets).provenance;
+    expect(nw.closed[nw.closed.length - 1]!.guessed).toBe(true);
+
+    // 暗杠中间两张不一致 → 整组标 guessed 且没有框（四张牌与两个可见框对不上）
+    const closed11 = row(CLOSED13.slice(0, 10).concat("9m~"), 10, 400);
+    const ankan = [
+      det("back", closed11.end + GAP, 400),
+      det("5z", closed11.end + GAP + 42, 400),
+      det("6z", closed11.end + GAP + 84, 400),
+      det("back", closed11.end + GAP + 126, 400),
+    ];
+    const kw = layoutHand([...closed11.dets, ...ankan]);
+    expect(kw.warnings.map((w) => w.code)).toContain("kan_mismatch");
+    expect(kw.provenance.melds[0]!.every((o) => o.det === -1 && o.guessed)).toBe(true);
+
+    // 杠里一张认成牌背 → 补出来的那张没有框且标 guessed
+    const closed11b = row(CLOSED13.slice(0, 10).concat("9m~"), 10, 400);
+    const kan = row(["5z", "5z~", "5z"], closed11b.end + GAP, 400).dets;
+    kan.push(det("back", closed11b.end + GAP + 130, 400));
+    const bw = layoutHand([...closed11b.dets, ...kan]);
+    expect(bw.warnings.map((w) => w.code)).toContain("back_in_hand");
+    const last = bw.provenance.melds[0]![bw.provenance.melds[0]!.length - 1]!;
+    expect(last).toEqual({ det: -1, guessed: true });
+  });
+
+  it("告警分级：blocking 只有 no_tiles / count / bad_group，其余都是 info", () => {
+    const BLOCKING = new Set(["no_tiles", "count", "bad_group"]);
+    // 每个 code 都要被下面的场景覆盖到，漏一个就说明清单和实现对不上
+    const scenes: Detection[][] = [
+      [],
+      row([...CLOSED13.slice(0, 11), "9m~"], 10, 200).dets, // count + bad_group
+      (() => {
+        const d = row([...CLOSED13, "9m~"], 10, 200).dets;
+        return [...d, { ...det("8p", 120, 120), box: [120, 120, 140, 176] } as Detection];
+      })(), // odd_box
+      row([...CLOSED13, "9m"], 10, 200).dets, // no_win_tile
+      row(["1m~", "5p", "9s", ...CLOSED13.slice(3), "9m~"], 10, 200).dets, // multi_win
+      (() => {
+        const hand = row([...CLOSED13, "9m~"], 10, 400);
+        return [...hand.dets, ...row(["1z", "2z", "3z", "4z", "5z", "6z"], 10, 100).dets];
+      })(), // extra_rows
+      (() => {
+        const hand = row([...CLOSED13, "9m~"], 10, 400);
+        return [
+          ...hand.dets,
+          ...row(["1z", "2z"], 30, 330).dets, // 里宝 2 张
+          ...row(["6s"], 30, 250).dets, // 表宝 1 张
+        ];
+      })(), // too_many_dora
+      (() => {
+        const c = row(CLOSED13.slice(0, 10).concat("9m~"), 10, 400);
+        return [
+          ...c.dets,
+          det("back", c.end + GAP, 400),
+          det("5z", c.end + GAP + 42, 400),
+          det("6z", c.end + GAP + 84, 400),
+          det("back", c.end + GAP + 126, 400),
+        ];
+      })(), // kan_mismatch
+      (() => {
+        const c = row(CLOSED13.slice(0, 10).concat("9m~"), 10, 400);
+        const kan = row(["5z", "5z~", "5z"], c.end + GAP, 400).dets;
+        kan.push(det("back", c.end + GAP + 130, 400));
+        return [...c.dets, ...kan];
+      })(), // back_in_hand
+    ];
+    const seen = new Set<string>();
+    for (const dets of scenes) {
+      for (const w of layoutHand(dets).warnings) {
+        seen.add(w.code);
+        expect(w.severity).toBe(BLOCKING.has(w.code) ? "blocking" : "info");
+      }
+    }
+    expect([...seen].sort()).toEqual([
+      "back_in_hand",
+      "bad_group",
+      "count",
+      "extra_rows",
+      "kan_mismatch",
+      "multi_win",
+      "no_tiles",
+      "no_win_tile",
+      "odd_box",
+      "too_many_dora",
+    ]);
   });
 });

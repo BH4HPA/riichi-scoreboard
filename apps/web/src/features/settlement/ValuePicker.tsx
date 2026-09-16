@@ -150,6 +150,7 @@ export function ValuePicker({
           evaluated={draft.evaluated}
           evaluating={evaluating}
           evalError={evalError}
+          uncertain={draft.recognition?.uncertain ?? []}
         />
       </TabsContent>
     </Tabs>

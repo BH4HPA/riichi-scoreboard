@@ -18,6 +18,7 @@ export type { TileSize } from "./tileSize";
 /**
  * 单张牌：`<img>` 引用扁平风格 SVG。
  * - `back`：牌背（暗杠首尾）；`rotated`：横置（副露叫牌）；`selected`：和张/当前选中；`dim`：不可选。
+ * - `mark`：识别没把握，建议核对。用强调色角标而不是错误色 —— 它不是错误，只是提醒眼睛往这儿看。
  */
 export function TileFace({
   tile,
@@ -26,6 +27,7 @@ export function TileFace({
   dim = false,
   rotated = false,
   back = false,
+  mark = false,
   onClick,
   className,
 }: {
@@ -35,11 +37,18 @@ export function TileFace({
   dim?: boolean;
   rotated?: boolean;
   back?: boolean;
+  mark?: boolean;
   onClick?: (() => void) | undefined;
   className?: string;
 }) {
   const { w, h } = TILE_PX[size];
   const label = back ? "牌背" : tileLabel(tile);
+  const badge = mark ? (
+    <span
+      className="pointer-events-none absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent ring-1 ring-surface"
+      aria-hidden
+    />
+  ) : null;
   // 横置：外框固定为 h×w，图片本体绕左上角旋转 90° 再平移进框；不依赖 preflight 的 img max-width
   const rotation = rotated
     ? { transform: "rotate(90deg) translateY(-100%)", transformOrigin: "top left" }
@@ -69,16 +78,16 @@ export function TileFace({
   ) : (
     face
   );
-  const wrapped = (
-    <span
-      className={cn("inline-flex shrink-0 items-end", dim && "opacity-35", className)}
-      role="img"
-      aria-label={label}
-    >
-      {body}
-    </span>
-  );
-  if (!onClick) return wrapped;
+  // 角标绝对定位，所以容器加 relative；不新包一层，免得破坏与副露牌的基线对齐（smoke 有断言）
+  const box = cn("relative inline-flex shrink-0 items-end", dim && "opacity-35", className);
+  if (!onClick) {
+    return (
+      <span className={box} role="img" aria-label={label} data-mark={mark || undefined}>
+        {body}
+        {badge}
+      </span>
+    );
+  }
   return (
     <button
       type="button"
@@ -88,9 +97,11 @@ export function TileFace({
       aria-label={label}
       aria-pressed={selected}
       disabled={dim}
+      data-mark={mark || undefined}
     >
-      <span className={cn("inline-flex shrink-0 items-end", dim && "opacity-35", className)}>
+      <span className={box}>
         {body}
+        {badge}
       </span>
     </button>
   );

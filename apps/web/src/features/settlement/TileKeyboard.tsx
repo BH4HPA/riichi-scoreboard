@@ -22,6 +22,7 @@ import {
 import { CheckRow, Label } from "@/ui/controls";
 import { cn } from "@/lib/utils";
 import { TileFace } from "@/features/hand/TileFace";
+import { hasLoc, type TileLoc } from "@/features/hand/tileLoc";
 import { YakuChips } from "@/features/hand/YakuChips";
 import { closedCapacity, isHandComplete } from "./valueDraft";
 
@@ -60,6 +61,7 @@ export function TileKeyboard({
   evaluated,
   evaluating,
   evalError,
+  uncertain = [],
 }: {
   hand: HandInput;
   onChange: (next: HandInput) => void;
@@ -68,7 +70,10 @@ export function TileKeyboard({
   evaluated: EvaluatedHand | null;
   evaluating: boolean;
   evalError: string | null;
+  /** 识别没把握的位置，给对应的牌打记号 */
+  uncertain?: readonly TileLoc[];
 }) {
+  const marked = (loc: TileLoc) => hasLoc(uncertain, loc);
   const [target, setTarget] = useState<Target>("closed");
   const capacity = closedCapacity(hand);
   const complete = isHandComplete(hand);
@@ -178,6 +183,7 @@ export function TileKeyboard({
                 tile={t}
                 size="sm"
                 selected={i === winIndex}
+                mark={marked({ area: "closed", i })}
                 onClick={() => removeClosed(i)}
               />
             ))}
@@ -190,6 +196,7 @@ export function TileKeyboard({
                   tile={t}
                   size="sm"
                   back={!m.open && m.tiles.length === 4 && (j === 0 || j === 3)}
+                  mark={marked({ area: "meld", i, j })}
                   onClick={
                     tileNumber(t) === 5 && !isHonor(t) ? () => toggleMeldAka(i, j) : undefined
                   }
@@ -282,6 +289,7 @@ export function TileKeyboard({
                 key={i}
                 tile={t}
                 size="sm"
+                mark={marked({ area: "dora", i })}
                 onClick={() =>
                   update({ doraIndicators: hand.doraIndicators.filter((_, k) => k !== i) })
                 }
@@ -297,6 +305,7 @@ export function TileKeyboard({
                 key={i}
                 tile={t}
                 size="sm"
+                mark={marked({ area: "ura", i })}
                 onClick={() =>
                   update({ uraIndicators: hand.uraIndicators.filter((_, k) => k !== i) })
                 }

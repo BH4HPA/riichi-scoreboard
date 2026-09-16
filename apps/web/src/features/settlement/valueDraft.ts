@@ -10,6 +10,10 @@ export interface ValueDraft {
   evaluated: EvaluatedHand | null;
   /** 牌面来自拍照识别时的记录信息；手工录入为 null */
   recognition: DraftRecognition | null;
+  /** 立直是识别里宝后系统替用户勾上的：确认态给这个旗标打记号，让「为什么亮着」看得见 */
+  riichiAuto: boolean;
+  /** 用户在确认态点过「改牌」：此后一直留在编辑态，直到下一次识别 */
+  editing: boolean;
 }
 
 export function emptyHand(tsumo: boolean): HandInput {
@@ -48,7 +52,20 @@ export function createValueDraft(tsumo: boolean): ValueDraft {
     hand: emptyHand(tsumo),
     evaluated: null,
     recognition: null,
+    riichiAuto: false,
+    editing: false,
   };
+}
+
+/**
+ * 能不能收起键盘只看结果：来自识别、牌面录满、没有 blocking 提示，且用户没主动点过「改牌」。
+ * 宝牌指示牌为空不拦（用户拍板），确认态会把那一栏留空位提醒。
+ */
+export function confirmable(draft: ValueDraft): boolean {
+  if (draft.mode !== "hand" || draft.editing) return false;
+  const rec = draft.recognition;
+  if (!rec || rec.warnings.some((w) => w.severity === "blocking")) return false;
+  return isHandComplete(draft.hand);
 }
 
 /** 草稿 → 可计算的番符值；牌面未评估或非和牌形时为 null。 */
