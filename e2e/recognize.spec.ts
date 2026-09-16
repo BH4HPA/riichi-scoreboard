@@ -79,13 +79,17 @@ test("拍照 → 裁剪 → 本机推理填入牌面并自动算番 → 检测�
   await expect(dialog.getByTestId("recognize-status")).toHaveText(/^识别完成 · \d+ ms$/, {
     timeout: 30_000,
   });
-  const handArea = dialog.getByTestId("hand-area");
+  // 识别自洽 → 收起键盘，只剩一排牌
+  const confirm = dialog.getByTestId("hand-confirm");
+  await expect(confirm).toBeVisible();
+  await expect(dialog.getByTestId("tile-keyboard")).toHaveCount(0);
   // 假检测器给赤5筒 0.45 的置信度：不再报红字，改成那张牌自己带「请核对」记号
-  const aka = handArea.getByRole("button", { name: "赤5筒" });
-  await expect(aka).toBeVisible();
+  const aka = confirm.getByRole("button", { name: "赤5筒" });
   await expect(aka).toHaveAttribute("data-mark", "true");
-  await expect(handArea.getByRole("button", { name: "1萬" })).not.toHaveAttribute("data-mark");
+  await expect(confirm.getByRole("button", { name: "1萬" })).not.toHaveAttribute("data-mark");
   await expect(dialog.getByText(/置信度/)).toHaveCount(0);
+  // 一张宝牌指示牌都没认出来时留空位，不是整行消失
+  await expect(confirm.getByText("宝牌指示")).toBeVisible();
   await expect(dialog.getByText("2 番 30 符")).toBeVisible();
   await expect(dialog.getByText("赤宝牌 1 番")).toBeVisible();
 
@@ -122,4 +126,45 @@ test("模型加载失败 → 错误提示、牌面不变，照片仍已上传", 
   await uploaded;
   await expect(dialog.getByTestId("hand-area").getByRole("button")).toHaveCount(0);
   await expect(dialog.getByTestId("recognize-button")).toBeEnabled();
+});
+
+test("确认态：点牌替换、改和张、改牌展开全键盘后不再自动收回", async ({ browser }) => {
+  const { phone: p, dialog } = await openRonHandTab(browser, async (page) => {
+    await page.route("**/riichi/models/*.onnx", (route) =>
+      route.fulfill({ path: DETECTOR, contentType: "application/octet-stream" }),
+    );
+    await page.route("**/api/recognitions/*", (route) => route.fulfill({ status: 204 }));
+  });
+  await dialog.getByTestId("recognize-file").setInputFiles(FIXTURE);
+  const cropDialog = p.getByRole("dialog").filter({ hasText: "裁剪照片" });
+  await cropDialog.getByRole("button", { name: "确认裁剪" }).click();
+
+  const confirm = dialog.getByTestId("hand-confirm");
+  await expect(confirm).toBeVisible({ timeout: 30_000 });
+  await expect(dialog.getByText("2 番 30 符")).toBeVisible();
+
+  // 点带记号的那张 → 替换面板；换成 5筒 后番符重算（少了赤宝牌 1 番）
+  await confirm.getByRole("button", { name: "赤5筒" }).click();
+  const sheet = p.getByRole("dialog").filter({ hasText: "换掉 赤5筒" });
+  await expect(sheet).toBeVisible();
+  await sheet.getByTestId("replace-grid").getByRole("button", { name: "5筒", exact: true }).click();
+  await expect(dialog.getByText("1 番 30 符")).toBeVisible();
+  // 换过之后这张不再带记号
+  await expect(confirm.getByRole("button", { name: "5筒", exact: true })).not.toHaveAttribute(
+    "data-mark",
+  );
+
+  // 点非和张的牌能改和张：把和张从 9萬 挪到 1萬，牌型不再是平和
+  await confirm.getByRole("button", { name: "1萬" }).click();
+  await p
+    .getByRole("dialog")
+    .filter({ hasText: "换掉 1萬" })
+    .getByRole("button", { name: "把这张设为和张" })
+    .click();
+  await expect(dialog.getByText(/^\d+ 番 \d+ 符$/)).toBeVisible();
+
+  // 改牌 → 全键盘；牌面仍然完整，但不会自己收回确认态
+  await confirm.getByRole("button", { name: "改牌" }).click();
+  await expect(dialog.getByTestId("tile-keyboard")).toBeVisible();
+  await expect(dialog.getByTestId("hand-confirm")).toHaveCount(0);
 });
