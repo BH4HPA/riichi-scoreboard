@@ -5,15 +5,18 @@
 # 用法：ci/upload-model.sh <model.onnx> [note]
 # 需要：ml/ 的 uv 环境（校验脚本 ml/scripts/check_onnx.py 会检查类顺序与 manifest 一致，不一致不上传）；
 #       coscmd 已在 PATH（pipx install coscmd）；QCLOUD_SECRET_ID / QCLOUD_SECRET_KEY 必填，
-#       QCLOUD_COS_BUCKET / QCLOUD_COS_REGION 默认为 bite-go 的 static 桶。
+#       QCLOUD_COS_BUCKET 默认为 bite-go 的 static 桶，接入点默认全球加速域名（见 ci/cos-conf.sh）。
 # 桶内前缀与下载地址常量 apps/web/src/features/recognition/modelUrl.ts 须一致，改一处必须改另一处。
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MANIFEST="$ROOT_DIR/packages/core/src/recognition/manifest.json"
+# shellcheck source=ci/cos-conf.sh
+source "$ROOT_DIR/ci/cos-conf.sh"
 KEY_PREFIX="riichi/models"
 BUCKET="${QCLOUD_COS_BUCKET:-bitego-static-1251306253}"
-REGION="${QCLOUD_COS_REGION:-ap-shanghai}"
+REGION="${QCLOUD_COS_REGION:-}"
+ENDPOINT="${QCLOUD_COS_ENDPOINT:-}"
 FILE="${1:-}"
 NOTE="${2:-}"
 
@@ -38,7 +41,7 @@ KEY="$KEY_PREFIX/$ID.onnx"
 
 CONF="$(mktemp)"
 trap 'rm -f "$CONF"' EXIT
-coscmd -c "$CONF" config -a "$QCLOUD_SECRET_ID" -s "$QCLOUD_SECRET_KEY" -b "$BUCKET" -r "$REGION"
+cos_config "$CONF" "$BUCKET" "$ENDPOINT" "$REGION"
 echo "$FILE -> cos://$BUCKET/$KEY"
 coscmd -c "$CONF" upload \
   -H '{"Content-Type":"application/octet-stream","Cache-Control":"public, max-age=31536000, immutable"}' \

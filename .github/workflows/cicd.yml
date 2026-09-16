@@ -20,7 +20,8 @@ env:
   API_BASE_URL: https://riichi-api.ruivon.cn
   WEB_URL: https://riichi.ruivon.cn
   WEB_COS_BUCKET: riichi-scoreboard-1251306253
-  WEB_COS_REGION: ap-shanghai
+  # 全球加速域名：runner 在境外，区域域名传 14 MB 的 wasm 会 UserNetworkTooSlow
+  WEB_COS_ENDPOINT: cos.accelerate.myqcloud.com
   DOCKER_SERVER: useccr.ccs.tencentyun.com
   IMAGE: useccr.ccs.tencentyun.com/bitego/riichi
   DEPLOY_SSH_USER: ray
@@ -87,7 +88,7 @@ jobs:
           QCLOUD_SECRET_ID: ${{ secrets.QCLOUD_SECRET_ID }}
           QCLOUD_SECRET_KEY: ${{ secrets.QCLOUD_SECRET_KEY }}
           QCLOUD_WEB_COS_BUCKET: ${{ env.WEB_COS_BUCKET }}
-          QCLOUD_WEB_COS_REGION: ${{ env.WEB_COS_REGION }}
+          QCLOUD_WEB_COS_ENDPOINT: ${{ env.WEB_COS_ENDPOINT }}
         run: bash ci/deploy-web-to-cos.sh
       - name: Purge CDN cache
         env:

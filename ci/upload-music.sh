@@ -3,17 +3,20 @@
 # 在本机手工执行（CI 不调用）。用法：ci/upload-music.sh <本地目录>
 #   目录里放 manifest 中 file 字段对应的原文件；中文文件名只在本地，桶内只有 uuid。
 # 需要：coscmd 已在 PATH（pipx install coscmd）；QCLOUD_SECRET_ID / QCLOUD_SECRET_KEY 必填，
-#       QCLOUD_COS_BUCKET / QCLOUD_COS_REGION 默认为 bite-go 的 static 桶。
+#       QCLOUD_COS_BUCKET 默认为 bite-go 的 static 桶，接入点默认全球加速域名（见 ci/cos-conf.sh）。
 # 桶内前缀与前端播放地址（apps/web/src/features/music/url.ts）是同一常量，改一处必须改另一处。
 # 每次全量覆盖上传（coscmd 的 -s 跳过时会静默返回 254，不用它）；曲库总量几十 MB，可重复执行。
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MANIFEST="$ROOT_DIR/packages/core/src/music/manifest.json"
+# shellcheck source=ci/cos-conf.sh
+source "$ROOT_DIR/ci/cos-conf.sh"
 KEY_PREFIX="riichi/music"
 SRC_DIR="${1:-}"
 BUCKET="${QCLOUD_COS_BUCKET:-bitego-static-1251306253}"
-REGION="${QCLOUD_COS_REGION:-ap-shanghai}"
+REGION="${QCLOUD_COS_REGION:-}"
+ENDPOINT="${QCLOUD_COS_ENDPOINT:-}"
 
 [[ -n "$SRC_DIR" && -d "$SRC_DIR" ]] || {
   echo "usage: $0 <dir-with-source-mp3s>" >&2
@@ -38,7 +41,7 @@ done <<< "$entries"
 
 CONF="$(mktemp)"
 trap 'rm -f "$CONF"' EXIT
-coscmd -c "$CONF" config -a "$QCLOUD_SECRET_ID" -s "$QCLOUD_SECRET_KEY" -b "$BUCKET" -r "$REGION"
+cos_config "$CONF" "$BUCKET" "$ENDPOINT" "$REGION"
 
 while IFS=$'\t' read -r id file; do
   key="$KEY_PREFIX/$id.mp3"
