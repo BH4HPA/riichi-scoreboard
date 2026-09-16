@@ -109,6 +109,22 @@ export function align(
   if (hand.closed.length !== corrected.closed.length || !sameShape(hand.melds, corrected.melds)) {
     return manual("用户增删过牌，位置对不上");
   }
+  /*
+   * 指示牌的张数必须**两边完全相等**，多一张少一张都送人工。少一张有三种成因，
+   * 从张数上根本分不开，而其中两种照单全收就会灌进错标注：
+   * - 用户在编辑态删掉了一张误检（实拍遇到过：牌背被认成白板混进指示牌行）。
+   *   若按「只比两边都有的部分」对齐，删的又是靠前那张，后面的真牌会顶上来，
+   *   那个误检框就被改标成真牌的类 —— 一张照片里出现两个同类框，其中一个是牌背。
+   * - 房间村规截断（不开杠宝只留 1 张、无里宝清空）。被截掉的那几张用户根本没在
+   *   界面上见过，拿模型的预测当真值等于把没验证过的东西写进训练集。
+   * - 多一张则说明模型漏检了：照片里有张牌没有任何框，YOLO 会把它学成背景。
+   */
+  if (
+    hand.doraIndicators.length !== corrected.doraIndicators.length ||
+    hand.uraIndicators.length !== corrected.uraIndicators.length
+  ) {
+    return manual("指示牌张数对不上（删掉了误检、被村规截断、或模型漏检）");
+  }
   // 照片里每一张真牌都得有标注，否则 YOLO 会把没标的牌学成背景。
   // 但按噪声剔除的框（低置信、形状退化）不是牌，不标注才是对的，也不该因此降级。
   const accounted = new Set([...provenance.usedDetections, ...provenance.rejectedDetections]);
@@ -123,9 +139,9 @@ export function align(
       pairs.push([provenance.melds[i]![j]!, t, corrected.melds[i]!.tiles[j]!]),
     ),
   );
-  // 指示牌可能被房间规则截断（不开杠宝、无里宝），只比两边都有的部分；被截掉的保留模型的判断
+  // 张数上面已经核过相等，这里逐位比
   const row = (a: readonly Tile[], b: readonly Tile[], origins: readonly TileOrigin[]) =>
-    a.slice(0, Math.min(a.length, b.length)).forEach((t, i) => pairs.push([origins[i]!, t, b[i]!]));
+    a.forEach((t, i) => pairs.push([origins[i]!, t, b[i]!]));
   row(hand.doraIndicators, corrected.doraIndicators, provenance.doraIndicators);
   row(hand.uraIndicators, corrected.uraIndicators, provenance.uraIndicators);
 

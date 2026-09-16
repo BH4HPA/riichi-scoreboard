@@ -82,13 +82,38 @@ describe("align", () => {
     expect(clsOf(out.labels, akaIndex)).toBe("0p");
   });
 
-  it("指示牌被规则截掉：少的那几张保留模型的判断，不当成用户改动", () => {
+  it("用户删掉混进指示牌行的误检 → 送人工，且不能把那个框改标成真牌（实拍遇到过）", () => {
+    // 牌背被认成白板，混进了指示牌行，排在真宝牌前面
+    const spurious = [...DETS, det("5z", 80, 100)];
+    const b = layoutHand(spurious);
+    expect(b.hand.doraIndicators).toHaveLength(2);
+    // 用户在编辑态把白板那张删了，只留真宝牌
+    const kept = b.hand.doraIndicators.filter((t) => t !== TILE.Haku);
+    expect(kept).toHaveLength(1);
+    const out = align(spurious, b.hand, emptyHand([...b.hand.closed], kept));
+    expect(out.status).toBe("manual");
+    expect(out.reason).toContain("指示牌张数对不上");
+    // 关键：白板那个框必须原样保留，绝不能顶着后面那张真牌的类
+    expect(out.labels.map((l) => l.cls)).toEqual(spurious.map((d) => d.cls));
+    const haku = RECOGNITION_CLASSES.indexOf("5z");
+    expect(out.labels.filter((l) => l.cls === haku)).toHaveLength(1);
+  });
+
+  it("指示牌被村规截断 → 也送人工：被截掉的那几张用户根本没在界面上见过", () => {
     const twoDora = [...DETS, det("1z", 80, 100)];
     const b = layoutHand(twoDora);
-    expect(b.hand.doraIndicators).toHaveLength(2);
     const out = align(twoDora, b.hand, emptyHand([...b.hand.closed], [b.hand.doraIndicators[0]!]));
-    expect(out.status).toBe("auto");
+    expect(out.status).toBe("manual");
     expect(out.labels.map((l) => l.cls)).toEqual(twoDora.map((d) => d.cls));
+  });
+
+  it("用户补了一张模型没认出来的指示牌 → 送人工：照片里那张牌没有框，会被学成背景", () => {
+    const out = align(DETS, base.hand, {
+      ...emptyHand([...base.hand.closed], [TILE.S6]),
+      uraIndicators: [TILE.M6],
+    });
+    expect(out.status).toBe("manual");
+    expect(out.reason).toContain("指示牌张数对不上");
   });
 
   it("编辑态删一张再补一张 → 下标整体错位，必须送人工（照单全收会把十几个框全标错）", () => {
