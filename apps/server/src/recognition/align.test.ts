@@ -74,12 +74,13 @@ describe("align", () => {
     expect(RECOGNITION_CLASSES[changed[0]!.cls]).toBe("3s");
   });
 
-  it("赤五被房间规则折回普通五：不能按 corrected 改，否则会把照片里的赤五标成普通五", () => {
+  it("赤五改成普通五 → 送人工：可能是房间规则折回（该留 0p），也可能是纠正认错（该标 5p），分不开", () => {
     const closed = base.hand.closed.map((t) => (t === AKA.P5 ? TILE.P5 : t));
     const out = align(DETS, base.hand, emptyHand(closed, [TILE.S6]));
-    expect(out.status).toBe("auto");
-    const akaIndex = DETS.findIndex((d) => RECOGNITION_CLASSES[d.cls] === "0p");
-    expect(clsOf(out.labels, akaIndex)).toBe("0p");
+    expect(out.status).toBe("manual");
+    expect(out.reason).toContain("赤五改成了普通五");
+    // 预标注保持模型原判，交给人定
+    expect(out.labels.map((l) => l.cls)).toEqual(DETS.map((d) => d.cls));
   });
 
   it("用户删掉混进指示牌行的误检 → 送人工，且不能把那个框改标成真牌（实拍遇到过）", () => {
@@ -138,7 +139,7 @@ describe("align", () => {
     expect(out.status).toBe("manual");
   });
 
-  it("把普通五改成赤五是真纠正，必须重标（只有赤→普通才是规则折返）", () => {
+  it("把普通五改成赤五是真纠正，必须重标（规则只会把赤折成普通，不会反过来）", () => {
     // 模型认成普通 5p 的那种情形：用 5p 版本的检测框重跑
     const plain = DETS.map((d) =>
       RECOGNITION_CLASSES[d.cls] === "0p" ? { ...d, cls: RECOGNITION_CLASSES.indexOf("5p") } : d,
@@ -183,6 +184,58 @@ describe("align", () => {
     const out = align(DETS, stale, emptyHand([...base.hand.closed], [TILE.S6]));
     expect(out.status).toBe("manual");
     expect(out.reason).toContain("改版");
+  });
+
+  describe("暗杠", () => {
+    const closed11 = row(
+      ["1m", "2m", "3m", "4p", "6p", "7s", "8s", "9s", "7m", "8m", "9m~"],
+      10,
+      400,
+    );
+    const x = closed11.end + 40;
+    const ankanOf = (mid: [Detection, Detection]) => [
+      ...closed11.dets,
+      det("back", x, 400),
+      ...mid,
+      det("back", x + 126, 400),
+    ];
+    const withMelds = (b: ReturnType<typeof layoutHand>, tiles: Tile[]): HandInput => ({
+      ...emptyHand([...b.hand.closed], [...b.hand.doraIndicators]),
+      melds: [{ open: false, tiles }],
+    });
+
+    it("普通暗杠照单确认 → 自动入库：补出来的首尾没被猜过，闸门不能把所有暗杠都拦下", () => {
+      const dets = ankanOf([det("5z", x + 42, 400), det("5z", x + 84, 400)]);
+      const b = layoutHand(dets);
+      expect(align(dets, b.hand, withMelds(b, [...b.hand.melds[0]!.tiles])).status).toBe("auto");
+    });
+
+    it("中间两张都认成赤、实际只有一张 → 不管用户挪红标还是照单确认，都送人工", () => {
+      const dets = ankanOf([det("0p", x + 42, 400), det("0p", x + 84, 400)]);
+      const b = layoutHand(dets);
+      expect(b.hand.melds[0]!.tiles).toEqual([TILE.P5, AKA.P5, AKA.P5, TILE.P5]);
+      // 以前「赤→普通」一律当规则折返保留原判，这两种都会带着一个错的 0p 框进 auto
+      for (const tiles of [
+        [TILE.P5, TILE.P5, AKA.P5, TILE.P5], // 用户把红标挪到右边那张
+        [TILE.P5, AKA.P5, TILE.P5, TILE.P5], // 照单确认 applyRecognized 按赤 3 裁过的结果
+      ]) {
+        const out = align(dets, b.hand, withMelds(b, tiles));
+        expect(out.status).toBe("manual");
+        expect(out.reason).toContain("赤五改成了普通五");
+      }
+    });
+
+    it("中间两张不一致、照单确认 → 送人工：被弃用的那个框会带着模型原判进 auto", () => {
+      const dets = ankanOf([
+        { ...det("6z", x + 42, 400), conf: 0.6 },
+        { ...det("7z", x + 84, 400), conf: 0.9 },
+      ]);
+      const b = layoutHand(dets);
+      expect(b.hand.melds[0]!.tiles).toEqual([TILE.Chun, TILE.Chun, TILE.Chun, TILE.Chun]);
+      const out = align(dets, b.hand, withMelds(b, [...b.hand.melds[0]!.tiles]));
+      expect(out.status).toBe("manual");
+      expect(out.reason).toContain("布局猜过的牌");
+    });
   });
 
   it("用户改了暗杠里补出来的那张（没有对应的框）→ 送人工", () => {
