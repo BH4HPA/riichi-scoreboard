@@ -20,7 +20,10 @@ cos_config() {
   elif [[ -n "$region" ]]; then
     args+=(-r "$region")
   else
-    args+=(-e "$COS_ACCELERATE_ENDPOINT")
+    endpoint="$COS_ACCELERATE_ENDPOINT"
+    args+=(-e "$endpoint")
   fi
+  # 打出实际接入点：环境里若有同名的服务端 COS 变量（.env 的 QCLOUD_COS_REGION），会静默改变走向
+  echo "COS: $bucket @ ${endpoint:-$region}"
   coscmd "${args[@]}"
 }

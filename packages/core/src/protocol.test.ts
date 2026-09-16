@@ -77,15 +77,13 @@ describe("立直音乐", () => {
 });
 
 describe("并发提交", () => {
-  it("TOLERATES_STALE：座位类与开局豁免落后的 baseSeq；结算、撤销、改规则不豁免", () => {
-    expect(TOLERATES_STALE.sit).toBe(true);
-    expect(TOLERATES_STALE.sitLocal).toBe(true);
-    expect(TOLERATES_STALE.leave).toBe(true);
-    expect(TOLERATES_STALE.setReady).toBe(true);
-    expect(TOLERATES_STALE.start).toBe(true);
-    expect(TOLERATES_STALE.ron).toBe(false);
-    expect(TOLERATES_STALE.undo).toBe(false);
-    expect(TOLERATES_STALE.setRules).toBe(false);
-    expect(TOLERATES_STALE.dissolve).toBe(false);
+  // 表是 Record<ClientCommand["type"], boolean>，漏项由类型挡住；这里只钉住两类的分界
+  it("TOLERATES_STALE：大厅里点得到的都豁免，改动这一局的都不豁免", () => {
+    for (const t of ["sit", "sitLocal", "leave", "setReady", "start", "dissolve"] as const) {
+      expect(TOLERATES_STALE[t]).toBe(true);
+    }
+    for (const t of ["ron", "tsumo", "undo", "redo", "adjust", "setRules", "toLobby"] as const) {
+      expect(TOLERATES_STALE[t]).toBe(false);
+    }
   });
 });

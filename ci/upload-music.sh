@@ -15,7 +15,7 @@ source "$ROOT_DIR/ci/cos-conf.sh"
 KEY_PREFIX="riichi/music"
 SRC_DIR="${1:-}"
 BUCKET="${QCLOUD_COS_BUCKET:-bitego-static-1251306253}"
-REGION="${QCLOUD_COS_REGION:-}"
+REGION="${QCLOUD_COS_REGION:-ap-shanghai}"
 ENDPOINT="${QCLOUD_COS_ENDPOINT:-}"
 
 [[ -n "$SRC_DIR" && -d "$SRC_DIR" ]] || {

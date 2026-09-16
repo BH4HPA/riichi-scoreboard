@@ -34,7 +34,7 @@ cos_config "$CONF" "$BUCKET" "$ENDPOINT" "$REGION"
 # 3) 根目录（index.html 等）按默认头传，并删掉桶里多余的对象。
 IMMUTABLE='"Cache-Control":"public, max-age=31536000, immutable"'
 echo "Syncing $DIST_DIR -> cos://$BUCKET/"
-coscmd -c "$CONF" upload -rs --include "*.wasm" \
+coscmd -c "$CONF" upload -rsf --include "*.wasm" \
   -H "{\"Content-Type\":\"application/wasm\",$IMMUTABLE}" "$DIST_DIR/assets/" /assets/ </dev/null
-coscmd -c "$CONF" upload -rs --ignore "*.wasm" -H "{$IMMUTABLE}" "$DIST_DIR/assets/" /assets/ </dev/null
-coscmd -c "$CONF" upload -rs --delete -f "$DIST_DIR/" /
+coscmd -c "$CONF" upload -rsf --ignore "*.wasm" -H "{$IMMUTABLE}" "$DIST_DIR/assets/" /assets/ </dev/null
+coscmd -c "$CONF" upload -rsf --delete "$DIST_DIR/" / </dev/null

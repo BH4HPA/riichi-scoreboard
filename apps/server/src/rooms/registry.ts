@@ -158,7 +158,7 @@ export class RoomRegistry {
     return toRoomView(room.state, room.seq, this.onlineIds(room), autoStartIn, room.music);
   }
 
-  /** 形状校验 → 校验 baseSeq（座位类命令豁免，见 TOLERATES_STALE）→ 按 actor 补全/鉴权 → reduce → 事务落库 → 广播。 */
+  /** 形状校验 → 校验 baseSeq（大厅类命令豁免，见 TOLERATES_STALE）→ 按 actor 补全/鉴权 → reduce → 事务落库 → 广播。 */
   apply(room: LiveRoom, baseSeq: number, rawCommand: unknown, actor: EventActor): RoomEvent {
     const client = validateCommand(rawCommand);
     if (baseSeq !== room.seq && !TOLERATES_STALE[client.type]) throw new StaleCommand();
@@ -258,6 +258,9 @@ export class RoomRegistry {
         own(cmd.seat, "离开", true);
         return cmd;
       case "setReady":
+        // reducer 对 setReady 没有阶段校验（历史事件按原样重放），在命令入口挡住：
+        // 豁免 baseSeq 后，开局瞬间到达的「取消准备」会写进事件流，虽不影响判定但是脏数据
+        if (state.phase !== "lobby") throw new DomainError("locked", "开局后不能改准备状态");
         own(cmd.seat, "准备");
         return cmd;
       case "tsumo":

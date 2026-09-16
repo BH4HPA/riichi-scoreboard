@@ -98,6 +98,9 @@ jobs:
           python3 -m pip install --user --quiet tccli
           export PATH="$HOME/.local/bin:$PATH"
           tccli cdn PurgePathCache --cli-unfold-argument --Paths "${WEB_URL%/}/" --FlushType flush
+      # 上一步之后才算发布完成：逐个核对 dist 里的文件真的在线上（半截部署要当场失败）
+      - name: Verify the deployed site
+        run: bash ci/verify-web-deploy.sh
 
   server:
     needs: check

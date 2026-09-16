@@ -22,7 +22,9 @@ Package manager is **Yarn 4** (via corepack). Node >= 22.13 (node:sqlite); use 2
   screenshots for visual review (skipped otherwise).
 - `docker compose up -d --build` — single container (server + built web), data volume at `/data`
 - CI/CD: `.github/workflows/cicd.yml` runs the gates above (plus e2e) on every push/PR; pushes to `main`
-  deploy the web build to COS (`ci/deploy-web-to-cos.sh`) and the server image to CCR + the bitego server
+  deploy the web build to COS (`ci/deploy-web-to-cos.sh`, global-acceleration endpoint; then
+  `ci/verify-web-deploy.sh` checks every `dist` file is really served — size and `.wasm` type
+  — so a half-finished upload fails the run) and the server image to CCR + the bitego server
   over SSH (`ci/deploy-server.sh`). Rollback = re-run the workflow on an older commit. See README 部署.
 
 ## Architecture
@@ -35,8 +37,8 @@ Yarn workspaces monorepo:
   Shared by server (authority) and web (pre-confirm preview).
 - `apps/server` — Hono + `@hono/node-ws` + `node:sqlite` + `riichi-rs-node` (hand → han/fu/yaku, server
   only). Rooms are event-sourced: commands carry the client's `baseSeq` and are rejected as `stale` when it
-  lags, except for the seat commands listed in `TOLERATES_STALE` (their target is absolute and the
-  server re-checks permission against the current snapshot, so a broadcast still in flight must not
+  lags, except for the commands listed in `TOLERATES_STALE` (seat commands, `start`, `dissolve` —
+  feasibility is decided from the current snapshot alone, so a broadcast still in flight must not
   swallow a tap); they are then validated (`validateCommand`), enriched by actor
   (`registry.enrich`: seat identity, local-player ownership, engine evaluation), reduced, appended to
   `room_events`, and the resulting `present` state is broadcast. Undo/redo stacks live in memory and are

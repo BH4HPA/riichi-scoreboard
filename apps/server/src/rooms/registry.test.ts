@@ -91,6 +91,13 @@ describe("RoomRegistry：在线状态、离线座位回收、自动开局", () =
     expect(last(b).seats[1]?.id).toBe(b.playerId);
     registry.apply(room, stale, { type: "setReady", seat: 1, ready: true }, actorOf(b));
     expect(last(b).ready[1]).toBe(true);
+    registry.apply(room, stale, { type: "leave", seat: 1 }, actorOf(b));
+    expect(last(b).seats[1]).toBeNull();
+
+    // 豁免的是 baseSeq，不是鉴权：甲在线时乙仍然请不动甲的座位
+    expect(() => registry.apply(room, stale, { type: "leave", seat: 0 }, actorOf(b))).toThrow(
+      /自己的座位/,
+    );
 
     expect(() => registry.apply(room, stale, { type: "undo" }, actorOf(a))).toThrow(/已更新/);
     expect(() =>

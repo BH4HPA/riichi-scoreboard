@@ -24,9 +24,9 @@ docker compose up -d --build   # 单容器，:8787，数据卷 /data（SQLite + 
 
 ### 线上（GitHub Actions → 腾讯云）
 
-`.github/workflows/cicd.yml`：每次推送与 PR 跑门禁（typecheck / lint / format / 单测 / e2e）；推到 `main` 后并行发布——前端构建后由 `ci/deploy-web-to-cos.sh` 镜像同步到 COS 静态站桶并刷新 CDN（`https://riichi.ruivon.cn`），服务端镜像推到 CCR 后经 SSH 在服务器执行 `ci/deploy-server.sh <sha7>`（`https://riichi-api.ruivon.cn`，HTTP 与 WebSocket 同一端口，经 CDN 回源）。
+`.github/workflows/cicd.yml`：每次推送与 PR 跑门禁（typecheck / lint / format / 单测 / e2e）；推到 `main` 后并行发布——前端构建后由 `ci/deploy-web-to-cos.sh` 镜像同步到 COS 静态站桶（走全球加速域名）并刷新 CDN，再由 `ci/verify-web-deploy.sh` 逐个核对 `dist` 里的文件真的能从 `https://riichi.ruivon.cn` 取到（比大小与 `.wasm` 的类型；长缓存头在上传时写进源站对象，CDN 会按自己的规则改写响应头，所以不在这里判），个别对象没传上去的半截部署会让工作流失败，服务端镜像推到 CCR 后经 SSH 在服务器执行 `ci/deploy-server.sh <sha7>`（`https://riichi-api.ruivon.cn`，HTTP 与 WebSocket 同一端口，经 CDN 回源）。
 
-- 手动发布 / 回滚：在 Actions 里对任意提交 `Run workflow`，前端与服务端按同一提交重建。
+- 手动发布 / 回滚：在 Actions 里对任意提交 `Run workflow`，前端与服务端按同一提交重建。回滚到「前端发布走全球加速」之前的提交时，前端作业用的是那个提交自带的旧脚本（区域域名 + 每次强制重传 14 MB 的 wasm），境外 runner 上很可能再次 `UserNetworkTooSlow` 失败而服务端作业成功，造成前后端版本劈叉；这种情况要么只回滚服务端，要么把这次的 `ci/` 改动 cherry-pick 到回滚分支上再发。
 - 服务器上只通过 `ci/deploy-server.sh` 起服务：它先读 `~/.env`（云密钥、static 桶、CCR 登录）再读仓库 `.env`（`RIICHI_IMAGE` / `RIICHI_PORT` / `CORS_ORIGINS`），`--no-build` 只拉镜像。直接 `docker compose up` 会在服务器上本地构建，且缺少密钥时会静默退回本地存储模式。
 - 镜像内仍包含同源模式的前端产物（本地与开发机 compose 需要）；线上在服务器 `.env` 里设 `WEB_DIST=`（空）关闭静态托管，接口域名下的页面路径会 302 到正式站点。
 - 仓库 secrets：`QCLOUD_SECRET_ID` / `QCLOUD_SECRET_KEY`（COS 上传 + CDN 刷新）、`QCLOUD_DOCKER_USERNAME` / `QCLOUD_DOCKER_PASSWORD`（CCR）、`DEPLOY_SSH_HOST` / `DEPLOY_SSH_KEY` / `DEPLOY_KNOWN_HOSTS`（部署机）。桶名、域名、镜像名等常量写在工作流的 `env` 里。
