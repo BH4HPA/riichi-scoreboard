@@ -203,10 +203,26 @@ test("标注模式：主页进入、检测框可见、连拍一张提交真值",
   // 照片以 source=label 上传，确认后回填真值并自动回到取景
   await expect.poll(() => posts.some((u) => u.includes("source=label"))).toBe(true);
   await expect(p.getByTestId("hand-confirm")).toBeVisible();
+
+  // 定格帧连同烧进去的检测框一起回看：点开是灯箱，可以下载存档
+  const shot = p.getByTestId("annotated-shot");
+  await expect(shot).toBeVisible();
+  await shot.click();
+  const lightbox = p.getByTestId("annotated-lightbox");
+  await expect(lightbox).toBeVisible();
+  await expect(lightbox.getByTestId("annotated-download")).toHaveAttribute("download", /\.jpg$/);
+  const download = p.waitForEvent("download");
+  await lightbox.getByTestId("annotated-download").click();
+  expect((await download).suggestedFilename()).toMatch(/\.jpg$/);
+  await lightbox.getByRole("button", { name: "关闭" }).click();
+  await expect(lightbox).toHaveCount(0);
+
   await p.getByTestId("label-submit").click();
   await expect.poll(() => patches.some((x) => "corrected" in x)).toBe(true);
   expect((patches.find((x) => "corrected" in x)!.corrected as { closed: number[] }).closed).toEqual(
     CLOSED,
   );
+  // 提交后自动回到取景，上一张的标注图跟着清掉
   await expect(p.getByTestId("camera-sheet")).toBeVisible();
+  await expect(p.getByTestId("annotated-shot")).toHaveCount(0);
 });
