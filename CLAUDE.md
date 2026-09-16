@@ -25,7 +25,8 @@ Package manager is **Yarn 4** (via corepack). Node >= 22.13 (node:sqlite); use 2
   deploy the web build to COS (`ci/deploy-web-to-cos.sh`, global-acceleration endpoint; then
   `ci/verify-web-deploy.sh` checks every `dist` file is really served — size and `.wasm` type
   — so a half-finished upload fails the run) and the server image to CCR + the bitego server
-  over SSH (`ci/deploy-server.sh`). Rollback = re-run the workflow on an older commit. See README 部署.
+  over SSH (`ci/deploy-server.sh`). Rollback = re-run the workflow on an older commit. See
+  `docs/deployment.md` (README is the human-facing overview; `docs/development.md` has local HTTPS setup).
 
 ## Architecture
 
@@ -50,7 +51,10 @@ Yarn workspaces monorepo:
   desktop → `/console`, tablet chooses, phone gets QR scan + six-cell code input), `/console` (TV: two
   columns ≥ 1280px, otherwise single column with history drawer + QR dialog), `/r/:code` (phone).
   Phone settlement dialogs mirror to the TV as a full-screen modal (`features/mirror/SettlementMirror`),
-  carrying the hand only once the engine has evaluated it. Tile images are flat SVGs from mahjong_graphic (`src/assets/tiles`, see NOTICE.md), rendered by
+  carrying the hand only once the engine has evaluated it. Site footer links (copyright, ICP record) live in
+  `features/site/SiteFooter`: landing shows both, the console shows the ICP number pinned at the bottom of its
+  left column. PWA = `public/manifest.json` + icons only, deliberately no Service Worker (the app is useless
+  without its WebSocket, and caching index would pin stale versions); logo master in `docs/brand/`. Tile images are flat SVGs from mahjong_graphic (`src/assets/tiles`, see NOTICE.md), rendered by
   `features/hand/TileFace`.
 
 Layering rule: entry files only assemble; data/state/render responsibilities are split into directories
