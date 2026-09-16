@@ -15,7 +15,10 @@ import { HandEditor } from "@/features/settlement/hand/HandEditor";
 import { createValueDraft, type ValueDraft } from "@/features/settlement/valueDraft";
 import { useRoomStore } from "@/ws/store";
 
-/** 标注用全量规则（赤五、杠宝、里宝都开），免得房间村规把认出来的牌截掉 */
+/**
+ * 标注固定用 M-League：杠宝、里宝都开，指示牌不会被截；赤五是赤 3（每色一张），
+ * 认出超额的赤五会被折回并打「请核对」记号，回流时这类记录送人工
+ */
 const RULES = MLEAGUE_RULES;
 /**
  * 给模型标牌：不进房间，取景 → 定格 → 改到全对 → 「就是这手」把真值传回去。

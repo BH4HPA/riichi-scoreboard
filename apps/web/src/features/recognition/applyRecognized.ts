@@ -63,35 +63,34 @@ function uncertainLocs(
 /**
  * 手牌里赤五的规则收口。布局层不看规则、照实记（暗杠两张都认成赤就是两张），裁剪只在这里做一次：
  * - 不用赤五的房间全部折回普通五。照片里确实是赤，只是这桌不算，不打记号。
- * - 用赤五的房间只折超出每色上限的（akaLimit；各色上限之和恰为 akaCount，总数不必另查），
- *   并标成要核对 —— 超额说明模型至少认错了一张，而先到先得留下的未必是认对的那张。
+ * - 用赤五的房间只折超出每色上限的（akaLimit；各色上限之和恰为 akaCount，总数不必另查）。
+ *   超额说明模型至少认错了一张，但认错的是哪张不知道：先到先得只是给个合法的默认值，
+ *   所以这个花色的赤五**全部**标成要核对，留下的那张也标 —— 否则用户只会去点折掉的那张，
+ *   而它因为名额已满改不回赤。
  */
 function capAka(
   closed: readonly Tile[],
   melds: readonly Meld[],
   rules: RoomRules,
 ): { closed: Tile[]; melds: Meld[]; capped: TileLoc[] } {
-  const kept = { m: 0, p: 0, s: 0 };
-  const capped: TileLoc[] = [];
+  const { akaCount } = rules.hand;
+  const seen: Record<"m" | "p" | "s", TileLoc[]> = { m: [], p: [], s: [] };
   const cap = (t: Tile, loc: TileLoc): Tile => {
     if (!isAka(t)) return t;
-    if (rules.hand.akaCount === 0) return baseTile(t);
+    if (akaCount === 0) return baseTile(t);
     const suit = tileSuit(t) as "m" | "p" | "s";
-    if (kept[suit] < akaLimit(suit, rules.hand.akaCount)) {
-      kept[suit] += 1;
-      return t;
-    }
-    capped.push(loc);
-    return baseTile(t);
+    seen[suit].push(loc);
+    return seen[suit].length <= akaLimit(suit, akaCount) ? t : baseTile(t);
   };
-  return {
-    closed: closed.map((t, i) => cap(t, { area: "closed", i })),
-    melds: melds.map((m, i) => ({
-      ...m,
-      tiles: m.tiles.map((t, j) => cap(t, { area: "meld", i, j })),
-    })),
-    capped,
-  };
+  const nextClosed = closed.map((t, i) => cap(t, { area: "closed", i }));
+  const nextMelds = melds.map((m, i) => ({
+    ...m,
+    tiles: m.tiles.map((t, j) => cap(t, { area: "meld", i, j })),
+  }));
+  const capped = (["m", "p", "s"] as const).flatMap((suit) =>
+    seen[suit].length > akaLimit(suit, akaCount) ? seen[suit] : [],
+  );
+  return { closed: nextClosed, melds: nextMelds, capped };
 }
 
 /**
@@ -146,7 +145,9 @@ export function applyRecognized(
     doraIndicators.length,
     uraIndicators.length,
   );
-  const win = result.hand.winTile;
+  // 和张按位置取：布局把它放在暗牌末尾。按码找会出错 —— 暗牌里两张赤五、末尾那张被折回普通时，
+  // 按「同码取最后一张」的约定，和张记号就跳到了前面那张赤五上
+  const winIndex = result.hand.closed.lastIndexOf(result.hand.winTile);
   return {
     ...draft,
     mode: "hand",
@@ -154,8 +155,7 @@ export function applyRecognized(
       ...draft.hand,
       closed,
       melds,
-      // 和张按码记：它若被折回普通五就跟着折，保证仍在暗牌里
-      winTile: closed.includes(win) ? win : baseTile(win),
+      winTile: closed[winIndex] ?? result.hand.winTile,
       doraIndicators,
       uraIndicators,
       riichi,
