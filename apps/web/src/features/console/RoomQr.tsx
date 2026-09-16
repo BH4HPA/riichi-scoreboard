@@ -3,6 +3,7 @@ import { QrCode } from "lucide-react";
 import { Button } from "@/ui/button";
 import { Dialog, DialogContent } from "@/ui/dialog";
 import { cn } from "@/lib/utils";
+import { SiteBrand } from "@/features/site/SiteFooter";
 
 function joinUrl(code: string): string {
   return `${window.location.origin}/r/${code}`;
@@ -56,6 +57,7 @@ export function RoomQrDialog({
           description="手机扫码或在首页输入房间码"
           className="sm:max-w-sm"
         >
+          <SiteBrand className="justify-center pt-1" />
           <RoomQr code={code} size={200} className="py-2" />
         </DialogContent>
       </Dialog>

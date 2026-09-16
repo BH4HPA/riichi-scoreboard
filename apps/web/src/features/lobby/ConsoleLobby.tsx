@@ -103,7 +103,9 @@ export function ConsoleLobby({
       >
         强制开局
       </Button>
-      <span className="ml-auto flex items-center gap-2">
+      {/* 窄屏页脚并进按钮行，宽屏的在左栏 */}
+      {wide ? null : <SiteFooter className="flex-1 justify-center" />}
+      <span className={cn("flex items-center gap-2", wide && "ml-auto")}>
         {/* 窄屏的「本地玩家」在顶栏 */}
         {wide && (
           <Button size="lg" variant="ghost" onClick={() => openLocals(null)}>
@@ -158,7 +160,6 @@ export function ConsoleLobby({
         {rulesCard}
         {actions}
       </section>
-      {!wide && <SiteFooter className="shrink-0 justify-center" />}
 
       <LocalPlayerDialog
         seat={localSeat}
