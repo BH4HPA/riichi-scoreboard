@@ -1,5 +1,6 @@
 import { tileOrder, type Meld, type Tile } from "@riichi/core";
 import { cn } from "@/lib/utils";
+import { isAnkan, isAnkanBack } from "./meld";
 import { TileFace, type TileSize } from "./TileFace";
 import { hasLoc, type TileLoc } from "./tileLoc";
 
@@ -96,12 +97,14 @@ function MeldGroup({
   mark: (loc: TileLoc) => boolean;
   click: (loc: TileLoc) => (() => void) | undefined;
 }) {
-  const ankan = !meld.open && meld.tiles.length === 4;
-  const last = meld.tiles.length - 1;
   return (
-    <div className="flex items-end gap-px" role="group" aria-label={ankan ? "暗杠" : "副露"}>
+    <div
+      className="flex items-end gap-px"
+      role="group"
+      aria-label={isAnkan(meld) ? "暗杠" : "副露"}
+    >
       {meld.tiles.map((t, j) => {
-        const back = ankan && (j === 0 || j === last);
+        const back = isAnkanBack(meld, j);
         return (
           <TileFace
             key={j}
@@ -109,8 +112,8 @@ function MeldGroup({
             size={size}
             back={back}
             rotated={meld.open && j === 0}
-            mark={mark({ area: "meld", i: index, j })}
-            // 暗杠的牌背是摆法不是牌，点它没有意义
+            // 暗杠的牌背是摆法不是牌：既点不了也不提示核对
+            mark={!back && mark({ area: "meld", i: index, j })}
             onClick={back ? undefined : click({ area: "meld", i: index, j })}
           />
         );

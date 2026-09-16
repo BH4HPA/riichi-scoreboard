@@ -20,6 +20,7 @@ import {
 } from "@riichi/core";
 import { CheckRow, Label } from "@/ui/controls";
 import { cn } from "@/lib/utils";
+import { isAnkanBack } from "@/features/hand/meld";
 import { TileFace } from "@/features/hand/TileFace";
 import { hasLoc, type TileLoc } from "@/features/hand/tileLoc";
 import { ValueResult } from "./hand/ValueResult";
@@ -146,6 +147,9 @@ export function TileKeyboard({
   const toggleMeldAka = (meldIndex: number, tileIndex: number) => {
     const meld = hand.melds[meldIndex]!;
     const tile = meld.tiles[tileIndex]!;
+    // 赤五不能落进暗杠扣着的那两张：界面上看不见，却照样占着赤五名额。
+    // 调用点已经不给点了，这里再挡一次 —— 不变量守在改数据的地方才不会被下一个入口绕过
+    if (isAnkanBack(meld, tileIndex)) return;
     if (tileNumber(tile) !== 5 || isHonor(tile)) return;
     const next = isAka(tile) ? baseTile(tile) : akaOf(tile);
     if (isAka(next) && !akaAvailable(hand, next, rules)) return;
@@ -192,18 +196,24 @@ export function TileKeyboard({
           </div>
           {hand.melds.map((m, i) => (
             <div key={`m${i}`} className="relative ml-3 mr-1 flex items-end gap-px">
-              {m.tiles.map((t, j) => (
-                <TileFace
-                  key={j}
-                  tile={t}
-                  size="sm"
-                  back={!m.open && m.tiles.length === 4 && (j === 0 || j === 3)}
-                  mark={marked({ area: "meld", i, j })}
-                  onClick={
-                    tileNumber(t) === 5 && !isHonor(t) ? () => toggleMeldAka(i, j) : undefined
-                  }
-                />
-              ))}
+              {m.tiles.map((t, j) => {
+                // 扣着的那两张点了也看不见变化，改动却是真的（赤五就这么被藏进过牌背）
+                const back = isAnkanBack(m, j);
+                return (
+                  <TileFace
+                    key={j}
+                    tile={t}
+                    size="sm"
+                    back={back}
+                    mark={!back && marked({ area: "meld", i, j })}
+                    onClick={
+                      !back && tileNumber(t) === 5 && !isHonor(t)
+                        ? () => toggleMeldAka(i, j)
+                        : undefined
+                    }
+                  />
+                );
+              })}
               <button
                 type="button"
                 className="absolute -right-2 -top-2 rounded-full border border-border bg-surface p-0.5 text-muted shadow-sm hover:text-neg"
