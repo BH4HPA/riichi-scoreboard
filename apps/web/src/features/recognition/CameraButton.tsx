@@ -70,6 +70,7 @@ export function CameraButton({
   };
 
   const rec = draft.recognition;
+  const blocking = rec?.warnings.filter((w) => w.severity === "blocking") ?? [];
   return (
     <div className="space-y-2 rounded-lg border border-border p-2.5" data-testid="recognize">
       <div className="flex flex-wrap items-center gap-2">
@@ -118,9 +119,10 @@ export function CameraButton({
           />
         </div>
       )}
-      {rec && rec.warnings.length > 0 && (
+      {/* 只报用户此刻能动手的：结果自洽时模型的内务（丢了几个低置信框之类）对用户零价值 */}
+      {blocking.length > 0 && (
         <ul className="space-y-0.5 text-xs text-neg">
-          {rec.warnings.map((w, i) => (
+          {blocking.map((w, i) => (
             <li key={i}>{w.message}</li>
           ))}
         </ul>
