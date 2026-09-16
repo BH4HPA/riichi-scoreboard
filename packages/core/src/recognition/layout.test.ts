@@ -361,8 +361,44 @@ describe("layoutHand", () => {
     expect(warnings.map((w) => w.code)).toEqual(["back_in_hand"]);
     expect(h.melds).toEqual([
       { open: true, tiles: [TILE.Haku, TILE.Haku, TILE.Haku, TILE.Haku] },
-      { open: false, tiles: [TILE.P5, TILE.P5, TILE.P5, AKA.P5] },
+      { open: false, tiles: [TILE.P5, TILE.P5, AKA.P5, TILE.P5] },
     ]);
+  });
+
+  it("暗杠的赤五落回它露在照片里的那一侧，不进牌背", () => {
+    // 首尾两张渲染成牌背，赤放那儿就看不见也点不着，还白占掉每色一张的赤五名额
+    const c = row(["1m", "2m", "3m", "4p", "6p", "7s", "8s", "9s", "7m", "8m", "9m~"], 10, 300);
+    const withAnkan = (names: string[]) =>
+      layoutHand([...c.dets, ...row(names, c.end + GAP, 300).dets]);
+
+    expect(withAnkan(["back", "5p", "0p", "back"]).hand.melds[0]!.tiles).toEqual([
+      TILE.P5,
+      TILE.P5,
+      AKA.P5,
+      TILE.P5,
+    ]);
+    expect(withAnkan(["back", "0p", "5p", "back"]).hand.melds[0]!.tiles).toEqual([
+      TILE.P5,
+      AKA.P5,
+      TILE.P5,
+      TILE.P5,
+    ]);
+    // 两张都认成赤：当前只认露在左边的那张（多认一张牌面就非法了），另一张按普通五算
+    expect(withAnkan(["back", "0p", "0p", "back"]).hand.melds[0]!.tiles).toEqual([
+      TILE.P5,
+      AKA.P5,
+      TILE.P5,
+      TILE.P5,
+    ]);
+
+    // 赤的花色恒等于杠的花色：数牌之间不一致压根不成暗杠（isAnkan 只对字牌放行），
+    // 而字牌没有赤五 —— 所以「赤属于 kan_mismatch 里落败的那张」不可达，代码里不用防它
+    expect(withAnkan(["back", "0p", "6p", "back"]).hand.melds).toEqual([]);
+
+    // 四张牌与两个可见框对不上，整组仍记为补出来的 —— 回流据此从不去改暗杠的框
+    expect(withAnkan(["back", "5p", "0p", "back"]).provenance.melds[0]).toEqual(
+      Array.from({ length: 4 }, () => ({ det: -1, guessed: false })),
+    );
   });
 
   it("明杠第四张叠在横置牌上（高出一张牌宽）仍归入同一组", () => {
