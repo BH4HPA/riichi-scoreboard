@@ -19,6 +19,7 @@ export function HandConfirm({
   evaluated,
   evaluating,
   evalError,
+  showValue = true,
   onHandChange,
   onTileClick,
   onEdit,
@@ -30,6 +31,7 @@ export function HandConfirm({
   evaluated: EvaluatedHand | null;
   evaluating: boolean;
   evalError: string | null;
+  showValue?: boolean;
   onHandChange: (next: HandInput) => void;
   onTileClick: (loc: TileLoc) => void;
   onEdit: () => void;
@@ -52,7 +54,9 @@ export function HandConfirm({
         riichiAuto={riichiAuto}
         onChange={(next: HandInput) => onHandChange(next)}
       />
-      <ValueResult complete evaluated={evaluated} evaluating={evaluating} evalError={evalError} />
+      {showValue && (
+        <ValueResult complete evaluated={evaluated} evaluating={evaluating} evalError={evalError} />
+      )}
       <Button variant="ghost" size="sm" className="w-full" onClick={onEdit}>
         <Pencil className="mr-1 h-3.5 w-3.5" />
         改牌

@@ -20,6 +20,7 @@ export function HandEditor({
   evaluating,
   evalError,
   camera,
+  showValue = true,
 }: {
   draft: ValueDraft;
   onChange: (update: (d: ValueDraft) => ValueDraft) => void;
@@ -28,6 +29,8 @@ export function HandEditor({
   evaluating: boolean;
   evalError: string | null;
   camera: React.ReactNode;
+  /** 标注模式不算番：不显示番符与役种那一块，免得永远停在「计算中…」 */
+  showValue?: boolean;
 }) {
   const [picking, setPicking] = useState<TileLoc | null>(null);
 
@@ -63,6 +66,7 @@ export function HandEditor({
           evaluating={evaluating}
           evalError={evalError}
           uncertain={draft.recognition?.uncertain ?? []}
+          showValue={showValue}
         />
       </>
     );
@@ -79,6 +83,7 @@ export function HandEditor({
         evaluated={evaluated}
         evaluating={evaluating}
         evalError={evalError}
+        showValue={showValue}
         onHandChange={(next) => setHand(next)}
         onTileClick={setPicking}
         onEdit={() => onChange((d) => ({ ...d, editing: true }))}
