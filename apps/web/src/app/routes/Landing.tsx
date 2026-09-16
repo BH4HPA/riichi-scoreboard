@@ -21,7 +21,10 @@ export function Landing() {
     <main className="mx-auto flex min-h-dvh max-w-md flex-col px-6 pt-10 pb-[max(1rem,env(safe-area-inset-bottom))]">
       <div className="flex flex-1 flex-col justify-center gap-6 pb-10">
         <div>
-          <h1 className="text-2xl font-semibold">立直麻将计分板</h1>
+          <h1 className="flex items-center gap-3 text-2xl font-semibold">
+            <img src="/icon-192.png" alt="" className="h-10 w-10 rounded-xl" />
+            立直麻将计分板
+          </h1>
           <p className="mt-1 text-sm text-muted">扫描主控台二维码或者输入房间码，加入远程控制。</p>
         </div>
         {showJoin ? (

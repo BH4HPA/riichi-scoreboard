@@ -1,5 +1,5 @@
 import path from "node:path";
-import { test, type Browser, type Page } from "@playwright/test";
+import { devices, test, type Browser, type Page } from "@playwright/test";
 import { newContext } from "./helpers";
 
 /** 视觉检查用截图脚本：`SHOTS_DIR=/tmp/riichi-shots yarn e2e e2e/shots.spec.ts`；默认不跑。 */
@@ -22,6 +22,15 @@ test("截图：番符表与主控台", async ({ browser }) => {
   await tv.goto("/console");
   const code = (await tv.getByTestId("room-code").textContent())?.trim() ?? "";
   await tv.screenshot({ path: `${OUT}/tv-lobby.png` });
+  {
+    // 手机首页：Logo + 输码面板 + 底部版权与备案（UA 走手机分流）
+    const ctx = await newContext(browser, { ...devices["iPhone 13"] });
+    const landing = await ctx.newPage();
+    await landing.goto("/");
+    await landing.getByLabel("房间码").waitFor({ state: "attached" });
+    await landing.screenshot({ path: `${OUT}/phone-landing.png` });
+    await ctx.close();
+  }
   const phones: Page[] = [];
   for (let i = 0; i < 4; i++) {
     const p = await phone(browser, code, ["Ray", "小明", "阿花", "老王"][i]!);

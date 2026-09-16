@@ -90,6 +90,22 @@ test("输入法组词中输房间码：组词期间不改写 input，输满即�
   await tvCtx.close();
 });
 
+test("PWA：页面声明的 manifest 可解析，图标都取得到且是图片", async ({ request, page }) => {
+  await page.goto("/?stay=1");
+  const href = await page.locator('link[rel="manifest"]').getAttribute("href");
+  const manifest = (await (await request.get(href!)).json()) as {
+    display: string;
+    icons: { src: string; sizes: string }[];
+  };
+  expect(manifest.display).toBe("standalone");
+  const touch = await page.locator('link[rel="apple-touch-icon"]').getAttribute("href");
+  for (const src of [...manifest.icons.map((i) => i.src), touch!, "/favicon.ico"]) {
+    const res = await request.get(src);
+    expect(res.status(), src).toBe(200);
+    expect(res.headers()["content-type"], src).toMatch(/^image\//);
+  }
+});
+
 test("未知路径（如少了房间码的 /r/）回首页", async ({ browser }) => {
   const ctx = await newContext(browser, { viewport: { width: 400, height: 800 } });
   const page = await ctx.newPage();
