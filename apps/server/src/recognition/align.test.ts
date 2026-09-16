@@ -152,14 +152,61 @@ describe("align", () => {
     expect(clsOf(out.labels, i)).toBe("0p");
   });
 
-  it("低置信度的误检框不阻止自动入库：它不是牌，本来就不该标注", () => {
-    // 0.3 低于 minConf 0.4，layoutHand 直接剔除
-    const noisy = [...DETS, { ...det("5z", 600, 600), conf: 0.3 }];
+  it("低置信度的误检框不阻止自动入库，也不产出标注：它不是牌", () => {
+    // 0.3 低于 minConf 0.4，layoutHand 直接剔除（模型导出门槛是 0.25，这种框真会进记录）
+    const stray = { ...det("5z", 600, 600), conf: 0.3 };
+    const noisy = [...DETS, stray];
     const out = align(noisy, base.hand, emptyHand([...base.hand.closed], [TILE.S6]));
     expect(out.status).toBe("auto");
-    // 误检那个框不产出标注
+    expect(out.labels).toHaveLength(DETS.length);
+    expect(out.labels.map((l) => l.box)).not.toContainEqual(stray.box);
+  });
+
+  it("送人工时误检框照旧带着：由人决定删不删", () => {
+    const noisy = [...DETS, { ...det("5z", 600, 600), conf: 0.3 }];
+    const out = align(noisy, base.hand, emptyHand(base.hand.closed.slice(0, 5), [TILE.S6]));
+    expect(out.status).toBe("manual");
     expect(out.labels).toHaveLength(noisy.length);
-    expect(out.labels[noisy.length - 1]!.cls).toBe(noisy[noisy.length - 1]!.cls);
+  });
+
+  it("里宝行比表宝行长 → 送人工：截掉的框没有位置，照单全收会带着模型原判进 auto", () => {
+    const dets = [...hand.dets, ...row(["6s"], 30, 20).dets, ...row(["3m", "4m"], 30, 110).dets];
+    const b = layoutHand(dets);
+    expect(b.hand.doraIndicators).toEqual([TILE.S6]);
+    expect(b.hand.uraIndicators).toEqual([TILE.M3]);
+    const out = align(dets, b.hand, {
+      ...emptyHand([...b.hand.closed], [...b.hand.doraIndicators]),
+      uraIndicators: [...b.hand.uraIndicators],
+    });
+    expect(out.status).toBe("manual");
+    expect(out.reason).toContain("里宝指示牌多于表宝牌");
+  });
+
+  it("同牌连排的末尾被改 → 送人工：和「删掉前面一张再补一张」分不开，该重标的框不同", () => {
+    // 暗牌末尾 2p 2p 2p（和张横放）：删掉倒数第二张再补 3p，和直接把和张改成 3p 在数据上一模一样
+    const names = [
+      "1m",
+      "2m",
+      "3m",
+      "4p",
+      "5p",
+      "6p",
+      "7s",
+      "8s",
+      "9s",
+      "7m",
+      "8m",
+      "2p",
+      "2p",
+      "2p~",
+    ];
+    const dets = [...row(names, 10, 200).dets, ...dora.dets];
+    const b = layoutHand(dets);
+    const closed = [...b.hand.closed];
+    closed[closed.length - 1] = TILE.P3;
+    const out = align(dets, b.hand, emptyHand(closed, [TILE.S6]));
+    expect(out.status).toBe("manual");
+    expect(out.reason).toContain("同一张牌连排");
   });
 
   it("用户增删过牌 → 位置对不上，送人工", () => {
