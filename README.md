@@ -9,9 +9,29 @@
 ```bash
 corepack enable
 yarn install
-yarn dev        # server :8787 + web :5173（手机用电脑局域网 IP 访问 :5173）
+yarn dev        # server :8787 + web :5173（HTTPS，手机用电脑局域网 IP 访问 :5173）
 yarn test       # 单测（core + server）
 yarn e2e        # Playwright 端到端冒烟
+```
+
+`yarn dev` 的前端走 HTTPS（`vite-plugin-mkcert` 自动签本机与局域网 IP 的证书）：拍照识别的取景框用
+`getUserMedia`，只在安全上下文可用，手机通过局域网 IP 走 HTTP 会被浏览器直接拒绝。
+
+手机上要**一次性**信任 mkcert 的根证书，之后本机与开发机都不用再管：
+
+1. 本机 `mkcert -CAROOT` 找到 `rootCA.pem`，AirDrop / 邮件发到手机；
+2. iOS：打开后在 设置 → 通用 → VPN 与设备管理 里安装描述文件；
+3. **设置 → 通用 → 关于本机 → 证书信任设置 里打开这张证书的完全信任**（不做这步仍然不是安全上下文）。
+
+开发机（boxdev）上验收取景框同样需要 HTTPS，容器本身是纯 HTTP，所以叠一层 caddy 做 TLS 终结：
+
+```bash
+# 本机：签一张同时覆盖开发机 IP 的证书（与上面同一个根 CA，手机不用再装第二次）
+mkcert -cert-file cert.pem -key-file key.pem <开发机 IP> localhost
+rsync cert.pem key.pem boxdev:~/riichi-scoreboard/ci/dev-tls/certs/   # 证书不入库
+# 开发机：
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+# 手机开 https://<开发机 IP>:8443
 ```
 
 ## 部署
@@ -34,7 +54,7 @@ docker compose up -d --build   # 单容器，:8787，数据卷 /data（SQLite + 
 
 立直音乐：操作栏「对局中」一节选曲并按「立直」（手机与主控台弹窗都有；主控台代按时浮窗不显示名字），电视循环播放，右下角浮窗显示谁在放哪首，点结算键即停。曲库是 `packages/core/src/music/manifest.json`（`id` = 桶内对象名 uuid，`title` = 展示名，`file` = 本地原文件名），音频固定从 `https://static.bitego.net/riichi/music/<id>.mp3` 播放（常量在 `apps/web/src/features/music/url.ts`），服务端与前端都不需要额外配置。加曲：manifest 追加一条（id 用 `uuidgen | tr A-Z a-z`，必须小写）→ `QCLOUD_SECRET_ID=… QCLOUD_SECRET_KEY=… ci/upload-music.sh <放原文件的目录>`（本机执行，需要 `pipx install coscmd`）→ 推 `main`。
 
-拍照识别：手机结算对话框的「牌面」页有「拍照识别」——选一张照片 → 裁剪（框住手牌、副露和宝牌指示牌，把牌河裁掉）→ 手机浏览器本机推理（onnxruntime-web；约 10 MB 模型和 14 MB 运行时在进房间时就后台预下载，之后走缓存，没下完时识别处显示进度）→ 牌面自动填入并算番，认错的直接在牌键盘上改。摆法约定：暗牌连排、**和张横放**接在一端；副露 3/4 张且含一张横置（暗杠 = 牌背-X-X-牌背），放右侧、上方、下方都行；宝牌指示牌放手牌上方且全部正放，两行时上表下里；认出里宝指示牌会自动勾上立直。每次识别的裁剪图与结果会存到对象存储 `hands/` 前缀与 `recognitions` 表，结算确认后把最终手牌一并记录，作为后续训练数据（每人每小时最多 60 次）。模型训练、导出与发布在 `ml/`（见 `ml/README.md`）；类目录与当前发布的模型记录在 `packages/core/src/recognition/manifest.json`，模型对象放 `https://static.bitego.net/riichi/models/<id>.onnx`（`ci/upload-model.sh` 校验、上传并把 `model` 写回 manifest；为 `null` 时手机上不显示入口）。
+拍照识别：手机结算对话框的「牌面」页有「拍照识别」——打开全屏取景框，把手牌、副露和宝牌指示牌放进中间那条取景带（带外压暗，牌河自然落在暗区），**连续三帧认出同一副牌就自动定格**（约一秒；对不齐时右下角快门随时可按）→ 牌面自动填入并算番。推理在 Web Worker 里跑（onnxruntime-web 单线程 WASM；约 10 MB 模型和 14 MB 运行时在进房间时就后台预下载，之后走缓存，没下完时取景页显示进度），定格帧就是上传留存的那张照片，与检测框严格对齐。识别通过时结算界面只展示一排牌、指示牌与旗标，键盘收起；没把握的牌带记号，点一下可以换牌或改和张；识别不完整才展开全键盘。摆法约定：暗牌连排、**和张横放**接在一端；副露 3/4 张且含一张横置（暗杠 = 牌背-X-X-牌背），放右侧、上方、下方都行；宝牌指示牌放手牌上方且全部正放，两行时上表下里；认出里宝指示牌会自动勾上立直。每次识别的裁剪图与结果会存到对象存储 `hands/` 前缀与 `recognitions` 表，结算确认后把最终手牌一并记录，作为后续训练数据（每人每小时最多 60 次）。模型训练、导出与发布在 `ml/`（见 `ml/README.md`）；类目录与当前发布的模型记录在 `packages/core/src/recognition/manifest.json`，模型对象放 `https://static.bitego.net/riichi/models/<id>.onnx`（`ci/upload-model.sh` 校验、上传并把 `model` 写回 manifest；为 `null` 时手机上不显示入口）。
 
 头像等用户文件默认落在 `DATA_DIR/objects`，由服务端在 `/api/objects/*` 托管；配置 `QCLOUD_*` 五项变量后改为直传腾讯云 COS（桶内 `riichi/` 前缀，URL 走 CDN 域名），变量清单见 `.env.template`。数据库结构按 `user_version` 自动迁移，升级镜像无需手工处理；从 v1 数据升级时头像字段会被清空（旧的 `DATA_DIR/avatars` 目录不再使用，可手动删除），玩家重新上传即可。
 

@@ -1,0 +1,18 @@
+# 开发机（boxdev）验收用的 TLS 终结，叠在 docker-compose.yml 上：
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+# 手机开 https://<开发机 IP>:8443 才能用取景框 —— getUserMedia 只在安全上下文可用，
+# 而开发机本身是纯 HTTP。线上不用这个文件（HTTPS 由腾讯云 CDN 终结）。
+#
+# 证书不入库：本机 `mkcert <开发机 IP> localhost <本机局域网 IP>`，产物 rsync 到
+# ci/dev-tls/certs/{cert.pem,key.pem}；手机装一次 mkcert 根证书（见 README）。
+services:
+  tls:
+    image: caddy:2-alpine
+    ports:
+      - "${RIICHI_TLS_PORT:-8443}:8443"
+    volumes:
+      - ./ci/dev-tls/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./ci/dev-tls/certs:/certs:ro
+    depends_on:
+      - riichi
+    restart: unless-stopped

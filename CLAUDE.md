@@ -90,15 +90,28 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   Python/uv training workbench (public datasets + synthetic scenes from `sprites.py`/`synth.py` → train →
   export ONNX with embedded class-agnostic NMS, `[1,300,6]` output → `ci/upload-model.sh` verifies the
   class order against the manifest, uploads to `riichi/models/<uuid>.onnx` and writes `model` back).
-  Phone flow (`apps/web/src/features/recognition`): pick photo → `CropDialog` (react-easy-crop; the user
-  crops to hand + melds + indicators, rivers out) → `POST /api/recognitions` (raw JPEG, stored as
-  `hands/<player>/…jpg` + a `recognitions` row) in parallel with in-browser inference (onnxruntime-web,
-  single-thread WASM, model fetched from the CDN; `prefetchDetector` warms it up when the phone joins a
-  room, `CameraButton` shows the download progress only if it is still not ready) → `decodeNmsOutput` +
-  `layoutHand` (pure TS in core) → `applyRecognized` fills the `ValueDraft`, `ValuePicker`
-  auto-evaluates → after the win command is accepted the final hand is `PATCH`ed back as `corrected`
-  (training truth). Inference runs only on the phone (a server engine was considered and dropped: phone
-  WASM is fast enough). Layout convention (photo): closed tiles contiguous with the **win tile turned
+  Phone flow (`apps/web/src/features/recognition`): `CameraSheet` opens a full-screen viewfinder
+  (`camera/`); each video frame is cropped to the band (`band.ts`, pure geometry) and transferred to a
+  Web Worker (`worker/detector.worker.ts`) that runs onnxruntime-web (single-thread WASM) +
+  `decodeNmsOutput` + `layoutHand`. **Bytes are downloaded on the main thread** (`worker/bytes.ts`) and
+  handed to the worker — the wasm blob is cloned, not transferred, because it is the retry cache;
+  `prefetchDetector` warms the download when the phone joins a room but builds no session, and the worker
+  lives only while the sheet is open. `autoCapture.ts` is the shutter gate: three consecutive frames with
+  the same `closed + winTile + melds` and no `blocking` warning → the worker encodes **that same frame**
+  as JPEG (`grab`) so photo and detections stay aligned → `POST /api/recognitions` + `PATCH` the result →
+  `applyRecognized` fills the `ValueDraft`, `ValuePicker` auto-evaluates → after the win command is
+  accepted the final hand is `PATCH`ed back as `corrected` (training truth). Warnings are two-tier
+  (`severity` set at the emission site, not looked up by code): `blocking` shows in red and forces the
+  keyboard open, `info` is only shown in label mode. `layoutHand` also returns `provenance` (which
+  detection each tile came from, plus `usedDetections`) — the UI degrades it into "which tiles to
+  double-check" at the `applyRecognized` boundary, and the reflow pipeline uses it to relabel boxes.
+  Settlement shows `HandConfirm` (read-only strip + flag chips + tap-to-replace) when the result is
+  self-consistent, `TileKeyboard` otherwise (`settlement/hand/HandEditor.tsx`). Inference runs only on the
+  phone (a server engine was considered and dropped: phone WASM is fast enough); WebGPU is deliberately
+  not used (iOS "Chrome" is WKWebView, and ORT's WebGPU path crashes after ~500 inferences on iOS Safari).
+  `getUserMedia` needs a secure context: `yarn dev` serves HTTPS via `vite-plugin-mkcert`, and the dev
+  machine gets TLS from `docker-compose.dev.yml` (caddy, `:8443`, certs not in the repo).
+  Layout convention (photo): closed tiles contiguous with the **win tile turned
   sideways** at either end (3n+2 tiles); melds are groups of 3/4 that contain a sideways tile (kan may
   have two: the added tile is stacked sideways on top; back-X-X-back = closed kan) and may sit
   right/below/above, usually with no gap between groups — `layoutHand` splits a contiguous run by meld
@@ -106,7 +119,11 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   row nearer the hand = ura; ura present ⇒ riichi auto-checked). `layoutHand` never throws and is bounded
   (memoized partition; adversarial 300-box inputs stay under a few ms); it returns warnings the editor
   shows. `e2e/recognize.spec.ts` swaps the CDN model for `e2e/fixtures/detector.onnx`
-  (`ml/scripts/e2e_detector.py`, constant output) so the real ORT → layout → evaluate → PATCH chain runs.
+  (`ml/scripts/e2e_detector.py`, a single `Constant` node) so the real camera → ORT → layout → gate →
+  grab → evaluate → PATCH chain runs. No video fixture is needed: the detector ignores its input, so
+  Chromium's built-in test pattern (`--use-fake-device-for-media-stream`) is enough, and because the
+  output is constant the gate always fires on the third frame — the "frames disagree, reset" branch is
+  covered by `camera/autoCapture.test.ts` instead.
 - Riichi music: `RoomView.music` (`{track, seat, at}`) is memory-only room state like `online`; a client
   sends `{type:"music", track: id | null}` (the section lives in the shared `ControlPanel`, so the console
   can press it for local players with `seat: null`), the TV plays the track from the static bucket

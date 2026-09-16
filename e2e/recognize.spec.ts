@@ -2,7 +2,6 @@ import path from "node:path";
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
 import { newContext } from "./helpers";
 
-const FIXTURE = path.join(import.meta.dirname, "fixtures/hand.jpg");
 /** 假检测器（ml/scripts/e2e_detector.py）：恒定输出下面这副手牌的检测框，链路其余部分都是真的 */
 const DETECTOR = path.join(import.meta.dirname, "fixtures/detector.onnx");
 
@@ -54,38 +53,41 @@ async function openRonHandTab(
   return { phone: p, dialog };
 }
 
-test("拍照 → 裁剪 → 本机推理填入牌面并自动算番 → 检测框与结算后的真值都回填", async ({
-  browser,
-}) => {
-  const patches: Record<string, unknown>[] = [];
-  const { phone: p, dialog } = await openRonHandTab(browser, async (page) => {
+/** 装上假模型；patches 非空时顺便把 PATCH 体记下来 */
+function withDetector(patches?: Record<string, unknown>[]): Setup {
+  return async (page) => {
     // 进房间时预热的就是这个假模型（真模型在 CDN，测试不碰网络）
     await page.route("**/riichi/models/*.onnx", (route) =>
       route.fulfill({ path: DETECTOR, contentType: "application/octet-stream" }),
     );
     await page.route("**/api/recognitions/*", async (route) => {
-      patches.push(route.request().postDataJSON() as Record<string, unknown>);
+      patches?.push(route.request().postDataJSON() as Record<string, unknown>);
       await route.fulfill({ status: 204 });
     });
-  });
+  };
+}
 
-  await dialog.getByTestId("recognize-file").setInputFiles(FIXTURE);
-  const cropDialog = p.getByRole("dialog").filter({ hasText: "裁剪照片" });
-  await expect(cropDialog).toBeVisible();
-  const confirmCrop = cropDialog.getByRole("button", { name: "确认裁剪" });
-  await expect(confirmCrop).toBeEnabled();
-  await confirmCrop.click();
+/** 打开取景框，等自动定格把结果灌回牌面页 */
+async function shoot(p: Page, dialog: Locator): Promise<void> {
+  await dialog.getByTestId("recognize-button").click();
+  await expect(p.getByTestId("camera-sheet")).toBeVisible();
+  // 假检测器每帧输出相同，连续三帧一致必然触发自动定格
+  await expect(p.getByTestId("camera-sheet")).toHaveCount(0, { timeout: 30_000 });
+}
 
-  await expect(dialog.getByTestId("recognize-status")).toHaveText(/^识别完成 · \d+ ms$/, {
-    timeout: 30_000,
-  });
+test("取景 → 自动定格 → 填入牌面并自动算番 → 检测框与结算后的真值都回填", async ({ browser }) => {
+  const patches: Record<string, unknown>[] = [];
+  const { phone: p, dialog } = await openRonHandTab(browser, withDetector(patches));
+
+  await shoot(p, dialog);
+  await expect(dialog.getByTestId("recognize-status")).toHaveText(/^识别完成 · \d+ ms$/);
+
   // 识别自洽 → 收起键盘，只剩一排牌
   const confirm = dialog.getByTestId("hand-confirm");
   await expect(confirm).toBeVisible();
   await expect(dialog.getByTestId("tile-keyboard")).toHaveCount(0);
   // 假检测器给赤5筒 0.45 的置信度：不再报红字，改成那张牌自己带「请核对」记号
-  const aka = confirm.getByRole("button", { name: "赤5筒" });
-  await expect(aka).toHaveAttribute("data-mark", "true");
+  await expect(confirm.getByRole("button", { name: "赤5筒" })).toHaveAttribute("data-mark", "true");
   await expect(confirm.getByRole("button", { name: "1萬" })).not.toHaveAttribute("data-mark");
   await expect(dialog.getByText(/置信度/)).toHaveCount(0);
   // 一张宝牌指示牌都没认出来时留空位，不是整行消失
@@ -107,40 +109,27 @@ test("拍照 → 裁剪 → 本机推理填入牌面并自动算番 → 检测�
   expect(corrected.winTile).toBe(9);
 });
 
-test("模型加载失败 → 错误提示、牌面不变，照片仍已上传", async ({ browser }) => {
+test("模型加载失败 → 取景页给出错误，牌面不变", async ({ browser }) => {
   const { phone: p, dialog } = await openRonHandTab(browser, (page) =>
     page.route("**/riichi/models/*.onnx", (route) => route.abort()),
   );
-  const uploaded = p.waitForRequest(
-    (req) => req.method() === "POST" && /\/api\/recognitions$/.test(req.url()),
-  );
 
-  await dialog.getByTestId("recognize-file").setInputFiles(FIXTURE);
-  const cropDialog = p.getByRole("dialog").filter({ hasText: "裁剪照片" });
-  const confirmCrop = cropDialog.getByRole("button", { name: "确认裁剪" });
-  await expect(confirmCrop).toBeEnabled();
-  await confirmCrop.click();
-
+  await dialog.getByTestId("recognize-button").click();
+  const sheet = p.getByTestId("camera-sheet");
+  await expect(sheet).toBeVisible();
   // 模型下载被拦掉时才会走到这里：说明本地的 wasm 运行时已加载成功
-  await expect(p.getByText(/^识别失败：.*fetch/i)).toBeVisible({ timeout: 20_000 });
-  await uploaded;
+  await expect(sheet.getByText(/fetch/i)).toBeVisible({ timeout: 20_000 });
+  await sheet.getByRole("button", { name: "关闭取景" }).click();
   await expect(dialog.getByTestId("hand-area").getByRole("button")).toHaveCount(0);
   await expect(dialog.getByTestId("recognize-button")).toBeEnabled();
 });
 
 test("确认态：点牌替换、改和张、改牌展开全键盘后不再自动收回", async ({ browser }) => {
-  const { phone: p, dialog } = await openRonHandTab(browser, async (page) => {
-    await page.route("**/riichi/models/*.onnx", (route) =>
-      route.fulfill({ path: DETECTOR, contentType: "application/octet-stream" }),
-    );
-    await page.route("**/api/recognitions/*", (route) => route.fulfill({ status: 204 }));
-  });
-  await dialog.getByTestId("recognize-file").setInputFiles(FIXTURE);
-  const cropDialog = p.getByRole("dialog").filter({ hasText: "裁剪照片" });
-  await cropDialog.getByRole("button", { name: "确认裁剪" }).click();
+  const { phone: p, dialog } = await openRonHandTab(browser, withDetector());
+  await shoot(p, dialog);
 
   const confirm = dialog.getByTestId("hand-confirm");
-  await expect(confirm).toBeVisible({ timeout: 30_000 });
+  await expect(confirm).toBeVisible();
   await expect(dialog.getByText("2 番 30 符")).toBeVisible();
 
   // 点带记号的那张 → 替换面板；换成 5筒 后番符重算（少了赤宝牌 1 番）
@@ -154,7 +143,7 @@ test("确认态：点牌替换、改和张、改牌展开全键盘后不再自�
     "data-mark",
   );
 
-  // 点非和张的牌能改和张：把和张从 9萬 挪到 1萬，牌型不再是平和
+  // 点非和张的牌能改和张
   await confirm.getByRole("button", { name: "1萬" }).click();
   await p
     .getByRole("dialog")

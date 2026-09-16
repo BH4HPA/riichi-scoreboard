@@ -1,43 +1,28 @@
 import type { RecognitionResult } from "@riichi/core";
 import type { ValueDraft } from "@/features/settlement/valueDraft";
 import { createRecognition, patchRecognition } from "./api";
-import { recognizeInBrowser, type BrowserPhase } from "./browserEngine";
-
-export type RecognizePhase = "uploading" | BrowserPhase;
-
-export interface RecognizeHooks {
-  onPhase?: (phase: RecognizePhase) => void;
-  /** 模型与运行时还没下载完时的进度 0–1 */
-  onProgress?: (fraction: number) => void;
-  /** 上传完成，拿到记录 id（与推理并行，可能先于或晚于结果） */
-  onId?: (id: string) => void;
-}
 
 /** 每次识别的上传 Promise，按运行 key 记着：结算确认时若 id 还没回来就等它，真值不丢。 */
 const uploads = new Map<string, Promise<string>>();
 
 /**
- * 一次识别的编排：上传照片与本机推理并行；结果先回给调用方，再把检测框回填到记录。
- * 回填是 fire-and-forget：失败不影响用户流程。
+ * 定格之后的留存：上传照片建记录，再把检测框与识别结果回填。推理已经在取景时做完了，
+ * 这里只管 I/O，全程 fire-and-forget —— 上传失败不该打断用户结算。
+ * 照片就是推理的那一帧（Worker 编码回来的），所以照片与 detections 严格对齐。
  */
-export async function recognizePhoto(
+export function uploadRecognition(
   key: string,
-  photo: { blob: Blob; bitmap: ImageBitmap },
+  blob: Blob,
+  result: RecognitionResult,
   token: string,
-  hooks: RecognizeHooks = {},
-): Promise<RecognitionResult> {
-  hooks.onPhase?.("uploading");
-  const upload = createRecognition(photo.blob, token).then((created) => {
-    hooks.onId?.(created.id);
+  onId?: (id: string) => void,
+): void {
+  const upload = createRecognition(blob, token).then((created) => {
+    onId?.(created.id);
     return created.id;
   });
   uploads.set(key, upload);
   upload.catch(() => uploads.delete(key));
-  const result = await recognizeInBrowser(
-    photo.bitmap,
-    (p) => hooks.onPhase?.(p),
-    (f) => hooks.onProgress?.(f),
-  );
   void upload
     .then((id) =>
       patchRecognition(
@@ -52,7 +37,6 @@ export async function recognizePhoto(
       ),
     )
     .catch(() => undefined);
-  return result;
 }
 
 /** 结算命令被接受后：把用户最终提交的手牌回填为真值（上传还没回来就等它）。 */

@@ -1,4 +1,4 @@
-import type { HandInput } from "@riichi/core";
+import type { RecognizedHand } from "@riichi/core";
 import { cn } from "@/lib/utils";
 import { HandStrip, IndicatorRow } from "./HandStrip";
 import type { TileSize } from "./TileFace";
@@ -19,7 +19,8 @@ export function HandView({
   onAddDora,
   className,
 }: {
-  hand: HandInput;
+  /** 只要牌，不要旗标：结算草稿与取景框的实时结果都能直接传进来 */
+  hand: RecognizedHand;
   size?: TileSize;
   marks?: readonly TileLoc[] | undefined;
   onTileClick?: ((loc: TileLoc) => void) | undefined;

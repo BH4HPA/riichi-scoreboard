@@ -1,0 +1,6 @@
+# 开发机上的 TLS 终结：把 https://<IP>:8443 明文回源到同一个 compose 网络里的 riichi:8787。
+# WebSocket 由 reverse_proxy 默认透传（Upgrade/Connection 头原样转发），不用额外配置。
+:8443 {
+	tls /certs/cert.pem /certs/key.pem
+	reverse_proxy riichi:8787
+}
