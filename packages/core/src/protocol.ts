@@ -83,6 +83,38 @@ export const STOPS_MUSIC: Record<Command["type"], boolean> = {
   redo: true,
 };
 
+/**
+ * baseSeq 落后时仍然执行的命令：目标是绝对的（座位号），含义不依赖发起者当时看到的状态，
+ * 权限与可行性由服务端按当前快照再校验一遍（座位为空/已被占用/非本人）。穷举，新增命令时必须表态。
+ *
+ * 其余命令都必须拒绝：牌局类（结算/撤销/重做/调整/终局）的含义是「对我看到的这一局」，
+ * setRules 是整份规则覆盖，落后的提交会盖掉别人刚改的。
+ *
+ * 为什么需要这张表：房间里任何一个人的操作都会让 seq 前进，广播到别的客户端要几十毫秒；
+ * 这段窗口里别人点按钮就会带着旧 seq 到达。座位类操作因此被拒是纯粹的误伤（实测过：
+ * 手机重新入座后 26 ms 内主控台点「离座」被拒，只弹提示、座位不动）。
+ */
+export const TOLERATES_STALE: Record<ClientCommand["type"], boolean> = {
+  sit: true,
+  sitLocal: true,
+  leave: true,
+  setReady: true,
+  start: true,
+  setRules: false,
+  toLobby: false,
+  dissolve: false,
+  tsumo: false,
+  ron: false,
+  draw: false,
+  abortive: false,
+  chombo: false,
+  adjust: false,
+  undo: false,
+  redo: false,
+  endGame: false,
+  newGame: false,
+};
+
 /** 校验客户端发来的立直音乐请求：null = 停止；否则必须是曲库里的 id。 */
 export function validateMusicTrack(input: unknown): string | null {
   if (input === null) return null;

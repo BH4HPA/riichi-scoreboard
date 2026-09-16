@@ -34,7 +34,10 @@ Yarn workspaces monorepo:
   example hands in MPSZ notation), description formatting, client/server protocol types. No DOM, no wasm.
   Shared by server (authority) and web (pre-confirm preview).
 - `apps/server` — Hono + `@hono/node-ws` + `node:sqlite` + `riichi-rs-node` (hand → han/fu/yaku, server
-  only). Rooms are event-sourced: commands are validated (`validateCommand`), enriched by actor
+  only). Rooms are event-sourced: commands carry the client's `baseSeq` and are rejected as `stale` when it
+  lags, except for the seat commands listed in `TOLERATES_STALE` (their target is absolute and the
+  server re-checks permission against the current snapshot, so a broadcast still in flight must not
+  swallow a tap); they are then validated (`validateCommand`), enriched by actor
   (`registry.enrich`: seat identity, local-player ownership, engine evaluation), reduced, appended to
   `room_events`, and the resulting `present` state is broadcast. Undo/redo stacks live in memory and are
   rebuilt by replay. Transient UI intents (mirroring a phone's dialog on the TV) live in memory only.

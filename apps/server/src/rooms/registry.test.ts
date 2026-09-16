@@ -77,6 +77,27 @@ describe("RoomRegistry：在线状态、离线座位回收、自动开局", () =
     expect(last(b).seats[0]).toBeNull();
   });
 
+  it("baseSeq 落后：座位类命令照常执行（广播还没到就点按钮），牌局类仍然拒绝", () => {
+    const a = fakeClient(device("甲").id);
+    const b = fakeClient(device("乙").id);
+    registry.join(room, a);
+    registry.join(room, b);
+    // 乙手里的 seq 停在甲入座之前
+    const stale = room.seq;
+    registry.apply(room, room.seq, { type: "sit", seat: 0 }, actorOf(a));
+    expect(room.seq).toBe(stale + 1);
+
+    registry.apply(room, stale, { type: "sit", seat: 1 }, actorOf(b));
+    expect(last(b).seats[1]?.id).toBe(b.playerId);
+    registry.apply(room, stale, { type: "setReady", seat: 1, ready: true }, actorOf(b));
+    expect(last(b).ready[1]).toBe(true);
+
+    expect(() => registry.apply(room, stale, { type: "undo" }, actorOf(a))).toThrow(/已更新/);
+    expect(() =>
+      registry.apply(room, stale, { type: "setRules", rules: MLEAGUE_RULES }, actorOf(a)),
+    ).toThrow(/已更新/);
+  });
+
   it("全员准备且在线 → 3 s 后自动开局；中途取消准备则取消；全本地不触发", () => {
     const tv = fakeClient(device("主控台").id);
     registry.join(room, tv);

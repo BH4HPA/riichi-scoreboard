@@ -13,6 +13,7 @@ import {
   seatOfPlayer,
   seatsOnline,
   STOPS_MUSIC,
+  TOLERATES_STALE,
   toRoomView,
   validateCommand,
   validateMusicTrack,
@@ -157,11 +158,11 @@ export class RoomRegistry {
     return toRoomView(room.state, room.seq, this.onlineIds(room), autoStartIn, room.music);
   }
 
-  /** 校验 baseSeq → 形状校验 → 按 actor 补全/鉴权 → reduce → 事务落库 → 广播。 */
+  /** 形状校验 → 校验 baseSeq（座位类命令豁免，见 TOLERATES_STALE）→ 按 actor 补全/鉴权 → reduce → 事务落库 → 广播。 */
   apply(room: LiveRoom, baseSeq: number, rawCommand: unknown, actor: EventActor): RoomEvent {
-    if (baseSeq !== room.seq) throw new StaleCommand();
-    const command = this.enrich(room, validateCommand(rawCommand), actor);
-    return this.commit(room, command, actor);
+    const client = validateCommand(rawCommand);
+    if (baseSeq !== room.seq && !TOLERATES_STALE[client.type]) throw new StaleCommand();
+    return this.commit(room, this.enrich(room, client, actor), actor);
   }
 
   /**

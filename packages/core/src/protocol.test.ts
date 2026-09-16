@@ -3,6 +3,7 @@ import {
   autoStartEligible,
   seatsOnline,
   STOPS_MUSIC,
+  TOLERATES_STALE,
   toRoomView,
   validateMusicTrack,
 } from "./protocol";
@@ -72,5 +73,19 @@ describe("立直音乐", () => {
     expect(STOPS_MUSIC.redo).toBe(true);
     expect(STOPS_MUSIC.undo).toBe(false);
     expect(STOPS_MUSIC.setReady).toBe(false);
+  });
+});
+
+describe("并发提交", () => {
+  it("TOLERATES_STALE：座位类与开局豁免落后的 baseSeq；结算、撤销、改规则不豁免", () => {
+    expect(TOLERATES_STALE.sit).toBe(true);
+    expect(TOLERATES_STALE.sitLocal).toBe(true);
+    expect(TOLERATES_STALE.leave).toBe(true);
+    expect(TOLERATES_STALE.setReady).toBe(true);
+    expect(TOLERATES_STALE.start).toBe(true);
+    expect(TOLERATES_STALE.ron).toBe(false);
+    expect(TOLERATES_STALE.undo).toBe(false);
+    expect(TOLERATES_STALE.setRules).toBe(false);
+    expect(TOLERATES_STALE.dissolve).toBe(false);
   });
 });
