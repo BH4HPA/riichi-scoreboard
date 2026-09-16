@@ -383,11 +383,11 @@ describe("layoutHand", () => {
       TILE.P5,
       TILE.P5,
     ]);
-    // 两张都认成赤：当前只认露在左边的那张（多认一张牌面就非法了），另一张按普通五算
+    // 两张都认成赤就照实记两张：赤 4 的五筒真有两张；超出房间上限的由 applyRecognized 按规则裁
     expect(withAnkan(["back", "0p", "0p", "back"]).hand.melds[0]!.tiles).toEqual([
       TILE.P5,
       AKA.P5,
-      TILE.P5,
+      AKA.P5,
       TILE.P5,
     ]);
 

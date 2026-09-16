@@ -427,13 +427,14 @@ export function layoutHand(
         mismatch = true;
         warn("kan_mismatch", "info", "暗杠中间两张不一致，已取置信度高的");
       }
-      // 暗杠只露中间两张，赤五必须落回它在照片里的那一侧：seg[1]/seg[2] 就是牌面下标 1/2，
+      // 暗杠只露中间两张，赤五照实落在它露出来的那一侧：seg[1]/seg[2] 就是牌面下标 1/2，
       // 首尾两张渲染成牌背，赤放那儿看不见也点不着，还白占掉赤五名额。
-      // 两张都认成赤只取一张：布局层不看规则，赤 3 时另一张必是误认，赤 4 的五筒虽然真有两张，
-      // 这里也宁可少认一张，交给编辑器补 —— 多认一张会让牌面直接非法（bad_aka）。
-      const akaAt = [a.tile, b.tile].findIndex(isAka);
+      // 布局层只管照片里是什么、不看规则：两张都是赤就记两张（赤 4 的五筒真有两张），
+      // 超出房间上限的交给 applyRecognized 按规则裁。
       const tiles = [t, t, t, t];
-      if (akaAt >= 0) tiles[akaAt + 1] = akaOf(t);
+      [a.tile, b.tile].forEach((x, k) => {
+        if (isAka(x)) tiles[k + 1] = akaOf(t);
+      });
       melds.push({ open: false, tiles });
       // 下标 1/2 与 seg[1]/seg[2] 严格对应，但首尾两张是猜的，mismatch / 双赤时中间两张也被改写过
       // —— 整组记为补出来的，回流据此从不去改暗杠的框

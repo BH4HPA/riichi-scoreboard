@@ -1,15 +1,19 @@
 import {
+  akaLimit,
   baseTile,
   DEFAULT_LAYOUT,
   isAka,
+  tileSuit,
   type Detection,
   type HandProvenance,
+  type Meld,
   type RecognitionResult,
   type RecognitionWarning,
   type RoomRules,
+  type Tile,
   type TileOrigin,
 } from "@riichi/core";
-import type { TileLoc } from "@/features/hand/tileLoc";
+import { hasLoc, type TileLoc } from "../hand/tileLoc";
 import type { ValueDraft } from "@/features/settlement/valueDraft";
 
 /** 草稿里挂的识别信息：本次运行的 key（等上传用）、记录 id（上传完成后才有）、耗时、提示、没把握的位置。 */
@@ -57,8 +61,43 @@ function uncertainLocs(
 }
 
 /**
+ * 手牌里赤五的规则收口。布局层不看规则、照实记（暗杠两张都认成赤就是两张），裁剪只在这里做一次：
+ * - 不用赤五的房间全部折回普通五。照片里确实是赤，只是这桌不算，不打记号。
+ * - 用赤五的房间只折超出每色上限的（akaLimit；各色上限之和恰为 akaCount，总数不必另查），
+ *   并标成要核对 —— 超额说明模型至少认错了一张，而先到先得留下的未必是认对的那张。
+ */
+function capAka(
+  closed: readonly Tile[],
+  melds: readonly Meld[],
+  rules: RoomRules,
+): { closed: Tile[]; melds: Meld[]; capped: TileLoc[] } {
+  const kept = { m: 0, p: 0, s: 0 };
+  const capped: TileLoc[] = [];
+  const cap = (t: Tile, loc: TileLoc): Tile => {
+    if (!isAka(t)) return t;
+    if (rules.hand.akaCount === 0) return baseTile(t);
+    const suit = tileSuit(t) as "m" | "p" | "s";
+    if (kept[suit] < akaLimit(suit, rules.hand.akaCount)) {
+      kept[suit] += 1;
+      return t;
+    }
+    capped.push(loc);
+    return baseTile(t);
+  };
+  return {
+    closed: closed.map((t, i) => cap(t, { area: "closed", i })),
+    melds: melds.map((m, i) => ({
+      ...m,
+      tiles: m.tiles.map((t, j) => cap(t, { area: "meld", i, j })),
+    })),
+    capped,
+  };
+}
+
+/**
  * 把识别结果灌进草稿：切到牌面模式、替换牌与指示牌、清掉旧的评估结果；旗标（立直/一发/自摸…）不动。
- * 规则收口：不用赤五的房间把赤五折回普通五；宝牌指示牌按是否开杠宝截断；里宝只在立直时保留。
+ * 规则收口：手牌里的赤五按规则裁（见 capAka）；指示牌不占赤五名额，只在不用赤五时折回；
+ * 宝牌指示牌按是否开杠宝截断；里宝只在立直时保留。
  */
 export function applyRecognized(
   draft: ValueDraft,
@@ -66,6 +105,7 @@ export function applyRecognized(
   rules: RoomRules,
   key: string,
 ): ValueDraft {
+  const { closed, melds, capped } = capAka(result.hand.closed, result.hand.melds, rules);
   const fold = (t: number) => (rules.hand.akaCount === 0 && isAka(t) ? baseTile(t) : t);
   const warnings = [...result.warnings];
   const maxDora = rules.hand.kanDora ? 5 : 1;
@@ -100,14 +140,22 @@ export function applyRecognized(
       });
     }
   }
+  const shakyLocs = uncertainLocs(
+    result.provenance,
+    result.detections,
+    doraIndicators.length,
+    uraIndicators.length,
+  );
+  const win = result.hand.winTile;
   return {
     ...draft,
     mode: "hand",
     hand: {
       ...draft.hand,
-      closed: result.hand.closed.map(fold),
-      melds: result.hand.melds.map((m) => ({ ...m, tiles: m.tiles.map(fold) })),
-      winTile: fold(result.hand.winTile),
+      closed,
+      melds,
+      // 和张按码记：它若被折回普通五就跟着折，保证仍在暗牌里
+      winTile: closed.includes(win) ? win : baseTile(win),
       doraIndicators,
       uraIndicators,
       riichi,
@@ -121,12 +169,7 @@ export function applyRecognized(
       id: null,
       ms: result.ms,
       warnings,
-      uncertain: uncertainLocs(
-        result.provenance,
-        result.detections,
-        doraIndicators.length,
-        uraIndicators.length,
-      ),
+      uncertain: [...shakyLocs, ...capped.filter((l) => !hasLoc(shakyLocs, l))],
     },
   };
 }
