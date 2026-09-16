@@ -1,13 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
-import { RECOGNITION_MANIFEST, type RecognitionResult, type RoomRules } from "@riichi/core";
+import { Images, X } from "lucide-react";
+import {
+  RECOGNITION_CLASSES,
+  RECOGNITION_MANIFEST,
+  type Detection,
+  type RecognitionResult,
+  type RoomRules,
+} from "@riichi/core";
 import { Button } from "@/ui/button";
 import { HandView } from "@/features/hand/HandView";
 import { canUseCamera } from "@/lib/device";
 import { closeDetector, openDetector, type Detector } from "../worker/client";
 import type { FrameResult } from "../worker/protocol";
-import { BAND_DEFAULT } from "./band";
+import { BAND_DEFAULT, type Rect } from "./band";
 import { BandOverlay } from "./BandOverlay";
+import { DetectionOverlay } from "./DetectionOverlay";
+import { StillPicker } from "./StillPicker";
 import { EMPTY_CAPTURE, feedFrame, HINT_AFTER_MS, STABLE_FRAMES } from "./autoCapture";
 import { useCameraStream } from "./useCameraStream";
 import { useLiveDetect } from "./useLiveDetect";
@@ -30,10 +38,13 @@ export interface Capture {
  */
 export function CameraSheet({
   rules,
+  mode = "room",
   onCapture,
   onClose,
 }: {
   rules: RoomRules;
+  /** label：多画检测框与牌图标签，多给一个相册入口（标注模式才有） */
+  mode?: "room" | "label";
   onCapture: (c: Capture) => void;
   onClose: () => void;
 }) {
@@ -47,7 +58,11 @@ export function CameraSheet({
   const [openedAt] = useState(() => Date.now());
   const [now, setNow] = useState(() => Date.now());
 
+  const [file, setFile] = useState<File | null>(null);
+  const [cropRect, setCropRect] = useState<Rect | null>(null);
+  const [picked, setPicked] = useState<Detection | null>(null);
   const captureRef = useRef(EMPTY_CAPTURE);
+  const stillRef = useRef(0);
   const grabbingRef = useRef(false);
   const lastGoodRef = useRef(openedAt);
   const framesRef = useRef(new Map<number, FrameResult>());
@@ -117,6 +132,13 @@ export function CameraSheet({
       map.set(r.frameId, r);
       for (const id of map.keys()) if (id < r.frameId - FRAME_MEMORY) map.delete(id);
 
+      // 相册那张是一次性的：结果一到就直接定格，不参与连续三帧的稳定判断
+      if (r.frameId === stillRef.current) {
+        stillRef.current = 0;
+        void capture();
+        return;
+      }
+
       const out = feedFrame(captureRef.current, r);
       captureRef.current = out.state;
       setStable(out.state.count);
@@ -129,7 +151,24 @@ export function CameraSheet({
     [capture],
   );
 
-  useLiveDetect({ detector, videoRef, band, active: active && ready, onFrame });
+  const runStill = useCallback(
+    async (src: ImageBitmap, rect: Rect) => {
+      setFile(null);
+      if (!detector) return;
+      const cropped = await createImageBitmap(src, rect.x, rect.y, rect.width, rect.height);
+      stillRef.current = detector.infer(cropped);
+    },
+    [detector],
+  );
+
+  useLiveDetect({
+    detector,
+    videoRef,
+    band,
+    active: active && ready,
+    onFrame,
+    ...(mode === "label" ? { onCrop: setCropRect } : {}),
+  });
 
   const secure = canUseCamera();
   const downloading = !detector && !error && progress < 1;
@@ -150,6 +189,16 @@ export function CameraSheet({
           data-testid="camera-video"
         />
         {!paused && <BandOverlay band={band} onBandChange={setBand} hint={hint} />}
+        {mode === "label" && live && !paused && (
+          <div
+            className="absolute inset-x-0"
+            style={{ top: `${((1 - band) / 2) * 100}%`, height: `${band * 100}%` }}
+          >
+            {cropRect && (
+              <DetectionOverlay detections={live.detections} crop={cropRect} onPick={setPicked} />
+            )}
+          </div>
+        )}
         {paused && (
           <button
             type="button"
@@ -170,6 +219,15 @@ export function CameraSheet({
         >
           <X className="h-5 w-5" />
         </button>
+        {picked && (
+          <button
+            type="button"
+            onClick={() => setPicked(null)}
+            className="absolute inset-x-3 top-3 rounded-lg bg-black/70 px-3 py-2 text-sm text-white"
+          >
+            {RECOGNITION_CLASSES[picked.cls] ?? "?"} · 置信度 {Math.round(picked.conf * 100)}%
+          </button>
+        )}
       </div>
 
       <div className="space-y-2 bg-black/90 px-4 py-3 text-white">
@@ -199,17 +257,47 @@ export function CameraSheet({
           <span className="text-xs text-white/70">
             {overdue ? "对不齐？直接按快门" : "对准后会自动定格"}
           </span>
-          <Button
-            variant={overdue ? "accent" : "outline"}
-            size="sm"
-            onClick={() => void capture()}
-            disabled={!detector}
-            data-testid="camera-shutter"
-          >
-            快门
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* 相册只在标注模式给：房间里就地拍一张的成本已经接近零 */}
+            {mode === "label" && (
+              <label
+                className="inline-flex h-8 cursor-pointer items-center rounded-lg border border-white/40 px-2.5 text-sm"
+                aria-label="从相册选一张"
+              >
+                <Images className="h-4 w-4" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  data-testid="label-album"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    e.target.value = "";
+                    if (f) setFile(f);
+                  }}
+                />
+              </label>
+            )}
+            <Button
+              variant={overdue ? "accent" : "outline"}
+              size="sm"
+              onClick={() => void capture()}
+              disabled={!detector}
+              data-testid="camera-shutter"
+            >
+              快门
+            </Button>
+          </div>
         </div>
       </div>
+
+      {file && (
+        <StillPicker
+          file={file}
+          onPick={(bitmap, rect) => void runStill(bitmap, rect)}
+          onCancel={() => setFile(null)}
+        />
+      )}
     </div>
   );
 }

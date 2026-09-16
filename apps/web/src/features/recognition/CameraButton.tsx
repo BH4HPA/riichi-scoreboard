@@ -36,7 +36,7 @@ export function CameraButton({
       .getState()
       .ensure()
       .then(({ token }) =>
-        uploadRecognition(key, blob, result, token, (id) =>
+        uploadRecognition(key, blob, result, token, "room", (id) =>
           onChange((d) =>
             d.recognition?.key === key ? { ...d, recognition: { ...d.recognition, id } } : d,
           ),

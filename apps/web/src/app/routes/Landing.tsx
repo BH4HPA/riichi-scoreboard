@@ -58,6 +58,12 @@ export function Landing() {
           </Link>
         </p>
       )}
+      {/* 低频的开发者向功能，压在小字一档：手机端 showJoin 恒为 true，放进上面的三元就看不见了 */}
+      <p className="text-xs text-muted">
+        <Link to="/label" className="underline">
+          给模型标牌 →
+        </Link>
+      </p>
     </main>
   );
 }

@@ -59,14 +59,33 @@ describe("数据库迁移", () => {
     ).toBeTruthy();
   });
 
-  it("v3/v4：识别记录表（engine 列已删），JSON 列往返，归属校验", () => {
+  it("v4 库里已有识别记录 → v5 补 source 列，历史行落到 room", () => {
+    const db = new DatabaseSync(":memory:");
+    for (const m of MIGRATIONS.slice(0, 4)) db.exec(m);
+    db.exec("PRAGMA user_version = 4");
+    db.prepare(
+      "INSERT INTO recognitions (id, player_id, photo_key, model_id, created_at, updated_at) VALUES ('r2', 'p1', 'k', 'm', 1, 1)",
+    ).run();
+    migrate(db);
+    expect(schemaVersion(db)).toBe(MIGRATIONS.length);
+    expect(db.prepare("SELECT * FROM recognitions WHERE id = 'r2'").get()).toMatchObject({
+      player_id: "p1",
+      source: "room",
+    });
+  });
+
+  it("识别记录表：JSON 列往返，归属校验，来源按写入保留", () => {
     const db = new DatabaseSync(":memory:");
     migrate(db);
     const repo = new RecognitionsRepo(db);
-    const id = repo.create("p1", "hands/p1/x.jpg", "model-1", 100);
+    const id = repo.create("p1", "hands/p1/x.jpg", "model-1", "room", 100);
+    const labelled = repo.create("p1", "hands/p1/y.jpg", "model-1", "label", 100);
     const get = () =>
       db.prepare("SELECT * FROM recognitions WHERE id = ?").get(id) as unknown as RecognitionRow;
-    expect(get()).toMatchObject({ player_id: "p1", ms: null, detections: null });
+    expect(get()).toMatchObject({ player_id: "p1", ms: null, detections: null, source: "room" });
+    expect(db.prepare("SELECT source FROM recognitions WHERE id = ?").get(labelled)).toMatchObject({
+      source: "label",
+    });
     expect(get()).not.toHaveProperty("engine");
     const detections = [
       { cls: 3, conf: 0.9, box: [1, 2, 3, 4] as [number, number, number, number] },

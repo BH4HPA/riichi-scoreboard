@@ -68,6 +68,11 @@ export function recognitionRoutes(deps: Deps): Hono {
 
   authed.post("/", tooLarge("photo"), async (c) => {
     if (!deps.modelId) return c.json({ error: "no_model", message: "尚未发布识别模型" }, 409);
+    // 请求体已经被裸 JPEG 占用，来源只能走 query
+    const source = c.req.query("source") ?? "room";
+    if (source !== "room" && source !== "label") {
+      return c.json({ error: "bad_source", message: "来源只能是 room 或 label" }, 400);
+    }
     const player = c.get("player");
     const t = now();
     const bytes = new Uint8Array(await c.req.arrayBuffer());
@@ -81,7 +86,7 @@ export function recognitionRoutes(deps: Deps): Hono {
       return c.json({ error: "too_many", message: "识别次数过多，请稍后再试" }, 429);
     }
     const key = await savePhoto(deps.store, player.id, bytes, t);
-    const id = deps.recognitions.create(player.id, key, deps.modelId, t);
+    const id = deps.recognitions.create(player.id, key, deps.modelId, source, t);
     return c.json({ id }, 201);
   });
 

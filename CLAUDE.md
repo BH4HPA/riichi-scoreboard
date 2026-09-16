@@ -111,6 +111,11 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   not used (iOS "Chrome" is WKWebView, and ORT's WebGPU path crashes after ~500 inferences on iOS Safari).
   `getUserMedia` needs a secure context: `yarn dev` serves HTTPS via `vite-plugin-mkcert`, and the dev
   machine gets TLS from `docker-compose.dev.yml` (caddy, `:8443`, certs not in the repo).
+  `/label` (linked from the landing page) is the same viewfinder + `HandEditor` outside any room: it adds
+  `DetectionOverlay` (boxes labelled with the tile's own SVG, tap for class + confidence) and an album
+  entry (`StillPicker` reuses the same band), and submits `corrected` as training truth instead of a win
+  command, then returns to the viewfinder. Its rows are stored with `source: "label"` (`recognitions.source`,
+  migration v5, query param on `POST`; default `room`), which the reflow pipeline must always select.
   Layout convention (photo): closed tiles contiguous with the **win tile turned
   sideways** at either end (3n+2 tiles); melds are groups of 3/4 that contain a sideways tile (kan may
   have two: the added tile is stacked sideways on top; back-X-X-back = closed kan) and may sit

@@ -39,8 +39,8 @@ async function register(app: ReturnType<typeof createApp>["app"]): Promise<strin
   return ((await res.json()) as { token: string }).token;
 }
 
-async function post(bytes: Uint8Array, tok = token): Promise<Response> {
-  return ctx.app.request("/api/recognitions", {
+async function post(bytes: Uint8Array, tok = token, source?: string): Promise<Response> {
+  return ctx.app.request(`/api/recognitions${source ? `?source=${source}` : ""}`, {
     method: "POST",
     headers: tok ? { Authorization: `Bearer ${tok}` } : {},
     body: bytes,
@@ -89,6 +89,18 @@ describe("POST /api/recognitions", () => {
     expect(r.photo_key).toMatch(/^hands\/[0-9a-f]+\/\d{8}-[0-9a-f]{12}\.jpg$/);
     expect(fs.existsSync(path.join(dataDir, "objects", r.photo_key))).toBe(true);
     expect(r.model_id).toMatch(/^[0-9a-f-]{36}$/);
+    // 不带 source 就是房间结算来的，与历史记录一致
+    expect(r.source).toBe("room");
+  });
+
+  it("?source=label 记为标注模式；非法值 → 400，不落库", async () => {
+    const ok = (await post(JPEG, token, "label")).json() as Promise<{ id: string }>;
+    expect(row((await ok).id)!.source).toBe("label");
+    const before = ctx.db.prepare("SELECT COUNT(*) AS n FROM recognitions").get();
+    const bad = await post(JPEG, token, "nonsense");
+    expect(bad.status).toBe(400);
+    expect(((await bad.json()) as { error: string }).error).toBe("bad_source");
+    expect(ctx.db.prepare("SELECT COUNT(*) AS n FROM recognitions").get()).toEqual(before);
   });
 
   it("超过 2MB → 413 JSON（HTTPException 透传，不再变成 500）", async () => {

@@ -1,0 +1,49 @@
+import { RECOGNITION_CLASSES, tileOfClassId, type Detection } from "@riichi/core";
+import { TileFace } from "@/features/hand/TileFace";
+import { boxStyle, type Rect } from "./band";
+
+/**
+ * 标注模式的检测框叠加。**标签画牌图不画文字**：38 类的 `1m`/`0p` 小字在手机上糊成一团，
+ * 框角贴一张同款牌图，一眼就知道模型认成了什么。牌背没有对应的牌图，退回文字。
+ *
+ * 框的坐标是裁剪后那一帧的像素，所以按取景带矩形映射回屏幕。
+ */
+export function DetectionOverlay({
+  detections,
+  crop,
+  onPick,
+}: {
+  detections: readonly Detection[];
+  /** 送去推理的那块区域在视频里的位置与尺寸 */
+  crop: Rect;
+  onPick: (d: Detection) => void;
+}) {
+  if (crop.width <= 0 || crop.height <= 0) return null;
+  return (
+    <div className="pointer-events-none absolute inset-x-0" style={{ top: 0, bottom: 0 }}>
+      {detections.map((d, i) => {
+        const tile = tileOfClassId(d.cls);
+        const style = boxStyle(d.box, crop);
+        if (!style) return null;
+        return (
+          <button
+            key={i}
+            type="button"
+            style={style}
+            onClick={() => onPick(d)}
+            className="pointer-events-auto absolute rounded-sm border border-accent/90"
+            aria-label={`${RECOGNITION_CLASSES[d.cls] ?? "?"} ${Math.round(d.conf * 100)}%`}
+          >
+            <span className="absolute -left-0.5 -top-0.5 origin-top-left scale-[0.55]">
+              {tile === null ? (
+                <span className="rounded bg-black/70 px-1 text-[10px] text-white">背</span>
+              ) : (
+                <TileFace tile={tile} size="xs" />
+              )}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}

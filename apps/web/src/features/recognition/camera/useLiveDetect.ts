@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Detector } from "../worker/client";
 import type { FrameResult } from "../worker/protocol";
-import { bandRect, type Viewport } from "./band";
+import { bandRect, type Rect, type Viewport } from "./band";
 
 /** 上一帧的结果保留这么久再算过期：逐帧重画框会闪 */
 export const HOLD_MS = 500;
@@ -12,6 +12,8 @@ interface Options {
   band: number;
   active: boolean;
   onFrame: (r: FrameResult) => void;
+  /** 这一帧实际送去推理的区域（检测框的坐标系），标注模式据此把框画回屏幕 */
+  onCrop?: (rect: Rect) => void;
 }
 
 /**
@@ -19,17 +21,19 @@ interface Options {
  * **背压不排队**——上一帧还在推理就直接跳过这一帧，否则 300 ms 的推理会堆出越来越大的延迟，
  * 用户看到的框会慢慢落后于画面。
  */
-export function useLiveDetect({ detector, videoRef, band, active, onFrame }: Options): {
+export function useLiveDetect({ detector, videoRef, band, active, onFrame, onCrop }: Options): {
   /** 已经送出去推理的帧数，用来判断「相机开了但一直没认出东西」 */
   frames: number;
 } {
   const [frames, setFrames] = useState(0);
   const bandRef = useRef(band);
   const onFrameRef = useRef(onFrame);
+  const onCropRef = useRef(onCrop);
   // 走 ref：拖动取景带、换回调都不该重启整个循环（重启会丢掉正在推理的那一帧）
   useEffect(() => {
     bandRef.current = band;
     onFrameRef.current = onFrame;
+    onCropRef.current = onCrop;
   });
 
   useEffect(() => {
@@ -57,6 +61,7 @@ export function useLiveDetect({ detector, videoRef, band, active, onFrame }: Opt
       const rect = bandRect(view, bandRef.current);
       if (!rect) return;
       inFlight = true;
+      onCropRef.current?.(rect);
       void createImageBitmap(video, rect.x, rect.y, rect.width, rect.height)
         .then((bitmap) => {
           if (stopped) return bitmap.close();
