@@ -39,6 +39,7 @@ test("截图：番符表与主控台", async ({ browser }) => {
       // 手机大厅：自己已入座 + 三个空座；规则对话框滚到中段时底栏可见
       await p.getByTestId("seat-0").getByText("Ray").waitFor();
       await p.screenshot({ path: `${OUT}/phone-lobby.png`, fullPage: true });
+      await p.screenshot({ path: `${OUT}/phone-lobby-viewport.png` });
       await p.getByRole("button", { name: "修改规则" }).click();
       await p.getByRole("dialog").getByText("终局", { exact: true }).scrollIntoViewIfNeeded();
       await p.screenshot({ path: `${OUT}/phone-rules-dialog.png` });
