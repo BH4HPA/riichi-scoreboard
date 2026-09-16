@@ -21,6 +21,12 @@ test("平板 UA 二选一：可进主控台，也可作为玩家输码加入", a
   await expect(page.getByLabel("房间码")).toBeAttached();
   await page.getByRole("button", { name: "返回选择" }).click();
   await expect(page.getByRole("link", { name: /打开主控台/ })).toBeVisible();
+  // 窄屏主控台（Pad 竖屏单栏）：版权与备案号在页面底部
+  await page.getByRole("link", { name: /打开主控台/ }).click();
+  await expect(page.getByTestId("room-code")).toBeVisible();
+  await page.keyboard.press("Escape"); // 窄屏首次进大厅自动弹二维码
+  await expect(page.locator("footer").getByRole("link", { name: /ICP/ })).toBeInViewport();
+  await expect(page.locator("footer").getByRole("link", { name: /^© Ray/ })).toBeInViewport();
   await ctx.close();
 });
 

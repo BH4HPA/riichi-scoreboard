@@ -14,9 +14,9 @@ function normalize(raw: string): string {
  * 六格房间码：一个隐形 input 覆盖在六个格子上（手机键盘、粘贴行为都由原生 input 负责），
  * 格子只做展示。粘贴整条加入链接也能识别出房间码。
  *
- * input 里放的是用户原样打出来的文字，格子显示规范化后的码。输入法组词（iOS 拼音键盘打字母就在组词）
- * 期间绝不改写 input 的值：WebKit 会把被打断的组词缓冲再插一遍，一键出两三个字母。
- * 只在不组词时（普通按键、组词结束之后、失焦）才把 input 清理成规范码。
+ * input 里放的是用户原样打出来的文字，格子显示规范化后的码。输入事件里从不同步改写 input 的值：
+ * 输入法组词（iOS 拼音键盘打字母就在组词）时改写会打断 WebKit 的组词缓冲，输入法把缓冲再插一遍，
+ * 一键出两三个字母。清理成规范码只在不组词时、且延后到这次编辑命令走完之后做（另加失焦时）。
  */
 export function CodeInput({
   onChange,
@@ -50,9 +50,11 @@ export function CodeInput({
     if (next.length === LENGTH) onComplete(next);
   };
   const tidy = () => setRaw((r) => normalize(r));
+  // 等这次编辑命令走完再清理
+  const tidyLater = () => setTimeout(tidy, 0);
   const onInput = (e: ChangeEvent<HTMLInputElement>) => {
-    const nextRaw = e.target.value;
-    accept((e.nativeEvent as InputEvent).isComposing ? nextRaw : normalize(nextRaw));
+    accept(e.target.value);
+    if (!(e.nativeEvent as InputEvent).isComposing) tidyLater();
   };
   const onPaste = (e: ClipboardEvent<HTMLInputElement>) => {
     const fromLink = roomCodeFrom(e.clipboardData.getData("text"));
@@ -94,8 +96,8 @@ export function CodeInput({
         ref={inputRef}
         value={raw}
         onChange={onInput}
-        // 等这次编辑命令走完再清理：WebKit 在 compositionend 之后还有一个尾随 input，Chromium 没有
-        onCompositionEnd={() => setTimeout(tidy, 0)}
+        // WebKit 在 compositionend 之后还有一个不在组词中的尾随 input，Chromium 没有，这里兜底
+        onCompositionEnd={tidyLater}
         onPaste={onPaste}
         onFocus={() => setFocused(true)}
         onBlur={() => {
