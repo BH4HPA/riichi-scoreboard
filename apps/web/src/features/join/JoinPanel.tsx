@@ -12,7 +12,6 @@ import { QrScan } from "./QrScan";
 export function JoinPanel() {
   const navigate = useNavigate();
   const ensure = useSession((s) => s.ensure);
-  const [code, setCode] = useState("");
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shakeKey, setShakeKey] = useState(0);
@@ -59,11 +58,7 @@ export function JoinPanel() {
           <Smartphone className="h-4 w-4" /> 输入房间码
         </div>
         <CodeInput
-          value={code}
-          onChange={(c) => {
-            setCode(c);
-            setError(null);
-          }}
+          onChange={() => setError(null)}
           onComplete={check}
           shakeKey={shakeKey}
           invalid={error !== null}

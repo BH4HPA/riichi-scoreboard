@@ -1,4 +1,4 @@
-import { useRef, useState, type ClipboardEvent } from "react";
+import { useRef, useState, type ChangeEvent, type ClipboardEvent } from "react";
 import { cn } from "@/lib/utils";
 import { roomCodeFrom } from "./roomCode";
 
@@ -13,16 +13,18 @@ function normalize(raw: string): string {
 /**
  * 六格房间码：一个隐形 input 覆盖在六个格子上（手机键盘、粘贴行为都由原生 input 负责），
  * 格子只做展示。粘贴整条加入链接也能识别出房间码。
+ *
+ * input 里放的是用户原样打出来的文字，格子显示规范化后的码。输入法组词（iOS 拼音键盘打字母就在组词）
+ * 期间绝不改写 input 的值：WebKit 会把被打断的组词缓冲再插一遍，一键出两三个字母。
+ * 只在不组词时（普通按键、组词结束之后、失焦）才把 input 清理成规范码。
  */
 export function CodeInput({
-  value,
   onChange,
   onComplete,
   shakeKey = 0,
   invalid = false,
   disabled = false,
 }: {
-  value: string;
   onChange: (code: string) => void;
   /** 输满 6 位时触发（每次达到 6 位都触发一次） */
   onComplete: (code: string) => void;
@@ -33,22 +35,30 @@ export function CodeInput({
   disabled?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [raw, setRaw] = useState("");
   const [focused, setFocused] = useState(false);
   // 抖动：shakeKey 变化时加类，动画结束移除；不重挂载 input，键盘不会收起
   const [shakingFor, setShakingFor] = useState(0);
   const shaking = shakeKey > 0 && shakingFor !== shakeKey;
+  const code = normalize(raw);
 
-  const commit = (next: string) => {
-    if (next === value) return; // 已满 6 位再敲键：值不变，不重复校验
+  const accept = (nextRaw: string) => {
+    setRaw(nextRaw);
+    const next = normalize(nextRaw);
+    if (next === code) return; // 已满 6 位再敲键：码不变，不重复校验
     onChange(next);
     if (next.length === LENGTH) onComplete(next);
   };
+  const tidy = () => setRaw((r) => normalize(r));
+  const onInput = (e: ChangeEvent<HTMLInputElement>) => {
+    const nextRaw = e.target.value;
+    accept((e.nativeEvent as InputEvent).isComposing ? nextRaw : normalize(nextRaw));
+  };
   const onPaste = (e: ClipboardEvent<HTMLInputElement>) => {
-    const text = e.clipboardData.getData("text");
-    const fromLink = roomCodeFrom(text);
+    const fromLink = roomCodeFrom(e.clipboardData.getData("text"));
     if (fromLink) {
       e.preventDefault();
-      commit(fromLink);
+      accept(fromLink);
     }
   };
   const caretToEnd = () => {
@@ -64,9 +74,9 @@ export function CodeInput({
     >
       <div className="grid grid-cols-6 gap-2" aria-hidden>
         {Array.from({ length: LENGTH }, (_, i) => {
-          const ch = value[i] ?? "";
+          const ch = code[i] ?? "";
           const active =
-            focused && (i === value.length || (i === LENGTH - 1 && value.length === LENGTH));
+            focused && (i === code.length || (i === LENGTH - 1 && code.length === LENGTH));
           return (
             <div
               key={i}
@@ -82,11 +92,16 @@ export function CodeInput({
       </div>
       <input
         ref={inputRef}
-        value={value}
-        onChange={(e) => commit(normalize(e.target.value))}
+        value={raw}
+        onChange={onInput}
+        // 等这次编辑命令走完再清理：WebKit 在 compositionend 之后还有一个尾随 input，Chromium 没有
+        onCompositionEnd={() => setTimeout(tidy, 0)}
         onPaste={onPaste}
         onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
+        onBlur={() => {
+          setFocused(false);
+          tidy();
+        }}
         onSelect={caretToEnd}
         readOnly={disabled}
         autoCapitalize="characters"
