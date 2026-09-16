@@ -49,9 +49,15 @@ export function CodeInput({
     onChange(next);
     if (next.length === LENGTH) onComplete(next);
   };
+  // 组词状态：延后的清理触发时若又进入了组词（快速连打、换输入法），这时改写同样会打断组词，必须跳过。
+  // 失焦时复位，compositionend 万一丢失也不会一直卡住。
+  const composing = useRef(false);
   const tidy = () => setRaw((r) => normalize(r));
   // 等这次编辑命令走完再清理
-  const tidyLater = () => setTimeout(tidy, 0);
+  const tidyLater = () =>
+    setTimeout(() => {
+      if (!composing.current) tidy();
+    }, 0);
   const onInput = (e: ChangeEvent<HTMLInputElement>) => {
     accept(e.target.value);
     if (!(e.nativeEvent as InputEvent).isComposing) tidyLater();
@@ -97,11 +103,16 @@ export function CodeInput({
         value={raw}
         onChange={onInput}
         // WebKit 在 compositionend 之后还有一个不在组词中的尾随 input，Chromium 没有，这里兜底
-        onCompositionEnd={tidyLater}
+        onCompositionStart={() => (composing.current = true)}
+        onCompositionEnd={() => {
+          composing.current = false;
+          tidyLater();
+        }}
         onPaste={onPaste}
         onFocus={() => setFocused(true)}
         onBlur={() => {
           setFocused(false);
+          composing.current = false;
           tidy();
         }}
         onSelect={caretToEnd}
