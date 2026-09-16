@@ -16,6 +16,9 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await tv.goto("/console");
   const code = (await tv.getByTestId("room-code").textContent())?.trim() ?? "";
   expect(code).toMatch(/^[A-Z2-9]{6}$/);
+  // 备案号常驻主控台左栏底部（大厅与对局都不用滚动就能看到）
+  const icp = tv.getByRole("link", { name: "浙ICP备2022018560号-2" });
+  await expect(icp).toBeInViewport();
 
   const NAMES = ["东家", "南家", "西家", "北家"];
   const phones: Page[] = [];
@@ -40,6 +43,7 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   ]);
   await expect(tv.getByTestId("points-0")).toHaveText("25,000");
   await expect(phones[0]!.getByTestId("points-0")).toHaveText("25,000");
+  await expect(icp).toBeInViewport();
 
   // 立直音乐：手机 1 按下 → 电视挂上 <audio> 与浮窗；点结算键 → 停（音频请求拦掉，只看状态）
   await tv.route("**/*.mp3", (route) => route.abort());
