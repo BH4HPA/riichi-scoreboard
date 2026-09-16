@@ -94,7 +94,17 @@ describe("applyRecognized", () => {
     expect(next.recognition!.uncertain.map(locKey)).toEqual(["closed:1", "meld:0:0"]);
   });
 
-  it("赤五超出每色上限：折回普通五并标成要核对；赤 4 的五筒容得下两张；赤 0 全折不打记号", () => {
+  /** 置信度全高：记号只可能来自赤五裁剪，断言可以写精确 */
+  const sure = detections.map((d) => ({ ...d, conf: 0.9 }));
+  const withAka = (r: RecognitionResult, akaCount: 0 | 3 | 4) =>
+    applyRecognized(
+      createValueDraft(false),
+      { ...r, detections: sure },
+      { ...MLEAGUE_RULES, hand: { ...MLEAGUE_RULES.hand, akaCount } },
+      "k",
+    );
+
+  it("赤五超出每色上限：折回普通五，该花色的赤五全部标成要核对；赤 0 全折不打记号", () => {
     // 暗牌里已有一张赤五筒，暗杠中间两张又都认成了赤（布局照实记两张）
     const ankan: RecognitionResult = {
       ...result,
@@ -104,47 +114,38 @@ describe("applyRecognized", () => {
       },
       provenance: { ...provenance, melds: [[0, 1, 2, 3].map(() => ({ det: -1, guessed: false }))] },
     };
-    const withAka = (akaCount: 0 | 3 | 4) =>
-      applyRecognized(
-        createValueDraft(false),
-        ankan,
-        { ...MLEAGUE_RULES, hand: { ...MLEAGUE_RULES.hand, akaCount } },
-        "k",
-      );
 
-    // 赤 3：五筒只容一张，先到先得留暗牌里那张，暗杠里两张都折，都要核对
-    const aka3 = withAka(3);
+    // 赤 3：五筒只容一张。留下哪张只是合法的默认值，三张都标 —— 留下的那张也可能是认错的
+    const aka3 = withAka(ankan, 3);
     expect(aka3.hand.closed).toEqual([TILE.M1, AKA.P5, TILE.M9]);
     expect(aka3.hand.melds[0]!.tiles).toEqual([TILE.P5, TILE.P5, TILE.P5, TILE.P5]);
-    expect(aka3.recognition!.uncertain.map(locKey)).toEqual(
-      expect.arrayContaining(["meld:0:1", "meld:0:2"]),
-    );
+    expect(aka3.recognition!.uncertain.map(locKey)).toEqual(["closed:1", "meld:0:1", "meld:0:2"]);
 
-    // 赤 4：五筒容两张，暗杠里只折后到的那张
-    const aka4 = withAka(4);
+    // 赤 4：五筒容两张，只折最后那张，但同样超额，三张都标
+    const aka4 = withAka(ankan, 4);
     expect(aka4.hand.melds[0]!.tiles).toEqual([TILE.P5, AKA.P5, TILE.P5, TILE.P5]);
-    const keys4 = aka4.recognition!.uncertain.map(locKey);
-    expect(keys4).toContain("meld:0:2");
-    expect(keys4).not.toContain("meld:0:1");
+    expect(aka4.recognition!.uncertain.map(locKey)).toEqual(["closed:1", "meld:0:1", "meld:0:2"]);
 
-    // 赤 0：全折，但这是规则不算、不是认错，不打记号；和张跟着折，仍在暗牌里
-    const aka0 = withAka(0);
+    // 赤 0：全折，但这是规则不算、不是认错，不打记号
+    const aka0 = withAka(ankan, 0);
     expect(aka0.hand.closed).toEqual([TILE.M1, TILE.P5, TILE.M9]);
     expect(aka0.hand.melds[0]!.tiles).toEqual([TILE.P5, TILE.P5, TILE.P5, TILE.P5]);
-    const keys0 = aka0.recognition!.uncertain.map(locKey);
-    expect(keys0).not.toContain("meld:0:1");
-    expect(keys0).not.toContain("meld:0:2");
+    expect(aka0.recognition!.uncertain).toEqual([]);
   });
 
-  it("和张若是被折回的赤五，跟着折成普通五", () => {
-    const winAka: RecognitionResult = {
+  it("和张按位置取：暗牌两张赤五、末尾的和张被折回时，和张记号不能跳到前面那张赤五上", () => {
+    // 布局把和张放在暗牌末尾
+    const twoAka: RecognitionResult = {
       ...result,
-      hand: { ...result.hand, winTile: AKA.P5 },
+      hand: { ...result.hand, closed: [TILE.M1, AKA.P5, AKA.P5], winTile: AKA.P5 },
     };
-    const rules: RoomRules = { ...MLEAGUE_RULES, hand: { ...MLEAGUE_RULES.hand, akaCount: 0 } };
-    const next = applyRecognized(createValueDraft(false), winAka, rules, "k");
-    expect(next.hand.winTile).toBe(TILE.P5);
-    expect(next.hand.closed).toContain(next.hand.winTile);
+    for (const akaCount of [3, 0] as const) {
+      const next = withAka(twoAka, akaCount);
+      expect(next.hand.closed).toEqual([TILE.M1, akaCount ? AKA.P5 : TILE.P5, TILE.P5]);
+      expect(next.hand.winTile).toBe(TILE.P5);
+      expect(next.hand.closed.lastIndexOf(next.hand.winTile)).toBe(2);
+    }
+    expect(withAka(twoAka, 3).recognition!.uncertain.map(locKey)).toEqual(["closed:1", "closed:2"]);
   });
 
   it("截断后越界的记号被丢掉", () => {
