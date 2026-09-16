@@ -25,6 +25,7 @@ import { RulesEditor } from "@/features/rules/RulesEditor";
 import { ProfileEditor, StatsPanel } from "@/features/profile/ProfileEditor";
 import { useMirror } from "@/features/settlement/useMirror";
 import { prefetchDetector } from "@/features/recognition/prefetch";
+import { ICP } from "@/features/site/site";
 
 type Sheet = "reference" | "rules" | "history" | "me" | null;
 
@@ -138,6 +139,7 @@ function PhoneGame() {
           <span>
             房间 <span className="font-semibold tabular text-fg">{room.code}</span>
           </span>
+          <span className="ml-auto mr-3 truncate">{ICP.number}</span>
           <ConnectionBadge />
         </div>
         <div className="mx-auto grid max-w-md grid-cols-4">

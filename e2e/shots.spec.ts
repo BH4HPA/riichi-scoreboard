@@ -49,6 +49,8 @@ test("截图：番符表与主控台", async ({ browser }) => {
   }
   await tv.screenshot({ path: `${OUT}/tv-lobby-full.png` });
   await tv.getByTestId("points-0").waitFor({ timeout: 15_000 }); // 全员准备后自动开局
+  await phones[0]!.getByTestId("points-0").waitFor();
+  await phones[0]!.screenshot({ path: `${OUT}/phone-game.png` });
 
   // 手机 2 牌面荣和
   await phones[2]!.getByRole("button", { name: "荣和", exact: true }).click();

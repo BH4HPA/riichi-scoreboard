@@ -46,6 +46,10 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await expect(phones[0]!.getByTestId("points-0")).toHaveText("25,000");
   await expect(footer.getByRole("link", { name: /^© Ray/ })).toBeInViewport();
   await expect(footer.getByRole("link", { name: /ICP/ })).toBeInViewport();
+  // 宽屏对局页也能再打开二维码
+  await tv.getByRole("button", { name: "二维码" }).click();
+  await expect(tv.getByRole("dialog").getByTestId("room-code")).toHaveText(code);
+  await tv.keyboard.press("Escape");
 
   // 立直音乐：手机 1 按下 → 电视挂上 <audio> 与浮窗；点结算键 → 停（音频请求拦掉，只看状态）
   await tv.route("**/*.mp3", (route) => route.abort());
