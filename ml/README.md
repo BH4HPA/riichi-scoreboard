@@ -74,9 +74,31 @@ scripts/train.sh v1 model=runs/v0/weights/best.pt epochs=60 # 从 v0 微调
 scripts/export.sh runs/v1/weights/best.pt
 ```
 
-### 4. 线上纠错回流（下一阶段）
+### 4. 线上纠错回流
 
-应用侧接入后，每次识别会留存照片、检测框与用户最终确认的手牌；导出后同样走 预标注 → 修正 → remap → 微调。导出脚本届时补。
+每次识别都留存了定格帧、检测框与用户最终确认的手牌（`recognitions` 表，`source` 区分房间结算与标注模式）。
+判据是 `corrected IS NOT NULL`：房间来的记录只有结算命令被接受之后才回填，而牌桌上另外三个人不会允许
+错误的牌局录进系统——「触发了结算」本身就是一次人力校验，**不看用户改没改过**。
+
+```bash
+# 线上导出（位置对齐在 TS 侧做，见 apps/server/src/recognition/align.ts）
+ssh bitego 'docker exec riichi-scoreboard-riichi-1 node --experimental-strip-types \
+  /app/scripts/export-recognitions.ts /data/riichi.sqlite' > records.ndjson
+uv run scripts/import_records.py records.ndjson      # 照片走 COS；本地库加 --photos <DATA_DIR/objects>
+uv run scripts/remap.py                              # records 并入 merged
+```
+
+导出把每条记录分成两队：
+
+- **auto** —— 位置一一对应、且每个检测框都被布局采信。后一条是关键：只要有一个框没被采信，照片里就
+  存在一个没标注的牌面对象，YOLO 会把那种东西学成背景。写进 `data/raw/records/{images,labels}/`。
+- **manual** —— 其余全部，带预标注进 `data/raw/records/pending/`，喂 Label Studio 人工补。
+
+**先啃人工队列再训练。** 自动那条全是模型已经做对的样本，只喂它会把训练集越练越窄（自训练陷阱）；
+真正涨点的是漏检误检的难例。脚本会把两队的数量与占比打出来。
+
+两个容易踩的坑，对齐时已经处理：房间规则把赤五折回普通五时**不能**按 `corrected` 改标（否则会把照片里的
+赤五标成普通五）；指示牌被村规截掉的那几张保留模型的判断，不当成用户改动。
 
 ## 指标
 
