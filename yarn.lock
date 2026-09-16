@@ -1420,7 +1420,6 @@ __metadata:
     tailwind-merge: "npm:^3.7.0"
     tailwindcss: "npm:^4.3.3"
     vite: "npm:^8.3.0"
-    vite-plugin-mkcert: "npm:^2.1.0"
     zustand: "npm:^5.0.15"
   languageName: unknown
   linkType: soft
@@ -4173,13 +4172,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"supports-color@npm:^10.2.2":
-  version: 10.2.2
-  resolution: "supports-color@npm:10.2.2"
-  checksum: 10c0/fb28dd7e0cdf80afb3f2a41df5e068d60c8b4f97f7140de2eaed5b42e075d82a0e980b20a2c0efd2b6d73cfacb55555285d8cc719fa0472220715aefeaa1da7c
-  languageName: node
-  linkType: hard
-
 "tailwind-merge@npm:^3.7.0":
   version: 3.7.0
   resolution: "tailwind-merge@npm:3.7.0"
@@ -4355,7 +4347,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"undici@npm:^8.3.0, undici@npm:^8.4.1":
+"undici@npm:^8.4.1":
   version: 8.10.2
   resolution: "undici@npm:8.10.2"
   checksum: 10c0/66d7fc69149207cab570d6abbc9e965b6afe1ae889a7d46945b431165c973d6a56f3dd8b70a856e7ae1e550b6366a1cde6f06e68640587f0dadca38de72995ee
@@ -4441,19 +4433,6 @@ __metadata:
     core-util-is: "npm:1.0.2"
     extsprintf: "npm:^1.2.0"
   checksum: 10c0/37ccdf8542b5863c525128908ac80f2b476eed36a32cb944de930ca1e2e78584cc435c4b9b4c68d0fc13a47b45ff364b4be43aa74f8804f9050140f660fb660d
-  languageName: node
-  linkType: hard
-
-"vite-plugin-mkcert@npm:^2.1.0":
-  version: 2.1.0
-  resolution: "vite-plugin-mkcert@npm:2.1.0"
-  dependencies:
-    debug: "npm:^4.4.3"
-    supports-color: "npm:^10.2.2"
-    undici: "npm:^8.3.0"
-  peerDependencies:
-    vite: ">=3"
-  checksum: 10c0/989bb8563546f5073f8d422a46413b16a167d6658a3d5cdc1f6491c55ed935bbb8ffbfdcf1ad854a6979995ede0ee135c3df8de6fc6b131f8b0d826aafae4915
   languageName: node
   linkType: hard
 

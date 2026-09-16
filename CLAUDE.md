@@ -111,8 +111,10 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   not used: WASM already runs <300 ms/frame on an iPhone 15, iOS "Chrome" is WKWebView so it cannot use
   Chromium's implementation anyway, and ORT's WebGPU path has an open crash report on iOS Safari
   (microsoft/onnxruntime#27584) that a continuous viewfinder would hit within minutes.
-  `getUserMedia` needs a secure context: `yarn dev` serves HTTPS via `vite-plugin-mkcert`, and the dev
-  machine gets TLS from `docker-compose.dev.yml` (caddy, `:8443`, certs not in the repo).
+  `getUserMedia` needs a secure context and `OffscreenCanvas` needs iOS 16.4+ (checked in the worker's
+  `init` so it fails before `ready` instead of showing a silent black screen). One mkcert certificate in
+  `ci/dev-tls/certs/` (gitignored) covers both: `yarn dev` picks it up automatically when present, and the
+  dev machine gets TLS from `docker-compose.dev.yml` (caddy, `:8443`). The phone trusts the root CA once.
   `/label` (linked from the landing page) is the same viewfinder + `HandEditor` outside any room: it adds
   `DetectionOverlay` (boxes labelled with the tile's own SVG, tap for class + confidence) and an album
   entry (`StillPicker` reuses the same band), and submits `corrected` as training truth instead of a win
