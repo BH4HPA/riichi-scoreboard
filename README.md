@@ -1,82 +1,166 @@
-# 立直麻将计分板 v2
+<p align="center">
+  <img src="docs/brand/logo-1024.png" alt="立直麻将计分板" width="120">
+</p>
 
-电视开 `/console` 显示房间二维码，手机扫码加入并远程操作计分；没带手机的玩家可由主控台添加为「本地玩家」；房间规则可配置，默认 M-League。打开首页时按设备分流：电脑直接进主控台，平板二选一，手机进加入页（HTTPS 下可网页扫码，否则输房间码）。
+<h1 align="center">立直麻将计分板</h1>
 
-牌面录入使用扁平风格牌图（来源见 `apps/web/src/assets/tiles/NOTICE.md`），支持直接点选赤五；历史记录展示和牌手牌与役种；番符表按雀魂的结构呈现。
+<p align="center">
+  电视显示房间二维码，手机扫码入座，四个人各自在手机上记分、算番，所有屏幕实时同步
+</p>
 
-## 开发
+<p align="center">
+  🌐 <a href="https://riichi.ruivon.cn"><strong>riichi.ruivon.cn</strong></a> · 电脑或电视打开就是主控台，手机打开就是加入页
+</p>
+
+<p align="center">
+  <a href="#-亮点">亮点</a> ·
+  <a href="#-界面">界面</a> ·
+  <a href="#-怎么用">怎么用</a> ·
+  <a href="#-架构">架构</a> ·
+  <a href="#-快速开始">快速开始</a> ·
+  <a href="#-文档">文档</a>
+</p>
+
+<p align="center">
+  <img alt="Node" src="https://img.shields.io/badge/Node-24-339933?logo=node.js&logoColor=white">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white">
+  <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black">
+  <img alt="Vite" src="https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white">
+  <img alt="Hono" src="https://img.shields.io/badge/Hono-4-E36002?logo=hono&logoColor=white">
+  <img alt="SQLite" src="https://img.shields.io/badge/SQLite-node:sqlite-003B57?logo=sqlite&logoColor=white">
+  <img alt="ONNX Runtime" src="https://img.shields.io/badge/ONNX_Runtime-Web-005CED?logo=onnx&logoColor=white">
+  <img alt="Yarn" src="https://img.shields.io/badge/Yarn-4-2C8EBB?logo=yarn&logoColor=white">
+</p>
+
+> 打日麻时最麻烦的是算点：谁和了、几番几符、本场和供托怎么分，往往要翻表、口算、再挨个传点棒。这个计分板把这些交给程序。电视或平板当主控台，摆在牌桌旁显示四家点数和历史；每个人用自己的手机录入和牌，番符由服务端的引擎算，结果同时出现在所有屏幕上。牌型可以拍照识别，村规可以按房间配置。
+
+---
+
+## ✨ 亮点
+
+- **电视加手机的遥控模式**：主控台只负责显示，操作都在手机上。手机上正在录入的结算会实时镜像到电视上，全桌一起核对。没带手机的玩家，可以由主控台添加为「本地玩家」代为操作。
+- **拍照识别手牌**：把手牌、副露和宝牌指示牌摆进取景带，连续三帧认出同一副牌就自动定格，牌面自动填好并算番。模型是自训的 YOLO11n，在手机浏览器里用 onnxruntime-web 推理，iPhone 15 上一帧不到 300 ms。
+- **番符由引擎算，不靠手填**：录入牌面后，服务端用 `riichi-rs-node` 算出役种、番数和符数，历史记录里保留整副手牌与役种。也可以直接手填番符。
+- **村规按房间配置**：内置 M-League（默认）、雀魂段位、天凤凤凰、最高位战、WRC 五套预设。切上满贯、累计役满、击飞、西入、包牌、本场点数等规则都可以单独调整。
+- **断线不丢局**：房间事件溯源，每条命令都落进 SQLite。服务端重启后按事件回放恢复，撤销、重做随时可用。手机丢了登录状态，也能让离线的旧座位离座后重新坐回去。
+- **番符表随手查**：役种一览和点数计算表按雀魂的结构排版，每个役种都附例牌。手机上打开时，电视同步显示。
+- **立直音乐**：立直时选一首曲子，电视循环播放，结算时自动停止。
+
+## 📸 界面
+
+### 电视 / 电脑主控台
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/tv-lobby-full.png" alt="主控台大厅">
+      <sub><b>大厅</b> · 房间二维码、四家座位、本房规则</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/tv-game.png" alt="主控台对局">
+      <sub><b>对局</b> · 四家点数、点差表、带牌面与役种的历史</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/tv-mirror-settlement.png" alt="结算镜像">
+      <sub><b>结算镜像</b> · 手机上正在录入的荣和同步到电视</sub>
+    </td>
+    <td align="center" width="50%">&nbsp;</td>
+  </tr>
+</table>
+
+### 手机
+
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <img src="docs/screenshots/phone-landing.png" alt="加入页">
+      <sub><b>加入</b> · 扫码或输入六位房间码</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/screenshots/phone-lobby.png" alt="手机大厅">
+      <sub><b>入座</b> · 选座、准备，四人就绪自动开局</sub>
+    </td>
+    <td align="center" width="33%">
+      <img src="docs/screenshots/phone-ref-yaku.png" alt="番符表">
+      <sub><b>番符表</b> · 按番数分组，附例牌</sub>
+    </td>
+  </tr>
+</table>
+
+## 🀄 怎么用
+
+1. 电视、电脑或平板打开 [riichi.ruivon.cn](https://riichi.ruivon.cn)，会自动建好房间并显示二维码。
+2. 四个人用手机扫码，填昵称、选座、点「准备」。四人都准备好后，3 秒倒计时自动开局。
+3. 有人和牌，就在手机上点「荣和」或「自摸」，选放铳者，录入牌面（或点「拍照识别」）。确认后，所有屏幕上的点数同步更新。
+4. 流局、途中流局、错和、调整场况也在同一个面板里（主控台点右上角「操作」打开）；记错了可以撤销上一次操作。
+
+拍照识别的摆法：
+
+- 暗牌连着排，**和张横放**在一端；
+- 副露每组 3 或 4 张，其中一张横放（暗杠摆成牌背-X-X-牌背），放在右侧、上方、下方都可以；
+- 宝牌指示牌全部正放在手牌上方，两行时上面一行是表宝牌、下面一行是里宝牌，认出里宝牌会自动勾上立直。
+
+> 可以把网页「添加到主屏幕」，全屏使用。不过 iOS 主屏应用和 Safari 各存一份登录状态，同一台手机在两边会被当成两个玩家。
+
+## 🏛 架构
+
+```mermaid
+flowchart LR
+  TV["电视 / 电脑<br/>/console"] <-- WebSocket --> S
+  P1["手机<br/>/r/:code"] <-- WebSocket --> S
+  P1 -- 拍照识别<br/>WASM 推理 --> P1
+  S["Hono 服务端<br/>命令校验 → 引擎算番 → reducer"] --> DB[("SQLite<br/>room_events")]
+  S --> COS[("COS<br/>头像 / 识别照片")]
+```
+
+| 层                     | 组成                                                      | 职责                                                                                                                                       |
+| ---------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 领域层 `packages/core` | 纯 TypeScript                                             | 规则与预设、计分、局次推进、终局结算、`reduceRoom(state, event)` 纯函数 reducer、番符表数据、协议类型；前后端共用                          |
+| 服务端 `apps/server`   | Hono + `@hono/node-ws` + `node:sqlite` + `riichi-rs-node` | 房间事件溯源：命令带 `baseSeq` 做并发控制，校验后补全身份与引擎结果，再经 reducer 写入 `room_events` 并广播；撤销/重做栈在内存里按回放重建 |
+| 前端 `apps/web`        | Vite + React 19 + Tailwind v4 + Radix                     | `/` 按设备分流，`/console` 主控台，`/r/:code` 手机端，`/label` 识别标注页；识别推理在 Web Worker 里跑                                      |
+| 模型 `ml/`             | Python + uv + Ultralytics                                 | 公开数据集加合成场景训练 YOLO11n，导出内嵌 NMS 的 ONNX，发布到对象存储                                                                     |
+
+## 🧰 技术栈
+
+| 部分   | 选型                                                                                    |
+| ------ | --------------------------------------------------------------------------------------- |
+| 前端   | React 19、React Router、Zustand、Tailwind CSS v4、Radix UI、qr-scanner、onnxruntime-web |
+| 服务端 | Node 24、Hono、WebSocket、`node:sqlite`、`riichi-rs-node`、腾讯云 COS SDK               |
+| 测试   | Vitest（355 个单测）、Playwright 端到端（电视 + 多台手机 + 真实识别链路）               |
+| 部署   | Docker、GitHub Actions、腾讯云 COS + CDN + CCR                                          |
+
+## 🚀 快速开始
+
+需要 Node 24（最低 22.13）和 Corepack。
 
 ```bash
 corepack enable
 yarn install
-yarn dev        # server :8787 + web :5173（HTTPS，手机用电脑局域网 IP 访问 :5173）
-yarn test       # 单测（core + server）
-yarn e2e        # Playwright 端到端冒烟
+yarn dev          # 服务端 :8787，前端 :5173
 ```
 
-### 取景框要 HTTPS
-
-拍照识别的取景框用 `getUserMedia`，只在安全上下文可用——手机通过局域网 IP 走 HTTP 会被浏览器直接拒绝
-（入口会自己隐藏并提示）。本机与开发机共用**一张** mkcert 证书，手机只装一次根证书。
-
-一次性准备：
+电脑浏览器打开 `http://localhost:5173` 就是主控台；手机要扫码或拍照，需要 HTTPS，配置见 [本地开发](docs/development.md)。
 
 ```bash
-brew install mkcert
-mkdir -p ci/dev-tls/certs
-mkcert -cert-file ci/dev-tls/certs/cert.pem -key-file ci/dev-tls/certs/key.pem \
-  localhost 127.0.0.1 ::1 <本机局域网 IP> <开发机 IP>
+yarn test         # 单测
+yarn e2e          # 端到端
+docker compose up -d --build   # 单容器运行，:8787
 ```
 
-`ci/dev-tls/certs/` 不入库。证书在就 `yarn dev` 自动起 HTTPS，不在就退回 HTTP（CI 与新电脑照样能跑）。
+## 📚 文档
 
-手机上信任根证书（只做一次）：
+| 文档                                       | 内容                                                        |
+| ------------------------------------------ | ----------------------------------------------------------- |
+| [docs/development.md](docs/development.md) | 本地开发、常用命令、手机 HTTPS 调试（mkcert、开发机 caddy） |
+| [docs/deployment.md](docs/deployment.md)   | 同源部署、线上 CI/CD、服务器与 secrets、PWA、曲库与模型发布 |
+| [ml/README.md](ml/README.md)               | 牌面检测模型的数据、训练、导出与发布                        |
+| [CLAUDE.md](CLAUDE.md)                     | 架构与领域概念的完整说明（协议、事件溯源、识别流水线细节）  |
 
-1. `mkcert -CAROOT` 找到 `rootCA.pem`，AirDrop 到手机；
-2. iOS：打开后在 设置 → 通用 → VPN 与设备管理 里安装描述文件；
-3. **设置 → 通用 → 关于本机 → 证书信任设置 里打开这张证书的完全信任**（不做这步仍然不是安全上下文）。
+## 致谢
 
-开发机（boxdev）上容器是纯 HTTP，叠一层 caddy 做 TLS 终结：
+- 牌图来自 [lietxia/mahjong_graphic](https://github.com/lietxia/mahjong_graphic)，见 [`apps/web/src/assets/tiles/NOTICE.md`](apps/web/src/assets/tiles/NOTICE.md)
+- 番符计算使用 [riichi-rs-node](https://www.npmjs.com/package/riichi-rs-node)（[riichi-rust](https://github.com/MahjongPantheon/riichi-rust) 的 wasm 封装）
 
-```bash
-rsync -a ci/dev-tls/certs/ boxdev:~/riichi-scoreboard/ci/dev-tls/certs/
-ssh boxdev 'cd riichi-scoreboard && docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build'
-# 手机开 https://<开发机 IP>:8443
-```
-
-开发机上验证要加 `--noproxy "*"`：公司代理会把 `curl https://127.0.0.1:8443` 拦成 403。
-同样的原因，`docker-compose.dev.yml` 里显式清空了 caddy 的代理变量——Docker 会把宿主机的代理
-注入每个容器，而 caddy 的回源目标是服务名 `riichi`，匹配不上 `NO_PROXY` 里的网段。
-
-取景框需要 iOS 16.4 或更新的系统（`OffscreenCanvas`）；更低版本会给出明确提示而不是黑屏。
-
-## 部署
-
-```bash
-docker compose up -d --build   # 单容器，:8787，数据卷 /data（SQLite + 本地对象文件）
-```
-
-前端与后端同源部署时无需配置；前端单独托管到 COS 时，构建前设置 `VITE_API_BASE_URL`，在服务端设置 `CORS_ORIGINS`，并把 COS 静态站点的 404 回退到 `index.html`（`/console`、`/r/:code` 是前端路由）。
-
-### 线上（GitHub Actions → 腾讯云）
-
-`.github/workflows/cicd.yml`：每次推送与 PR 跑门禁（typecheck / lint / format / 单测 / e2e）；推到 `main` 后并行发布——前端构建后由 `ci/deploy-web-to-cos.sh` 镜像同步到 COS 静态站桶（走全球加速域名）并刷新 CDN，再由 `ci/verify-web-deploy.sh` 逐个核对 `dist` 里的文件真的能从 `https://riichi.ruivon.cn` 取到（比大小与 `.wasm` 的类型；长缓存头在上传时写进源站对象，CDN 会按自己的规则改写响应头，所以不在这里判），个别对象没传上去的半截部署会让工作流失败，服务端镜像推到 CCR 后经 SSH 在服务器执行 `ci/deploy-server.sh <sha7>`（`https://riichi-api.ruivon.cn`，HTTP 与 WebSocket 同一端口，经 CDN 回源）。
-
-- 手动发布 / 回滚：在 Actions 里对任意提交 `Run workflow`，前端与服务端按同一提交重建。回滚到「前端发布走全球加速」之前的提交时，前端作业用的是那个提交自带的旧脚本（区域域名 + 每次强制重传 14 MB 的 wasm），境外 runner 上很可能再次 `UserNetworkTooSlow` 失败而服务端作业成功，造成前后端版本劈叉；这种情况要么只回滚服务端，要么把这次的 `ci/` 改动 cherry-pick 到回滚分支上再发。
-- 服务器上只通过 `ci/deploy-server.sh` 起服务：它先读 `~/.env`（云密钥、static 桶、CCR 登录）再读仓库 `.env`（`RIICHI_IMAGE` / `RIICHI_PORT` / `CORS_ORIGINS`），`--no-build` 只拉镜像。直接 `docker compose up` 会在服务器上本地构建，且缺少密钥时会静默退回本地存储模式。
-- 镜像内仍包含同源模式的前端产物（本地与开发机 compose 需要）；线上在服务器 `.env` 里设 `WEB_DIST=`（空）关闭静态托管，接口域名下的页面路径会 302 到正式站点。
-- 仓库 secrets：`QCLOUD_SECRET_ID` / `QCLOUD_SECRET_KEY`（COS 上传 + CDN 刷新）、`QCLOUD_DOCKER_USERNAME` / `QCLOUD_DOCKER_PASSWORD`（CCR）、`DEPLOY_SSH_HOST` / `DEPLOY_SSH_KEY` / `DEPLOY_KNOWN_HOSTS`（部署机）。桶名、域名、镜像名等常量写在工作流的 `env` 里。
-- 腾讯云 CDN 对约 10 秒无数据的 WebSocket 会静默回收，客户端每 5 秒发心跳、8 秒无回包即重连，接口响应带 `Cache-Control: no-store`；CDN 侧接口域名仍应配置为不缓存。
-
-立直音乐：操作栏「对局中」一节选曲并按「立直」（手机与主控台弹窗都有；主控台代按时浮窗不显示名字），电视循环播放，右下角浮窗显示谁在放哪首，点结算键即停。曲库是 `packages/core/src/music/manifest.json`（`id` = 桶内对象名 uuid，`title` = 展示名，`file` = 本地原文件名），音频固定从 `https://static.bitego.net/riichi/music/<id>.mp3` 播放（常量在 `apps/web/src/features/music/url.ts`），服务端与前端都不需要额外配置。加曲：manifest 追加一条（id 用 `uuidgen | tr A-Z a-z`，必须小写）→ `QCLOUD_SECRET_ID=… QCLOUD_SECRET_KEY=… ci/upload-music.sh <放原文件的目录>`（本机执行，需要 `pipx install coscmd`）→ 推 `main`。
-
-拍照识别：手机结算对话框的「牌面」页有「拍照识别」——打开全屏取景框，把手牌、副露和宝牌指示牌放进中间那条取景带（带外压暗，牌河自然落在暗区），**连续三帧认出同一副牌就自动定格**（约一秒；对不齐时右下角快门随时可按）→ 牌面自动填入并算番。推理在 Web Worker 里跑（onnxruntime-web 单线程 WASM；约 10 MB 模型和 14 MB 运行时在进房间时就后台预下载，之后走缓存，没下完时取景页显示进度），定格帧就是上传留存的那张照片，与检测框严格对齐。识别通过时结算界面只展示一排牌、指示牌与旗标，键盘收起；没把握的牌带记号，点一下可以换牌或改和张；识别不完整才展开全键盘。摆法约定：暗牌连排、**和张横放**接在一端；副露 3/4 张且含一张横置（暗杠 = 牌背-X-X-牌背），放右侧、上方、下方都行；宝牌指示牌放手牌上方且全部正放，两行时上表下里；认出里宝指示牌会自动勾上立直。每次识别的定格帧与结果会存到对象存储 `hands/` 前缀与 `recognitions` 表（`source` 区分房间结算与标注模式），结算确认后把最终手牌一并记录，作为后续训练数据（每人每小时最多 60 次）。标注模式：首页底部「给模型标牌 →」进 `/label`，不进房间也能用——取景框里多画检测框与牌图标签（点框看类别与置信度），右下角多一个相册入口（相册图也走同一条取景带选区）；定格后把认错的改对，按「就是这手」把真值传回去，随即自动回到取景接着拍。这条路的记录以 `source=label` 存，与房间结算来的分开统计。模型训练、导出与发布在 `ml/`（见 `ml/README.md`）；类目录与当前发布的模型记录在 `packages/core/src/recognition/manifest.json`，模型对象放 `https://static.bitego.net/riichi/models/<id>.onnx`（`ci/upload-model.sh` 校验、上传并把 `model` 写回 manifest；为 `null` 时手机上不显示入口）。
-
-头像等用户文件默认落在 `DATA_DIR/objects`，由服务端在 `/api/objects/*` 托管；配置 `QCLOUD_*` 五项变量后改为直传腾讯云 COS（桶内 `riichi/` 前缀，URL 走 CDN 域名），变量清单见 `.env.template`。数据库结构按 `user_version` 自动迁移，升级镜像无需手工处理；从 v1 数据升级时头像字段会被清空（旧的 `DATA_DIR/avatars` 目录不再使用，可手动删除），玩家重新上传即可。
-
-## 结构
-
-- `packages/core` 规则、计分、reducer（纯 TS，前后端共用）
-- `apps/server` Hono + WebSocket + SQLite，房间事件溯源，托管前端产物
-- `apps/web` Vite + React，`/console` 电视端，`/r/:code` 手机端
-- `ml` 牌面检测模型的训练工作台（Python / uv，不参与 yarn 工作区）
+<p align="center"><sub>© <a href="https://r-ay.cn">Ray</a> 2014-present</sub></p>
