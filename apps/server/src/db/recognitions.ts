@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import type { RecognitionPatch } from "@riichi/core";
+import type { RecognitionPatch, RecognitionSource } from "@riichi/core";
 import type { Database } from "./index";
 
 export interface RecognitionRow {
@@ -11,6 +11,7 @@ export interface RecognitionRow {
   detections: string | null;
   recognized: string | null;
   corrected: string | null;
+  source: RecognitionSource;
   created_at: number;
   updated_at: number;
 }
@@ -19,13 +20,19 @@ export interface RecognitionRow {
 export class RecognitionsRepo {
   constructor(private readonly db: Database) {}
 
-  create(playerId: string, photoKey: string, modelId: string, now: number): string {
+  create(
+    playerId: string,
+    photoKey: string,
+    modelId: string,
+    source: RecognitionSource,
+    now: number,
+  ): string {
     const id = randomBytes(8).toString("hex");
     this.db
       .prepare(
-        "INSERT INTO recognitions (id, player_id, photo_key, model_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO recognitions (id, player_id, photo_key, model_id, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
       )
-      .run(id, playerId, photoKey, modelId, now, now);
+      .run(id, playerId, photoKey, modelId, source, now, now);
     return id;
   }
 

@@ -157,3 +157,45 @@ test("确认态：点牌替换、改和张、改牌展开全键盘后不再自�
   await expect(dialog.getByTestId("tile-keyboard")).toBeVisible();
   await expect(dialog.getByTestId("hand-confirm")).toHaveCount(0);
 });
+
+test("标注模式：主页进入、检测框可见、连拍一张提交真值", async ({ browser }) => {
+  const patches: Record<string, unknown>[] = [];
+  const ctx = await newContext(browser, { viewport: { width: 400, height: 800 } });
+  const p = await ctx.newPage();
+  await withDetector(patches)(p);
+  const posts: string[] = [];
+  p.on("request", (r) => {
+    if (r.method() === "POST" && /\/api\/recognitions/.test(r.url())) posts.push(r.url());
+  });
+
+  await p.goto("/?stay=1");
+  await p.getByRole("link", { name: /给模型标牌/ }).click();
+  await expect(p.getByRole("heading", { name: "给模型标牌" })).toBeVisible();
+
+  await p.getByRole("button", { name: /开始拍/ }).click();
+  const sheet = p.getByTestId("camera-sheet");
+  await expect(sheet).toBeVisible();
+  // 相册入口只在标注模式给（房间里就地拍一张的成本已经接近零）
+  await expect(p.getByTestId("label-album")).toBeAttached();
+  // 标注模式才画检测框；每个框贴一张同款牌图当标签。框一出现基本就到第三帧了，
+  // 所以这里用「要么看到框、要么已经定格」来判，避免和自动定格抢时序
+  await expect
+    .poll(
+      async () =>
+        (await sheet.count()) === 0 ||
+        (await sheet.getByRole("button", { name: /^0p \d+%$/ }).count()) > 0,
+      { timeout: 30_000 },
+    )
+    .toBe(true);
+  await expect(sheet).toHaveCount(0, { timeout: 30_000 });
+
+  // 照片以 source=label 上传，确认后回填真值并自动回到取景
+  await expect.poll(() => posts.some((u) => u.includes("source=label"))).toBe(true);
+  await expect(p.getByTestId("hand-confirm")).toBeVisible();
+  await p.getByTestId("label-submit").click();
+  await expect.poll(() => patches.some((x) => "corrected" in x)).toBe(true);
+  expect((patches.find((x) => "corrected" in x)!.corrected as { closed: number[] }).closed).toEqual(
+    CLOSED,
+  );
+  await expect(p.getByTestId("camera-sheet")).toBeVisible();
+});

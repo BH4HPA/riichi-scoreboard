@@ -1,4 +1,4 @@
-import type { RecognitionResult } from "@riichi/core";
+import type { RecognitionResult, RecognitionSource } from "@riichi/core";
 import type { ValueDraft } from "@/features/settlement/valueDraft";
 import { createRecognition, patchRecognition } from "./api";
 
@@ -15,9 +15,10 @@ export function uploadRecognition(
   blob: Blob,
   result: RecognitionResult,
   token: string,
+  source: RecognitionSource,
   onId?: (id: string) => void,
 ): void {
-  const upload = createRecognition(blob, token).then((created) => {
+  const upload = createRecognition(blob, token, source).then((created) => {
     onId?.(created.id);
     return created.id;
   });

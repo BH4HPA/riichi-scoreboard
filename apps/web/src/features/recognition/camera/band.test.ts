@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BAND_MAX, BAND_MIN, bandRect, clampBand, type Viewport } from "./band";
+import { BAND_MAX, BAND_MIN, bandRect, boxStyle, clampBand, type Viewport } from "./band";
 
 /** 横向视频（1920×1080）放进竖屏手机（390×780）：object-cover 会把左右各裁掉一大块 */
 const portrait: Viewport = {
@@ -58,5 +58,31 @@ describe("bandRect", () => {
   it("尺寸还没就绪时返回 null，不给出退化矩形", () => {
     expect(bandRect({ ...portrait, videoWidth: 0 }, 0.45)).toBeNull();
     expect(bandRect({ ...portrait, displayHeight: 0 }, 0.45)).toBeNull();
+  });
+});
+
+describe("boxStyle", () => {
+  const crop = { x: 0, y: 0, width: 500, height: 200 };
+
+  it("按裁剪区域换算成百分比", () => {
+    expect(boxStyle([50, 20, 150, 120], crop)).toEqual({
+      left: "10%",
+      top: "10%",
+      width: "20%",
+      height: "50%",
+    });
+  });
+
+  it("贴边的框落在 0% / 100%", () => {
+    expect(boxStyle([0, 0, 500, 200], crop)).toEqual({
+      left: "0%",
+      top: "0%",
+      width: "100%",
+      height: "100%",
+    });
+  });
+
+  it("裁剪尺寸退化时不给出无穷大的样式", () => {
+    expect(boxStyle([0, 0, 1, 1], { x: 0, y: 0, width: 0, height: 200 })).toBeNull();
   });
 });

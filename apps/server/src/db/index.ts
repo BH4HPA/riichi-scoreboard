@@ -93,6 +93,9 @@ CREATE INDEX idx_recognitions_player ON recognitions (player_id, created_at);
 `,
   // v4：只剩手机浏览器一种推理引擎，engine 列没有信息量
   `ALTER TABLE recognitions DROP COLUMN engine;`,
+  // v5：区分记录来源（房间结算 / 标注模式）。历史记录都来自房间，默认值正好。
+  // 照 players.kind 的先例用 TEXT + DEFAULT，取值由 core 的联合类型约束，不加 CHECK。
+  `ALTER TABLE recognitions ADD COLUMN source TEXT NOT NULL DEFAULT 'room';`,
 ];
 
 export type Database = DatabaseSync;

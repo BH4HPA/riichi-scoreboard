@@ -72,6 +72,13 @@ export interface RecognitionResult {
   provenance: HandProvenance;
 }
 
+/**
+ * 记录来自哪条路：`room` = 牌局里结算时拍的，`label` = 主页标注模式显式提交的真值。
+ * 回流时两个群体的可信度不同（房间里靠「结算被牌桌接受」背书，标注模式是用户明说的），
+ * 所以导出必须带上这一列。
+ */
+export type RecognitionSource = "room" | "label";
+
 /** POST /api/recognitions 的响应：照片已存、记录已建 */
 export interface RecognitionCreated {
   id: string;

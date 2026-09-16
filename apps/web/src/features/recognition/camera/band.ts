@@ -51,3 +51,22 @@ export function bandRect(view: Viewport, fraction: number): Rect | null {
   if (width <= 0 || height <= 0) return null;
   return { x, y, width, height };
 }
+
+/**
+ * 检测框（裁剪后那一帧的像素坐标）→ 覆盖层里的百分比定位。
+ * 覆盖层与裁剪区域同一块矩形，所以直接按比例换算；退化的裁剪尺寸返回 null。
+ */
+export function boxStyle(
+  box: readonly [number, number, number, number],
+  crop: Rect,
+): { left: string; top: string; width: string; height: string } | null {
+  if (crop.width <= 0 || crop.height <= 0) return null;
+  const [x1, y1, x2, y2] = box;
+  const pct = (v: number, total: number) => `${(v / total) * 100}%`;
+  return {
+    left: pct(x1, crop.width),
+    top: pct(y1, crop.height),
+    width: pct(x2 - x1, crop.width),
+    height: pct(y2 - y1, crop.height),
+  };
+}
