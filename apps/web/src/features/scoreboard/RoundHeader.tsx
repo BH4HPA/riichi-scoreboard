@@ -50,7 +50,8 @@ export function RoundHeader({
           {game.honba} 本场
         </Badge>
       </div>
-      <div className="ml-auto flex items-center gap-4 text-muted">
+      {/* 电视宽屏一行排得下，时钟组靠右；窄屏会折行，折下来靠左与上一行对齐 */}
+      <div className={cn("flex items-center gap-4 text-muted", tv && "ml-auto")}>
         <span className="flex items-center gap-1">
           <Clock3 className="h-4 w-4 text-sky-500" />
           <span className="tabular text-fg">{formatClock(now)}</span>
