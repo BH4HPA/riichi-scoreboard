@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/brand/logo-1024.png" alt="立直麻将计分板" width="120">
+  <img src="apps/web/public/icon-192.png" alt="立直麻将计分板" width="120">
 </p>
 
 <h1 align="center">立直麻将计分板</h1>
