@@ -83,6 +83,15 @@ function inPlace(pairs: ReadonlyArray<[unknown, Tile, Tile]>): boolean {
 }
 
 /**
+ * inPlace 的盲区：编辑态删一张再从末尾补一张，若删掉的那张在一段**延伸到末尾**的同牌连排里，
+ * 结果只有末位不同、多重集也只换了一张，和「直接改了末位」一模一样 —— 但两种情况下该重标的框不同。
+ * 所以被改的位置只要紧跟着一张同样的牌，就当分不清。副露没有删单张的操作，不用查。
+ */
+function changedAfterSame(predicted: readonly Tile[], truth: readonly Tile[]): boolean {
+  return predicted.some((t, i) => i > 0 && t !== truth[i] && predicted[i - 1] === t);
+}
+
+/**
  * 把用户改正后的牌写回检测框。对齐只有 layoutHand 知道位置映射，所以放在 TS 侧做，
  * Python 只负责拉照片与写文件。
  *
@@ -95,7 +104,7 @@ export function align(
   recognized: RecognizedHand,
   corrected: HandInput,
 ): Aligned {
-  const { hand, provenance } = layoutHand(detections);
+  const { hand, provenance, warnings } = layoutHand(detections);
   // 预标注：每个框先按模型自己的类走，再按 corrected 逐位纠正
   const labels: Label[] = detections.map((d) => ({ cls: d.cls, box: d.box }));
   const manual = (reason: string): Aligned => ({ labels, status: "manual", reason });
@@ -122,6 +131,11 @@ export function align(
   ) {
     return manual("指示牌张数对不上（删掉了误检、被村规截断、或模型漏检）");
   }
+  // 里宝行比表宝行长时布局只截了位置、整行的框却都算采信：截掉的那几个框没有位置、没人看过，
+  // 照单全收会带着模型原判进 auto。这种照片通常是表宝漏检了一张，那张实物还会被学成背景
+  if (warnings.some((w) => w.code === "too_many_dora")) {
+    return manual("里宝指示牌多于表宝牌：截掉的框没人看过，表宝多半漏检了一张");
+  }
   // 照片里每一张真牌都得有标注，否则 YOLO 会把没标的牌学成背景。
   // 但按噪声剔除的框（低置信、形状退化）不是牌，不标注才是对的，也不该因此降级。
   const accounted = new Set([...provenance.usedDetections, ...provenance.rejectedDetections]);
@@ -143,6 +157,13 @@ export function align(
   row(hand.uraIndicators, corrected.uraIndicators, provenance.uraIndicators);
 
   if (!inPlace(pairs)) return manual("牌的位置整体错开了（编辑态删牌再补牌会这样）");
+  if (
+    changedAfterSame(hand.closed, corrected.closed) ||
+    changedAfterSame(hand.doraIndicators, corrected.doraIndicators) ||
+    changedAfterSame(hand.uraIndicators, corrected.uraIndicators)
+  ) {
+    return manual("同一张牌连排的末尾被改了：分不清是改了这张，还是删掉前面一张再补一张");
+  }
   /*
    * 「赤五 → 同一张普通五」有两种成因，从记录里分不开（recognitions 没存房间规则）：
    * - 不用赤五的房间，applyRecognized 把照片里的赤五折回了普通五 —— 照片里就是赤，该保留 0p；
@@ -165,5 +186,8 @@ export function align(
     if (r === null) return manual("用户改了一张没有检测框的牌（暗杠里补出来的那几张）");
     if (r !== "keep") fixed[origin.det]!.cls = r;
   }
-  return { labels: fixed, status: "auto", reason: "" };
+  // 被布局当噪声剔除的框（低于 minConf、零面积、形状退化）不是牌：auto 没人复核，
+  // 带着模型原判写出去就是把误检当真牌教回给模型。人工队列照旧带着它们，由人决定删不删
+  const rejected = new Set(provenance.rejectedDetections);
+  return { labels: fixed.filter((_, i) => !rejected.has(i)), status: "auto", reason: "" };
 }
