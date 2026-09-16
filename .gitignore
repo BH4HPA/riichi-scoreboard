@@ -20,3 +20,6 @@ ml/runs/
 ml/.venv/
 ml/*.pt
 __pycache__/
+
+# 开发机 TLS 的自签证书与私钥：本机 mkcert 生成后 rsync 过去，不入库
+ci/dev-tls/certs/

@@ -22,8 +22,8 @@ export function deviceKind(nav: NavigatorLike = navigator as unknown as Navigato
   return "desktop";
 }
 
-/** 扫码需要相机 API 与安全上下文（HTTPS 或 localhost）。 */
-export function canScanQr(): boolean {
+/** 扫码与取景框都要相机 API + 安全上下文（HTTPS 或 localhost）。 */
+export function canUseCamera(): boolean {
   return (
     typeof navigator !== "undefined" &&
     Boolean(navigator.mediaDevices?.getUserMedia) &&

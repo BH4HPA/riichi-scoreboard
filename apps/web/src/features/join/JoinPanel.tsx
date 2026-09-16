@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { ScanLine, Smartphone } from "lucide-react";
 import { api, ApiError } from "@/api/client";
 import { useSession } from "@/api/session";
-import { canScanQr } from "@/lib/device";
+import { canUseCamera } from "@/lib/device";
 import { Button } from "@/ui/button";
 import { CodeInput } from "./CodeInput";
 import { QrScan } from "./QrScan";
@@ -17,7 +17,7 @@ export function JoinPanel() {
   const [error, setError] = useState<string | null>(null);
   const [shakeKey, setShakeKey] = useState(0);
   const [scanning, setScanning] = useState(false);
-  const scannable = canScanQr();
+  const scannable = canUseCamera();
   const go = useCallback((c: string) => navigate(`/r/${c.toUpperCase()}`), [navigate]);
 
   const check = async (c: string) => {
