@@ -14,25 +14,41 @@ yarn test       # 单测（core + server）
 yarn e2e        # Playwright 端到端冒烟
 ```
 
-`yarn dev` 的前端走 HTTPS（`vite-plugin-mkcert` 自动签本机与局域网 IP 的证书）：拍照识别的取景框用
-`getUserMedia`，只在安全上下文可用，手机通过局域网 IP 走 HTTP 会被浏览器直接拒绝。
+### 取景框要 HTTPS
 
-手机上要**一次性**信任 mkcert 的根证书，之后本机与开发机都不用再管：
+拍照识别的取景框用 `getUserMedia`，只在安全上下文可用——手机通过局域网 IP 走 HTTP 会被浏览器直接拒绝
+（入口会自己隐藏并提示）。本机与开发机共用**一张** mkcert 证书，手机只装一次根证书。
 
-1. 本机 `mkcert -CAROOT` 找到 `rootCA.pem`，AirDrop / 邮件发到手机；
+一次性准备：
+
+```bash
+brew install mkcert
+mkdir -p ci/dev-tls/certs
+mkcert -cert-file ci/dev-tls/certs/cert.pem -key-file ci/dev-tls/certs/key.pem \
+  localhost 127.0.0.1 ::1 <本机局域网 IP> <开发机 IP>
+```
+
+`ci/dev-tls/certs/` 不入库。证书在就 `yarn dev` 自动起 HTTPS，不在就退回 HTTP（CI 与新电脑照样能跑）。
+
+手机上信任根证书（只做一次）：
+
+1. `mkcert -CAROOT` 找到 `rootCA.pem`，AirDrop 到手机；
 2. iOS：打开后在 设置 → 通用 → VPN 与设备管理 里安装描述文件；
 3. **设置 → 通用 → 关于本机 → 证书信任设置 里打开这张证书的完全信任**（不做这步仍然不是安全上下文）。
 
-开发机（boxdev）上验收取景框同样需要 HTTPS，容器本身是纯 HTTP，所以叠一层 caddy 做 TLS 终结：
+开发机（boxdev）上容器是纯 HTTP，叠一层 caddy 做 TLS 终结：
 
 ```bash
-# 本机：签一张同时覆盖开发机 IP 的证书（与上面同一个根 CA，手机不用再装第二次）
-mkcert -cert-file cert.pem -key-file key.pem <开发机 IP> localhost
-rsync cert.pem key.pem boxdev:~/riichi-scoreboard/ci/dev-tls/certs/   # 证书不入库
-# 开发机：
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+rsync -a ci/dev-tls/certs/ boxdev:~/riichi-scoreboard/ci/dev-tls/certs/
+ssh boxdev 'cd riichi-scoreboard && docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build'
 # 手机开 https://<开发机 IP>:8443
 ```
+
+开发机上验证要加 `--noproxy "*"`：公司代理会把 `curl https://127.0.0.1:8443` 拦成 403。
+同样的原因，`docker-compose.dev.yml` 里显式清空了 caddy 的代理变量——Docker 会把宿主机的代理
+注入每个容器，而 caddy 的回源目标是服务名 `riichi`，匹配不上 `NO_PROXY` 里的网段。
+
+取景框需要 iOS 16.4 或更新的系统（`OffscreenCanvas`）；更低版本会给出明确提示而不是黑屏。
 
 ## 部署
 

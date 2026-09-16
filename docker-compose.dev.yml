@@ -13,6 +13,14 @@ services:
     volumes:
       - ./ci/dev-tls/Caddyfile:/etc/caddy/Caddyfile:ro
       - ./ci/dev-tls/certs:/certs:ro
+    environment:
+      # Docker 会把宿主机配的公司代理注入每一个容器（~/.docker/config.json 的 proxies.default），
+      # 而 caddy 的 reverse_proxy 照着 HTTP_PROXY 走 —— 回源 riichi:8787 会被打到代理上返回 403。
+      # NO_PROXY 里只有网段没有服务名，匹配不上，所以这里直接清空。
+      HTTP_PROXY: ""
+      HTTPS_PROXY: ""
+      http_proxy: ""
+      https_proxy: ""
     depends_on:
       - riichi
     restart: unless-stopped
