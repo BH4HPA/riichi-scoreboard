@@ -10,7 +10,9 @@ export function SiteFooter({ className }: { className?: string }) {
   return (
     <footer className={cn("flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted", className)}>
       <a href={AUTHOR.url} {...external} className={link}>
-        © {AUTHOR.name} {AUTHOR.since}-{new Date().getFullYear()}
+        {/* PingFang 的 © 字形又小又偏上（Mac 上的 Chrome 按字体栈会用到它），单独交给系统西文字体 */}
+        <span className="font-[system-ui]">©</span> {AUTHOR.name} {AUTHOR.since}-
+        {new Date().getFullYear()}
       </a>
       <a href={ICP.url} {...external} className={link}>
         {ICP.number}
