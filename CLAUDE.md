@@ -53,7 +53,7 @@ Yarn workspaces monorepo:
   Phone settlement dialogs mirror to the TV as a full-screen modal (`features/mirror/SettlementMirror`),
   carrying the hand only once the engine has evaluated it. Site footer links (copyright, ICP record) live in
   `features/site/SiteFooter`: landing centers them, the console shows them left-aligned, pinned at the bottom of
-  the left column on wide screens and at the page bottom otherwise. PWA = `public/manifest.json` + icons only, deliberately no Service Worker (the app is useless
+  the left column on wide screens and at the bottom of the page otherwise. PWA = `public/manifest.json` + icons only, deliberately no Service Worker (the app is useless
   without its WebSocket, and caching index would pin stale versions); logo master in `docs/brand/`. Tile images are flat SVGs from mahjong_graphic (`src/assets/tiles`, see NOTICE.md), rendered by
   `features/hand/TileFace`.
 

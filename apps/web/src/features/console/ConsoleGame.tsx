@@ -33,7 +33,7 @@ export function ConsoleGame({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   return (
-    <div className={wide ? "flex h-dvh flex-col gap-4 p-6" : "flex flex-col gap-3 p-4"}>
+    <div className={wide ? "flex h-dvh flex-col gap-4 p-6" : "flex min-h-dvh flex-col gap-3 p-4"}>
       <header className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <RoundHeader game={game.present} names={names} rules={room.rules} tv={wide} />
@@ -85,7 +85,7 @@ export function ConsoleGame({
               <DiffMatrix game={game.present} names={names} rules={room.rules} tv={wide} />
             </div>
           </div>
-          <SiteFooter className="shrink-0" />
+          {wide && <SiteFooter className="shrink-0" />}
         </div>
         {wide && (
           <div className="min-h-0 overflow-y-auto rounded-xl border border-border bg-surface p-3">
@@ -93,6 +93,8 @@ export function ConsoleGame({
           </div>
         )}
       </main>
+      {/* 窄屏整页滚动：页脚贴在屏幕底部，内容超一屏时跟在最后 */}
+      {!wide && <SiteFooter className="mt-auto pt-2" />}
 
       {!wide && (
         <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
