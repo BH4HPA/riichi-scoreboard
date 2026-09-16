@@ -15,7 +15,7 @@ import { ControlPanel } from "@/features/settlement/ControlPanel";
 import { MirrorOverlay } from "@/features/mirror/MirrorOverlay";
 import { SiteFooter } from "@/features/site/SiteFooter";
 
-/** 主控台对局页：宽屏双栏（左记分右历史），窄屏（Pad）单栏 + 历史抽屉 + 二维码弹窗。 */
+/** 主控台对局页：宽屏双栏（左记分右历史），窄屏（Pad）单栏 + 历史抽屉；两者都有二维码弹窗。 */
 export function ConsoleGame({
   room,
   game,
@@ -44,13 +44,12 @@ export function ConsoleGame({
             房间 <span className="font-semibold tabular text-fg">{room.code}</span>
           </span>
         ) : (
-          <>
-            <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
-              <History className="h-4 w-4" /> 记录 {game.present.history.length}
-            </Button>
-            <RoomQrDialog code={room.code} open={qrOpen} onOpenChange={setQrOpen} />
-          </>
+          <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
+            <History className="h-4 w-4" /> 记录 {game.present.history.length}
+          </Button>
         )}
+        {/* 开局后还有人要加入（换手机、断线重进）：两种屏宽都能再打开二维码 */}
+        <RoomQrDialog code={room.code} open={qrOpen} onOpenChange={setQrOpen} />
         <Button variant="outline" size="sm" onClick={() => setPanelOpen(true)}>
           <PanelRightOpen className="h-4 w-4" /> 操作
         </Button>
@@ -66,7 +65,7 @@ export function ConsoleGame({
               seats={room.seats}
               names={names}
               rules={room.rules}
-              tv={wide}
+              size={wide ? "tv" : "pad"}
             />
             <MirrorOverlay intents={intents} names={names} rules={room.rules} />
             {game.present.status === "finished" && (
@@ -82,7 +81,12 @@ export function ConsoleGame({
               </div>
             )}
             <div className="rounded-xl border border-border bg-surface p-3">
-              <DiffMatrix game={game.present} names={names} rules={room.rules} tv={wide} />
+              <DiffMatrix
+                game={game.present}
+                names={names}
+                rules={room.rules}
+                size={wide ? "tv" : "pad"}
+              />
             </div>
           </div>
           {wide && <SiteFooter className="shrink-0" />}
@@ -94,7 +98,7 @@ export function ConsoleGame({
         )}
       </main>
       {/* 窄屏整页滚动：页脚贴在屏幕底部，内容超一屏时跟在最后 */}
-      {!wide && <SiteFooter className="mt-auto pt-2" />}
+      {!wide && <SiteFooter className="mt-auto justify-center pt-2" />}
 
       {!wide && (
         <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>

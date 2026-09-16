@@ -8,7 +8,7 @@ function joinUrl(code: string): string {
   return `${window.location.origin}/r/${code}`;
 }
 
-/** 二维码 + 房间码 + 链接。宽屏大厅直接放左栏；窄屏放弹窗。 */
+/** 二维码 + 房间码 + 链接。宽屏大厅直接放左栏；其余场合放弹窗。 */
 export function RoomQr({
   code,
   size = 240,
@@ -35,7 +35,7 @@ export function RoomQr({
   );
 }
 
-/** 窄屏：按钮 + 弹窗。 */
+/** 按钮 + 弹窗：窄屏大厅与主控台对局页。 */
 export function RoomQrDialog({
   code,
   open,

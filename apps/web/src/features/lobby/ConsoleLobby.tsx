@@ -158,7 +158,7 @@ export function ConsoleLobby({
         {rulesCard}
         {actions}
       </section>
-      {!wide && <SiteFooter className="shrink-0" />}
+      {!wide && <SiteFooter className="shrink-0 justify-center" />}
 
       <LocalPlayerDialog
         seat={localSeat}
