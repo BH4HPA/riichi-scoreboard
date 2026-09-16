@@ -12,7 +12,6 @@ import {
   sameTile,
   tileNumber,
   tileSuit,
-  yakumanLabel,
   type EvaluatedHand,
   type HandInput,
   type Meld,
@@ -23,7 +22,7 @@ import { CheckRow, Label } from "@/ui/controls";
 import { cn } from "@/lib/utils";
 import { TileFace } from "@/features/hand/TileFace";
 import { hasLoc, type TileLoc } from "@/features/hand/tileLoc";
-import { YakuChips } from "@/features/hand/YakuChips";
+import { ValueResult } from "./hand/ValueResult";
 import { closedCapacity, isHandComplete } from "./valueDraft";
 
 type Target = "closed" | "dora" | "ura" | "chi" | "pon" | "kan" | "ankan";
@@ -356,30 +355,13 @@ export function TileKeyboard({
         </CheckRow>
       </div>
 
-      <div className="flex min-h-8 items-center gap-2 text-sm" aria-live="polite">
-        {!complete ? (
-          <span className="text-muted">录入 {capacity} 张（含和张）后自动计算番符</span>
-        ) : evaluating ? (
-          <span className="text-muted">计算中…</span>
-        ) : evalError ? (
-          <span className="text-neg">{evalError}</span>
-        ) : !evaluated ? (
-          <span className="text-muted">计算中…</span>
-        ) : !evaluated.isAgari ? (
-          <span className="text-neg">
-            {evaluated.reason === "noYaku" ? "该牌型无役" : "不是和牌形"}
-          </span>
-        ) : evaluated.yakuman > 0 ? (
-          <span className="text-lg font-semibold text-accent">
-            {yakumanLabel(evaluated.yakuman)}
-          </span>
-        ) : (
-          <span className="text-lg font-semibold">
-            {evaluated.han} 番 {evaluated.fu} 符
-          </span>
-        )}
-      </div>
-      {evaluated?.isAgari && <YakuChips yaku={evaluated.yaku} yakuman={evaluated.yakuman} />}
+      <ValueResult
+        complete={complete}
+        evaluated={evaluated}
+        evaluating={evaluating}
+        evalError={evalError}
+        hint={`录入 ${capacity} 张（含和张）后自动计算番符`}
+      />
     </div>
   );
 }

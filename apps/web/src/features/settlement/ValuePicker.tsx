@@ -10,9 +10,9 @@ import {
 import { ChipGroup, Label, Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/controls";
 import { useSocket } from "@/ws/useRoom";
 import { CommandError } from "@/ws/socket";
-import { TileKeyboard } from "./TileKeyboard";
+import { HandEditor } from "./hand/HandEditor";
 
-/** 拍照识别（裁剪库、布局规则）只在打开牌面页时才加载，主包不带 */
+/** 拍照识别（相机、推理、布局规则）只在打开牌面页时才加载，主包不带 */
 const CameraButton = lazy(() =>
   import("@/features/recognition/CameraButton").then((m) => ({ default: m.CameraButton })),
 );
@@ -140,17 +140,18 @@ export function ValuePicker({
         </div>
       </TabsContent>
       <TabsContent value="hand" className="mt-3 space-y-3">
-        <Suspense fallback={null}>
-          <CameraButton draft={draft} onChange={onChange} rules={rules} />
-        </Suspense>
-        <TileKeyboard
-          hand={draft.hand}
-          onChange={(hand) => onChange((d) => ({ ...d, hand, evaluated: null }))}
+        <HandEditor
+          draft={draft}
+          onChange={onChange}
           rules={rules}
           evaluated={draft.evaluated}
           evaluating={evaluating}
           evalError={evalError}
-          uncertain={draft.recognition?.uncertain ?? []}
+          camera={
+            <Suspense fallback={null}>
+              <CameraButton draft={draft} onChange={onChange} rules={rules} />
+            </Suspense>
+          }
         />
       </TabsContent>
     </Tabs>

@@ -216,6 +216,40 @@ export function Tip({ content, children }: { content: ReactNode; children: React
   );
 }
 
+/**
+ * 小按钮。单选用 `ChipGroup`，多选/开关式（旗标行）直接用它。
+ * 样式只此一处：多选变体不要在业务目录里另抄一份。
+ */
+export function Chip({
+  pressed,
+  onClick,
+  disabled,
+  children,
+  className,
+}: {
+  pressed: boolean;
+  onClick: () => void;
+  disabled?: boolean | undefined;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={pressed}
+      className={cn(
+        "h-8 min-w-9 rounded-md border border-border px-2 text-sm tabular disabled:opacity-40",
+        pressed ? "border-accent bg-accent text-accent-fg" : "bg-surface hover:bg-surface-2",
+        className,
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 /** 一组可选的小按钮（番数、符数等快选） */
 export function ChipGroup<T extends string | number>({
   value,
@@ -231,20 +265,9 @@ export function ChipGroup<T extends string | number>({
   return (
     <div className={cn("flex flex-wrap gap-1.5", className)}>
       {options.map((o) => (
-        <button
-          key={String(o.value)}
-          type="button"
-          onClick={() => onChange(o.value)}
-          aria-pressed={value === o.value}
-          className={cn(
-            "h-8 min-w-9 rounded-md border border-border px-2 text-sm tabular",
-            value === o.value
-              ? "border-accent bg-accent text-accent-fg"
-              : "bg-surface hover:bg-surface-2",
-          )}
-        >
+        <Chip key={String(o.value)} pressed={value === o.value} onClick={() => onChange(o.value)}>
           {o.label}
-        </button>
+        </Chip>
       ))}
     </div>
   );
