@@ -90,6 +90,21 @@ test("输入法组词中输房间码：组词期间不改写 input，输满即�
   // 退格清空（组词结束后没有隐形字符，六下正好删完；光标恒在末尾，fill 的全选删不掉）后组词输入正确房间码 → 进房
   for (let i = 0; i < 6; i++) await page.keyboard.press("Backspace");
   await expect(input).toHaveValue("");
+  // 普通按键排下的延后清理，撞上紧接着开始的组词也不能改写 input（CI 上曾复现成 XV5xv54）
+  await page.evaluate(() => {
+    const el = document.querySelector<HTMLInputElement>('input[aria-label="房间码"]')!;
+    el.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+  });
+  await page.keyboard.type("q"); // 非组词 input → 排下清理；此时 composing 已为真，清理应跳过
+  await page.evaluate(() => new Promise((r) => setTimeout(r, 20)));
+  await expect(input).toHaveValue("q");
+  await page.evaluate(() => {
+    const el = document.querySelector<HTMLInputElement>('input[aria-label="房间码"]')!;
+    el.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true }));
+  });
+  await expect(input).toHaveValue("Q");
+  await page.keyboard.press("Backspace");
+  await expect(input).toHaveValue("");
   for (let i = 1; i <= code.length; i++) await compose(code.slice(0, i).toLowerCase());
   await expect(page).toHaveURL(new RegExp(`/r/${code}$`));
   await ctx.close();
