@@ -94,6 +94,59 @@ describe("applyRecognized", () => {
     expect(next.recognition!.uncertain.map(locKey)).toEqual(["closed:1", "meld:0:0"]);
   });
 
+  it("赤五超出每色上限：折回普通五并标成要核对；赤 4 的五筒容得下两张；赤 0 全折不打记号", () => {
+    // 暗牌里已有一张赤五筒，暗杠中间两张又都认成了赤（布局照实记两张）
+    const ankan: RecognitionResult = {
+      ...result,
+      hand: {
+        ...result.hand,
+        melds: [{ open: false, tiles: [TILE.P5, AKA.P5, AKA.P5, TILE.P5] }],
+      },
+      provenance: { ...provenance, melds: [[0, 1, 2, 3].map(() => ({ det: -1, guessed: false }))] },
+    };
+    const withAka = (akaCount: 0 | 3 | 4) =>
+      applyRecognized(
+        createValueDraft(false),
+        ankan,
+        { ...MLEAGUE_RULES, hand: { ...MLEAGUE_RULES.hand, akaCount } },
+        "k",
+      );
+
+    // 赤 3：五筒只容一张，先到先得留暗牌里那张，暗杠里两张都折，都要核对
+    const aka3 = withAka(3);
+    expect(aka3.hand.closed).toEqual([TILE.M1, AKA.P5, TILE.M9]);
+    expect(aka3.hand.melds[0]!.tiles).toEqual([TILE.P5, TILE.P5, TILE.P5, TILE.P5]);
+    expect(aka3.recognition!.uncertain.map(locKey)).toEqual(
+      expect.arrayContaining(["meld:0:1", "meld:0:2"]),
+    );
+
+    // 赤 4：五筒容两张，暗杠里只折后到的那张
+    const aka4 = withAka(4);
+    expect(aka4.hand.melds[0]!.tiles).toEqual([TILE.P5, AKA.P5, TILE.P5, TILE.P5]);
+    const keys4 = aka4.recognition!.uncertain.map(locKey);
+    expect(keys4).toContain("meld:0:2");
+    expect(keys4).not.toContain("meld:0:1");
+
+    // 赤 0：全折，但这是规则不算、不是认错，不打记号；和张跟着折，仍在暗牌里
+    const aka0 = withAka(0);
+    expect(aka0.hand.closed).toEqual([TILE.M1, TILE.P5, TILE.M9]);
+    expect(aka0.hand.melds[0]!.tiles).toEqual([TILE.P5, TILE.P5, TILE.P5, TILE.P5]);
+    const keys0 = aka0.recognition!.uncertain.map(locKey);
+    expect(keys0).not.toContain("meld:0:1");
+    expect(keys0).not.toContain("meld:0:2");
+  });
+
+  it("和张若是被折回的赤五，跟着折成普通五", () => {
+    const winAka: RecognitionResult = {
+      ...result,
+      hand: { ...result.hand, winTile: AKA.P5 },
+    };
+    const rules: RoomRules = { ...MLEAGUE_RULES, hand: { ...MLEAGUE_RULES.hand, akaCount: 0 } };
+    const next = applyRecognized(createValueDraft(false), winAka, rules, "k");
+    expect(next.hand.winTile).toBe(TILE.P5);
+    expect(next.hand.closed).toContain(next.hand.winTile);
+  });
+
   it("截断后越界的记号被丢掉", () => {
     const shaky: RecognitionResult = {
       ...result,
