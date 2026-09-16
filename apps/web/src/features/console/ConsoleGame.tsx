@@ -13,7 +13,7 @@ import { HistoryTable } from "@/features/history/HistoryTable";
 import { FinalPanel } from "@/features/final/FinalPanel";
 import { ControlPanel } from "@/features/settlement/ControlPanel";
 import { MirrorOverlay } from "@/features/mirror/MirrorOverlay";
-import { IcpRecord } from "@/features/site/SiteFooter";
+import { SiteFooter } from "@/features/site/SiteFooter";
 
 /** 主控台对局页：宽屏双栏（左记分右历史），窄屏（Pad）单栏 + 历史抽屉 + 二维码弹窗。 */
 export function ConsoleGame({
@@ -85,7 +85,7 @@ export function ConsoleGame({
               <DiffMatrix game={game.present} names={names} rules={room.rules} tv={wide} />
             </div>
           </div>
-          <IcpRecord className="shrink-0 self-start" />
+          <SiteFooter className="shrink-0" />
         </div>
         {wide && (
           <div className="min-h-0 overflow-y-auto rounded-xl border border-border bg-surface p-3">
