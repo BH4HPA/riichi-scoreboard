@@ -9,6 +9,7 @@ import { useCommand } from "@/ws/useRoom";
 import { ProfileEditor } from "@/features/profile/ProfileEditor";
 import { RulesEditor, RulesSummary } from "@/features/rules/RulesEditor";
 import { useMirror } from "@/features/settlement/useMirror";
+import { SiteFooter } from "@/features/site/SiteFooter";
 import { SeatCards } from "./SeatCards";
 import { useCountdown } from "./useCountdown";
 
@@ -28,7 +29,7 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
   };
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-4 py-5">
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-4 pt-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" aria-label="退出房间" onClick={exit}>
@@ -76,33 +77,28 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
         <RulesSummary rules={room.rules} />
       </div>
 
-      <div className="mt-auto space-y-2">
-        {mySeat !== null && (
-          <Button
-            size="lg"
-            variant={ready ? "outline" : "accent"}
-            className="w-full"
-            onClick={() => send({ type: "setReady", seat: mySeat, ready: !ready })}
-          >
-            {ready ? "取消准备" : "准备"}
-          </Button>
-        )}
-        {mySeat !== null && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="w-full"
-            onClick={() => send({ type: "leave", seat: mySeat })}
-          >
-            离开座位
-          </Button>
-        )}
-        {full && room.ready.every(Boolean) && (
-          <p className="text-center text-sm text-muted">
-            {countdown !== null ? `${countdown} 秒后自动开局…` : "全员已准备，等待主控台开局…"}
-          </p>
-        )}
-      </div>
+      <SiteFooter className="mt-auto justify-center" />
+
+      {/* 准备按钮与开局提示贴在屏幕底部，内容多时页面在它上方滚动；换座直接点别的座位 */}
+      {(mySeat !== null || (full && room.ready.every(Boolean))) && (
+        <div className="sticky bottom-0 -mx-4 space-y-2 border-t border-border bg-bg/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur">
+          {mySeat !== null && (
+            <Button
+              size="lg"
+              variant={ready ? "outline" : "accent"}
+              className="w-full"
+              onClick={() => send({ type: "setReady", seat: mySeat, ready: !ready })}
+            >
+              {ready ? "取消准备" : "准备"}
+            </Button>
+          )}
+          {full && room.ready.every(Boolean) && (
+            <p className="text-center text-sm text-muted">
+              {countdown !== null ? `${countdown} 秒后自动开局…` : "全员已准备，等待主控台开局…"}
+            </p>
+          )}
+        </div>
+      )}
 
       <Dialog open={rulesOpen} onOpenChange={setRulesOpen}>
         <DialogContent title="房间规则" description="开局前所有人都可修改；开局后锁定。">
