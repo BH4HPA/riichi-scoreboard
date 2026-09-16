@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Images, X } from "lucide-react";
 import {
   RECOGNITION_CLASSES,
@@ -59,16 +60,25 @@ export function CameraSheet({
   const [now, setNow] = useState(() => Date.now());
 
   const [file, setFile] = useState<File | null>(null);
+  /** 相册那张正在推理：实时循环让开，免得两边抢 Worker 互相把对方的帧挤掉 */
+  const [stillBusy, setStillBusy] = useState(false);
+  /** 定格的视觉回执：iOS 全系没有 navigator.vibrate，只靠震动等于没有反馈 */
+  const [flash, setFlash] = useState(false);
   const [cropRect, setCropRect] = useState<Rect | null>(null);
   const [picked, setPicked] = useState<Detection | null>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
   const captureRef = useRef(EMPTY_CAPTURE);
   const stillRef = useRef(0);
   const grabbingRef = useRef(false);
   const lastGoodRef = useRef(openedAt);
   const framesRef = useRef(new Map<number, FrameResult>());
 
-  const active = !paused;
-  const { videoRef, error: camError, ready } = useCameraStream(active);
+  const active = !paused && file === null && !stillBusy;
+  const lost = useCallback(() => setPaused(true), []);
+  const { videoRef, error: camError, ready } = useCameraStream(active, lost);
 
   // 识别线程随取景页开关：一局牌九成时间用不上，几十 MB 的会话不必常驻
   useEffect(() => {
@@ -82,11 +92,32 @@ export function CameraSheet({
     };
   }, []);
 
+  // ready 之后才崩的会话（iOS 上的 ORT、推理抛错）：没有这条通道界面会一直显示正常
+  useEffect(() => {
+    if (!detector) return;
+    return detector.onError((message) => {
+      setError(message);
+      setDetector(null);
+    });
+  }, [detector]);
+
   // 切后台立即停流（回前台由用户点一下继续，免得 iOS 悄悄恢复时用户已经放下手机）
   useEffect(() => {
     const onHidden = () => document.visibilityState === "hidden" && setPaused(true);
     document.addEventListener("visibilitychange", onHidden);
     return () => document.removeEventListener("visibilitychange", onHidden);
+  }, []);
+
+  // Esc 归取景框自己：不拦的话 radix 会顺手把背后的结算对话框一起关掉，草稿全丢
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      e.preventDefault();
+      onCloseRef.current();
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
   }, []);
 
   // 一秒一跳，只为驱动「5 秒提示快门」与「60 秒停流」两个时间判断
@@ -135,6 +166,8 @@ export function CameraSheet({
       // 相册那张是一次性的：结果一到就直接定格，不参与连续三帧的稳定判断
       if (r.frameId === stillRef.current) {
         stillRef.current = 0;
+        setStillBusy(false);
+        setFlash(true);
         void capture();
         return;
       }
@@ -145,6 +178,7 @@ export function CameraSheet({
       if (out.state.count > 0) lastGoodRef.current = Date.now();
       if (out.fire) {
         navigator.vibrate?.(30);
+        setFlash(true);
         void capture();
       }
     },
@@ -153,8 +187,11 @@ export function CameraSheet({
 
   const runStill = useCallback(
     async (src: ImageBitmap, rect: Rect) => {
+      if (!detector) return setFile(null);
+      // 先停实时循环再送帧：否则这一张有极大概率撞上正在推理的实时帧被背压丢掉，
+      // 用户点了「用这块识别」却什么也不发生
+      setStillBusy(true);
       setFile(null);
-      if (!detector) return;
       const cropped = await createImageBitmap(src, rect.x, rect.y, rect.width, rect.height);
       stillRef.current = detector.infer(cropped);
     },
@@ -178,8 +215,18 @@ export function CameraSheet({
       ? `认出 ${live.hand.closed.length} 张 · 稳定 ${stable}/${STABLE_FRAMES}`
       : "把手牌、副露和宝牌指示牌放进框里";
 
-  return (
-    <div className="fixed inset-0 z-[75] flex flex-col bg-black" data-testid="camera-sheet">
+  // portal 到 body：DialogContent 在 ≥640px 上有 translate，transform 祖先会让 fixed 以它为
+  // 包含块，取景框就被压进对话框里不再全屏；顺带让背后的内容退出无障碍树。
+  return createPortal(
+    <div
+      // pointer-events-auto 不能省：radix 的 Dialog 打开时会给 body 挂 pointer-events:none，
+      // 只在它自己的 content 里放开；portal 出来的我们是 body 的另一个孩子，不声明就点不动。
+      className="pointer-events-auto fixed inset-0 z-[75] flex touch-none flex-col overscroll-contain bg-black"
+      role="dialog"
+      aria-modal="true"
+      aria-label="拍照识别取景"
+      data-testid="camera-sheet"
+    >
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <video
           ref={videoRef}
@@ -219,6 +266,14 @@ export function CameraSheet({
         >
           <X className="h-5 w-5" />
         </button>
+        {flash && (
+          <span
+            className="pointer-events-none absolute inset-0 bg-white/70"
+            onAnimationEnd={() => setFlash(false)}
+            style={{ animation: "riichi-flash 220ms ease-out forwards" }}
+            aria-hidden
+          />
+        )}
         {picked && (
           <button
             type="button"
@@ -230,7 +285,7 @@ export function CameraSheet({
         )}
       </div>
 
-      <div className="space-y-2 bg-black/90 px-4 py-3 text-white">
+      <div className="space-y-2 bg-black/90 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 text-white">
         {!secure && (
           <p className="text-sm text-neg">当前不是安全上下文（需要 HTTPS），相机无法打开。</p>
         )}
@@ -298,6 +353,7 @@ export function CameraSheet({
           onCancel={() => setFile(null)}
         />
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }

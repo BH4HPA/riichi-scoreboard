@@ -275,16 +275,25 @@ export function layoutHand(
     doraIndicators: [],
     uraIndicators: [],
   };
-  const emptyProvenance: HandProvenance = {
-    closed: [],
-    melds: [],
-    doraIndicators: [],
-    uraIndicators: [],
-    usedDetections: [],
-  };
+  // 没通过硬门槛的框是误检，不是牌：记下来，回流时既不标注也不因此降级
+  const rejected = new Set<number>();
+  allDetections.forEach((_, i) => rejected.add(i));
+  kept.forEach(({ detIndex }) => rejected.delete(detIndex));
+  const sorted = (s: Set<number>) => [...s].sort((a, b) => a - b);
   if (kept.length === 0) {
     warn("no_tiles", "blocking", "照片里没有认出任何牌");
-    return { hand: empty, warnings, provenance: emptyProvenance };
+    return {
+      hand: empty,
+      warnings,
+      provenance: {
+        closed: [],
+        melds: [],
+        doraIndicators: [],
+        uraIndicators: [],
+        usedDetections: [],
+        rejectedDetections: sorted(rejected),
+      },
+    };
   }
 
   const swap = isPortrait(kept);
@@ -292,8 +301,11 @@ export function layoutHand(
   const all = toItems(kept, swap, opts.sideAspect);
   const ratioRef = median(all.filter((i) => !i.side).map((i) => i.w / i.h));
   const items = all.filter((i) => i.side || i.w / i.h >= 0.85 * ratioRef);
-  if (items.length < all.length)
+  if (items.length < all.length) {
     warn("odd_box", "info", `${all.length - items.length} 个检测框形状异常，已忽略`);
+    const keptItems = new Set(items);
+    all.forEach((i) => !keptItems.has(i) && rejected.add(i.detIndex));
+  }
   const upright = items.filter((i) => !i.side);
   const medH = median((upright.length ? upright : items).map((i) => i.h));
   const medW = median((upright.length ? upright : items).map((i) => i.w));
@@ -391,13 +403,14 @@ export function layoutHand(
       warn("bad_group", "blocking", "副露超过 4 组，多出的已忽略");
       return;
     }
-    seg.forEach((i) => used.add(i.detIndex));
     if (isAnkan(seg)) {
       const [a, b] = [seg[1]!, seg[2]!];
       if (a.tile === null || b.tile === null) {
+        // 这一组被整体忽略，框也就没有被采信：不能记进 used，否则回流会以为照片全标注了
         warn("bad_group", "blocking", "暗杠中间不是牌面，已忽略该组");
         return;
       }
+      seg.forEach((i) => used.add(i.detIndex));
       let t = baseTile(a.tile);
       let mismatch = false;
       if (baseTile(a.tile) !== baseTile(b.tile)) {
@@ -412,6 +425,7 @@ export function layoutHand(
       meldOrigins.push([0, 1, 2, 3].map(() => synthetic(mismatch)));
       return;
     }
+    seg.forEach((i) => used.add(i.detIndex));
     const faceItems = seg.filter((i) => i.tile !== null);
     const faces = faceItems.map((i) => i.tile!);
     const origins = faceItems.map((i) => originOf(i));
@@ -494,7 +508,8 @@ export function layoutHand(
       melds: meldOrigins,
       doraIndicators: doraOrigins,
       uraIndicators: uraOrigins,
-      usedDetections: [...used].sort((a, b) => a - b),
+      usedDetections: sorted(used),
+      rejectedDetections: sorted(rejected),
     },
   };
 }

@@ -41,10 +41,13 @@ export function HandConfirm({
     <div className="space-y-3" data-testid="hand-confirm">
       <HandView
         hand={hand}
-        size="md"
+        // 手机宽度放不下 14 张大牌：用与编辑态一致的尺寸，横滑只剩一点点，和张基本一眼可见。
+        // 「像主控台一样」指的是只读成排展示，不是牌得一样大——电视有 1600px，手机没有。
+        size="sm"
         marks={uncertain}
         onTileClick={onTileClick}
         showUra={showUra}
+        scroll
         keepEmptyDora
         onAddDora={onEdit}
       />

@@ -43,7 +43,10 @@ type Resolution = "keep" | number | null;
  */
 export function resolve(origin: TileOrigin, predicted: Tile, truth: Tile): Resolution {
   if (predicted === truth) return "keep";
-  if (baseTile(predicted) === baseTile(truth) && isAka(predicted) !== isAka(truth)) return "keep";
+  // **只有赤 → 普通这一个方向**是规则折返（applyRecognized 的 fold）。
+  // 反过来（模型认成普通五、用户在替换面板里改成赤五）是真纠正，必须重标，
+  // 否则照片里明明是红五、标注却写成普通五。
+  if (baseTile(predicted) === baseTile(truth) && isAka(predicted) && !isAka(truth)) return "keep";
   if (origin.det < 0) return null;
   return CLASS_OF_TILE.get(truth) ?? null;
 }
@@ -52,12 +55,43 @@ const sameShape = (a: readonly Meld[], b: readonly Meld[]): boolean =>
   a.length === b.length && a.every((m, i) => m.tiles.length === b[i]!.tiles.length);
 
 /**
+ * 一手牌里每种牌各几张（赤五按精确码单独计）。
+ */
+function counts(tiles: readonly Tile[]): Map<Tile, number> {
+  const m = new Map<Tile, number>();
+  for (const t of tiles) m.set(t, (m.get(t) ?? 0) + 1);
+  return m;
+}
+
+/**
+ * 逐位比较是否**真的是逐位改牌**，而不是整体错位。
+ *
+ * 这是最要命的一条。编辑态的全键盘是「删一张 → 从末尾补一张」的语义
+ * （TileKeyboard 的 removeClosed 会把后面的牌整体左移，tap 追加到末尾）。
+ * 用户删掉认错的第 3 张再补回正确的那张之后，张数不变、副露形状不变、框也全被采信，
+ * 但从第 3 张起每个位置都错开了一格 —— 照单全收就会把十几个框全标成右邻那张牌，
+ * 而且没有任何人会去复核 auto 队列。
+ *
+ * 判据：**位置差异的个数必须等于多重集差异的个数**。
+ * - 逐位改牌：改 k 张 → k 个位置不同，多重集也正好换掉 k 张 ⇒ 相等。
+ * - 整体错位：十几个位置不同，多重集只换了一张 ⇒ 不等，降级人工。
+ * - 两张牌互换位置：位置不同 2 个、多重集没变 ⇒ 不等，降级（这种情况本来也无法判断谁是谁）。
+ */
+function inPlace(pairs: ReadonlyArray<[unknown, Tile, Tile]>): boolean {
+  const differing = pairs.filter(([, predicted, truth]) => predicted !== truth).length;
+  const before = counts(pairs.map(([, predicted]) => predicted));
+  const after = counts(pairs.map(([, , truth]) => truth));
+  let changed = 0;
+  for (const [tile, n] of before) changed += Math.max(0, n - (after.get(tile) ?? 0));
+  return differing === changed;
+}
+
+/**
  * 把用户改正后的牌写回检测框。对齐只有 layoutHand 知道位置映射，所以放在 TS 侧做，
  * Python 只负责拉照片与写文件。
  *
- * 只有**严格对齐**的记录才标成 auto：位置一一对应，且每个检测框都被布局采信。
- * 后一条是关键——只要有一个框没被采信，照片里就存在一个没标注的牌面对象，
- * YOLO 会把那种东西学成背景。宁可送人工。
+ * 只有**严格对齐**的记录才标成 auto：改动确实是逐位替换（见 inPlace）、
+ * 每个框要么被布局采信要么被判为误检、改到的位置都有对应的框。
  */
 export function align(
   detections: Detection[],
@@ -75,9 +109,11 @@ export function align(
   if (hand.closed.length !== corrected.closed.length || !sameShape(hand.melds, corrected.melds)) {
     return manual("用户增删过牌，位置对不上");
   }
-  const used = new Set(provenance.usedDetections);
-  if (used.size !== detections.length) {
-    return manual(`${detections.length - used.size} 个框没被布局采信`);
+  // 照片里每一张真牌都得有标注，否则 YOLO 会把没标的牌学成背景。
+  // 但按噪声剔除的框（低置信、形状退化）不是牌，不标注才是对的，也不该因此降级。
+  const accounted = new Set([...provenance.usedDetections, ...provenance.rejectedDetections]);
+  if (accounted.size !== detections.length) {
+    return manual(`${detections.length - accounted.size} 个框既没被采信也不算误检`);
   }
 
   const pairs: Array<[TileOrigin, Tile, Tile]> = [];
@@ -93,10 +129,14 @@ export function align(
   row(hand.doraIndicators, corrected.doraIndicators, provenance.doraIndicators);
   row(hand.uraIndicators, corrected.uraIndicators, provenance.uraIndicators);
 
+  if (!inPlace(pairs)) return manual("牌的位置整体错开了（编辑态删牌再补牌会这样）");
+
+  // 中途放弃时不能留下改了一半的标注：先在副本上写，全部通过再落地
+  const fixed = labels.map((l) => ({ ...l }));
   for (const [origin, predicted, truth] of pairs) {
     const r = resolve(origin, predicted, truth);
     if (r === null) return manual("用户改了一张没有检测框的牌（暗杠里补出来的那几张）");
-    if (r !== "keep") labels[origin.det]!.cls = r;
+    if (r !== "keep") fixed[origin.det]!.cls = r;
   }
-  return { labels, status: "auto", reason: "" };
+  return { labels: fixed, status: "auto", reason: "" };
 }

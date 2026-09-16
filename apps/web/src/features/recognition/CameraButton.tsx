@@ -36,10 +36,17 @@ export function CameraButton({
       .getState()
       .ensure()
       .then(({ token }) =>
-        uploadRecognition(key, blob, result, token, "room", (id) =>
-          onChange((d) =>
-            d.recognition?.key === key ? { ...d, recognition: { ...d.recognition, id } } : d,
-          ),
+        uploadRecognition(
+          key,
+          blob,
+          result,
+          token,
+          "room",
+          (id) =>
+            onChange((d) =>
+              d.recognition?.key === key ? { ...d, recognition: { ...d.recognition, id } } : d,
+            ),
+          () => useRoomStore.getState().notify("error", "照片留存失败，不影响结算"),
         ),
       )
       .catch(() => useRoomStore.getState().notify("error", "照片留存失败，不影响结算"));

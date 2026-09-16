@@ -144,20 +144,24 @@ export function IndicatorRow({
   onAdd?: (() => void) | undefined;
 }) {
   if (tiles.length === 0 && !keepEmpty) return null;
-  const loc = (i: number): TileLoc => ({ area: area ?? "dora", i });
+  // 没给 area 就是纯展示：不匹配记号也不可点，免得里宝拿表宝的下标去比对
+  const loc = (i: number): TileLoc | null => (area ? { area, i } : null);
   return (
     <div className="flex items-center gap-1.5 text-[11px] text-muted">
       <span>{label}</span>
       <div className="flex items-end gap-px">
-        {tiles.map((t, i) => (
-          <TileFace
-            key={i}
-            tile={t}
-            size={size}
-            mark={marks ? hasLoc(marks, loc(i)) : false}
-            onClick={area && onTileClick ? () => onTileClick(loc(i)) : undefined}
-          />
-        ))}
+        {tiles.map((t, i) => {
+          const at = loc(i);
+          return (
+            <TileFace
+              key={i}
+              tile={t}
+              size={size}
+              mark={at !== null && marks ? hasLoc(marks, at) : false}
+              onClick={at && onTileClick ? () => onTileClick(at) : undefined}
+            />
+          );
+        })}
       </div>
       {tiles.length === 0 &&
         (onAdd ? (

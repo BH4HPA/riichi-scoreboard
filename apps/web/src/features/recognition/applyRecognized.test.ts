@@ -26,6 +26,7 @@ const provenance: HandProvenance = {
   doraIndicators: [6, 7].map((det) => ({ det, guessed: false })),
   uraIndicators: [{ det: 8, guessed: false }],
   usedDetections: [0, 1, 2, 3, 4, 5, 6, 7, 8],
+  rejectedDetections: [],
 };
 
 const result: RecognitionResult = {
@@ -115,6 +116,23 @@ describe("applyRecognized", () => {
     expect(
       next.recognition!.uncertain.filter((l) => l.area !== "closed" && l.area !== "meld"),
     ).toEqual([]);
+  });
+
+  it("web 层 push 的提示一律是 info：只要有一条 blocking，确认态就永远收不起键盘", () => {
+    const rules: RoomRules = {
+      ...MLEAGUE_RULES,
+      hand: { ...MLEAGUE_RULES.hand, kanDora: false, uraDora: false },
+    };
+    // 这三条分别覆盖 applyRecognized 里的三处 push（规则截断宝牌、无里宝、认出里宝勾立直）
+    for (const [r, key] of [
+      [rules, "s1"],
+      [MLEAGUE_RULES, "s2"],
+    ] as const) {
+      const next = applyRecognized(createValueDraft(false), result, r, key);
+      const pushed = next.recognition!.warnings.filter((w) => w.code !== "count");
+      expect(pushed.length).toBeGreaterThan(0);
+      expect(pushed.every((w) => w.severity === "info")).toBe(true);
+    }
   });
 
   it("识别里宝自动勾立直时标记 riichiAuto；新一次识别把 editing 复位", () => {

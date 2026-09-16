@@ -81,18 +81,31 @@ scripts/export.sh runs/v1/weights/best.pt
 错误的牌局录进系统——「触发了结算」本身就是一次人力校验，**不看用户改没改过**。
 
 ```bash
-# 线上导出（位置对齐在 TS 侧做，见 apps/server/src/recognition/align.ts）
-ssh bitego 'docker exec riichi-scoreboard-riichi-1 node --experimental-strip-types \
-  /app/scripts/export-recognitions.ts /data/riichi.sqlite' > records.ndjson
+# 1. 把线上库拷到本机（运行镜像里没有脚本也没有 core，导出在本机跑）
+#    先 checkpoint：WAL 模式下最近的写还在 -wal 里，直接拷主库会丢掉刚打的那几局
+ssh bitego "docker exec riichi-scoreboard-riichi-1 node --input-type=module -e \
+  \"const {DatabaseSync} = await import('node:sqlite'); const d = new DatabaseSync('/data/riichi.sqlite'); \
+  d.exec('PRAGMA wal_checkpoint(TRUNCATE)'); d.close()\" \
+  && docker cp riichi-scoreboard-riichi-1:/data/riichi.sqlite /tmp/riichi.sqlite"
+scp bitego:/tmp/riichi.sqlite /tmp/
+
+# 2. 导出（位置对齐在 TS 侧做，见 apps/server/src/recognition/align.ts）
+yarn workspace @riichi/server exec tsx scripts/export-recognitions.ts /tmp/riichi.sqlite > records.ndjson
+
+# 3. 拉照片、归一化、落盘
 uv run scripts/import_records.py records.ndjson      # 照片走 COS；本地库加 --photos <DATA_DIR/objects>
 uv run scripts/remap.py                              # records 并入 merged
 ```
 
 导出把每条记录分成两队：
 
-- **auto** —— 位置一一对应、且每个检测框都被布局采信。后一条是关键：只要有一个框没被采信，照片里就
-  存在一个没标注的牌面对象，YOLO 会把那种东西学成背景。写进 `data/raw/records/{images,labels}/`。
+- **auto** —— 改动确实是**逐位替换**（不是编辑态删一张再补一张那种整体错位），且每个检测框要么被布局
+  采信、要么被判为误检（低置信、形状退化的框不是牌，不标注才对）。写进 `data/raw/records/{images,labels}/`。
 - **manual** —— 其余全部，带预标注进 `data/raw/records/pending/`，喂 Label Studio 人工补。
+
+注意这里有**两层判据，别混为一谈**：一条记录**可不可信**，看结算有没有被牌桌接受（`corrected IS NOT NULL`）；
+可不可信与**能不能自动转成框级标注**是两回事——后者只看位置对不对得上。对不上的那些真值依然可靠，
+只是要人工把框补对，所以它们进的是人工队列而不是废纸篓。
 
 **先啃人工队列再训练。** 自动那条全是模型已经做对的样本，只喂它会把训练集越练越窄（自训练陷阱）；
 真正涨点的是漏检误检的难例。脚本会把两队的数量与占比打出来。

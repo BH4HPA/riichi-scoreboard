@@ -22,6 +22,8 @@ export type FromWorker =
       provenance: HandProvenance;
     }
   | { type: "grabbed"; frameId: number; blob: Blob }
+  /** 上一帧还在推理，这一帧被背压丢掉了 */
+  | { type: "dropped"; frameId: number }
   | { type: "grab-miss" };
 
 export interface FrameResult {
