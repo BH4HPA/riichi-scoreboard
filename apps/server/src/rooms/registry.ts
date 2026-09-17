@@ -203,6 +203,8 @@ export class RoomRegistry {
     const event: RoomEvent = { seq: room.seq + 1, at: this.now(), actor, command };
     const prev = room.state;
     const next = reduceRoom(prev, event);
+    // 没有状态变化（如重复的立直声明）：不落库、不推进 seq、不广播，免得把别人同时提交的命令挤成 stale
+    if (next === prev) return { ...event, seq: room.seq };
     this.roomsRepo.transaction(() => {
       this.roomsRepo.appendEvent(room.code, event);
       this.resultsRepo.onTransition(room.state, next);

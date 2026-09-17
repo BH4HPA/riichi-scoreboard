@@ -189,10 +189,18 @@ function makeWinRecord(
   };
 }
 
-/** 声明立直：幂等（已声明原样返回同一对象）；对局结束或点数不足时拒绝。 */
-export function declareRiichi(game: GameState, seat: Seat, rules: RoomRules): GameState {
+/** 声明立直：幂等（已声明原样返回同一对象）；局面已变、对局结束或点数不足时拒绝。 */
+export function declareRiichi(
+  game: GameState,
+  cmd: Extract<GameCommand, { type: "declareRiichi" }>,
+  rules: RoomRules,
+): GameState {
+  const { seat } = cmd;
   assertSeat(seat, "立直座位");
   if (game.status === "finished") throw new DomainError("finished", "对局已结束");
+  if (cmd.kyoku !== game.kyoku || cmd.honba !== game.honba || cmd.entries !== game.history.length) {
+    throw new DomainError("stale_round", "局面已变化，立直没有记上，请确认后重按");
+  }
   if (!canRiichi(game, rules, seat)) {
     throw new DomainError("riichi_points", "点数不足 1000 不能立直");
   }

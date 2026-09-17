@@ -108,8 +108,12 @@ describe("reduceRoom / lobby", () => {
     expect(next.ready).toEqual([false, false, false, true]);
   });
   it("旧事件（改规则无 resetReady）回放语义不变：准备后改规则仍可开局", () => {
+    // 规则确有变化、但事件里没有 resetReady（改动前写下的事件）：准备保持，照常开局
+    const rules = { ...MLEAGUE_RULES, scoring: { ...MLEAGUE_RULES.scoring, kiriageMangan: false } };
     const cmds = lobbyCommands();
-    cmds.splice(8, 0, { type: "setRules", rules: MLEAGUE_RULES });
+    cmds.splice(8, 0, { type: "setRules", rules });
+    const lobby = replay(createRoom("X", MLEAGUE_RULES), events(cmds.slice(0, 9)));
+    expect(lobby.ready).toEqual([true, true, true, true]);
     const room = replay(createRoom("X", MLEAGUE_RULES), events(cmds));
     expect(room.phase).toBe("playing");
   });
@@ -322,14 +326,25 @@ describe("reduceRoom / 立直声明", () => {
   let seq = 100;
   const apply = (room: RoomState, command: Command): RoomState =>
     reduceRoom(room, { seq: seq++, at: 0, actor: { playerId: null, clientId: "t" }, command });
+  /** 按下时看到的就是当前局面 */
+  const declare = (room: RoomState, seat: 0 | 1 | 2 | 3): Command => {
+    const g = room.game!.present;
+    return {
+      type: "declareRiichi",
+      seat,
+      kyoku: g.kyoku,
+      honba: g.honba,
+      entries: g.history.length,
+    };
+  };
 
   it("声明只置位本局状态：幂等、不扣点、不入撤销栈", () => {
     const room = startedRoom();
-    const declared = apply(room, { type: "declareRiichi", seat: 1 });
+    const declared = apply(room, declare(room, 1));
     expect(declared.game!.present.riichi).toEqual([false, true, false, false]);
     expect(declared.game!.present.points).toEqual(room.game!.present.points);
     expect(declared.game!.past).toHaveLength(0);
-    expect(apply(declared, { type: "declareRiichi", seat: 1 })).toBe(declared);
+    expect(apply(declared, declare(declared, 1))).toBe(declared);
   });
 
   it("点数不足 1000 且规则不允许时拒绝", () => {
@@ -343,16 +358,17 @@ describe("reduceRoom / 立直声明", () => {
         present: { ...room.game!.present, points: [500, 25000, 25000, 49500] },
       },
     };
-    expect(() => apply(poor, { type: "declareRiichi", seat: 0 })).toThrow(/不足 1000/);
+    expect(() => apply(poor, declare(poor, 0))).toThrow(/不足 1000/);
     const lenient = {
       ...poor,
       rules: { ...poor.rules, progress: { ...poor.rules.progress, riichiBelow1000: true } },
     };
-    expect(apply(lenient, { type: "declareRiichi", seat: 0 }).game!.present.riichi[0]).toBe(true);
+    expect(apply(lenient, declare(lenient, 0)).game!.present.riichi[0]).toBe(true);
   });
 
   it("结算后清空；撤销结算后声明随快照回来；重做再次清空", () => {
-    let room = apply(startedRoom(), { type: "declareRiichi", seat: 2 });
+    const started = startedRoom();
+    let room = apply(started, declare(started, 2));
     room = apply(room, { type: "tsumo", winner: 0, value: manual(3, 30), riichi: [2] });
     expect(room.game!.present.riichi).toEqual([false, false, false, false]);
     room = apply(room, { type: "undo" });
@@ -362,7 +378,8 @@ describe("reduceRoom / 立直声明", () => {
   });
 
   it("流局与途中流局同样清空；调整场况只在局数或本场变化时清", () => {
-    const declared = apply(startedRoom(), { type: "declareRiichi", seat: 0 });
+    const started = startedRoom();
+    const declared = apply(started, declare(started, 0));
     const drawn = apply(declared, {
       type: "draw",
       tenpai: [true, false, false, false],
@@ -382,8 +399,15 @@ describe("reduceRoom / 立直声明", () => {
     expect(moved.game!.present.riichi).toEqual([false, false, false, false]);
   });
 
+  it("按下时看到的局面已经变了（别人刚记了一笔）：拒绝，不落到下一局", () => {
+    const room = startedRoom();
+    const pressed = declare(room, 1);
+    const next = apply(room, { type: "tsumo", winner: 0, value: manual(3, 30), riichi: [] });
+    expect(() => apply(next, pressed)).toThrow(/局面已变化/);
+  });
+
   it("终局后不能声明", () => {
     const finished = apply(startedRoom(), { type: "endGame" });
-    expect(() => apply(finished, { type: "declareRiichi", seat: 0 })).toThrow(/已结束/);
+    expect(() => apply(finished, declare(finished, 0))).toThrow(/已结束/);
   });
 });

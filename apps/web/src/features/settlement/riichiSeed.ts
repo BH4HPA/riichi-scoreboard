@@ -1,4 +1,7 @@
 import { useState } from "react";
+import type { Seat } from "@riichi/core";
+import { draftWithRiichi } from "./riichiSync";
+import type { ValueDraft } from "./valueDraft";
 
 /** 表单里的立直勾选 + 已经并入过的立直声明。 */
 export interface RiichiSeed {
@@ -28,4 +31,18 @@ export function useSeededRiichi(declared: readonly boolean[]) {
   const next = seedRiichi(state, declared);
   if (next !== state) setState(next);
   return [next.riichi, (riichi: boolean[]) => setState((st) => ({ ...st, riichi }))] as const;
+}
+
+/**
+ * 并入声明后和牌者的手牌：只有和牌者自己那格的存值这次确实变了才跟着改。
+ * 别家的声明不能动和牌者牌面侧来的立直（识别到里宝自动勾的、牌面页手动取消的）。
+ */
+export function winnerDraftAfterSeed(
+  draft: ValueDraft,
+  winner: Seat | null,
+  before: readonly boolean[],
+  after: readonly boolean[],
+): ValueDraft {
+  if (winner === null || after[winner] === before[winner]) return draft;
+  return draftWithRiichi(draft, after[winner]!);
 }

@@ -5,6 +5,7 @@ import { Button } from "@/ui/button";
 import { Dialog, DialogContent } from "@/ui/dialog";
 import { ConnectionBadge } from "@/ui/notice";
 import { RoomQrDialog } from "./RoomQr";
+import { HANDLE_PX } from "./split/clampSplit";
 import { SplitHandle } from "./split/SplitHandle";
 import { useSplit } from "./split/useSplit";
 import { RoundHeader } from "@/features/scoreboard/RoundHeader";
@@ -64,7 +65,9 @@ export function ConsoleGame({
       <main
         ref={attach}
         className={wide ? "grid min-h-0 flex-1" : "flex flex-col gap-3"}
-        style={wide ? { gridTemplateColumns: `${ratio}fr 16px ${1 - ratio}fr` } : undefined}
+        style={
+          wide ? { gridTemplateColumns: `${ratio}fr ${HANDLE_PX}px ${1 - ratio}fr` } : undefined
+        }
       >
         <div className={wide ? "flex min-h-0 flex-col gap-2" : "contents"}>
           <div className={wide ? "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto" : "contents"}>

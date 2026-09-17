@@ -130,7 +130,7 @@ export function reduceRoom(room: RoomState, event: RoomEvent): RoomState {
 
   if (cmd.type === "declareRiichi") {
     // 替换 present、不动撤销栈：撤销撤的是结算，声明跟着局面快照走
-    const present = declareRiichi(room.game.present, cmd.seat, room.rules);
+    const present = declareRiichi(room.game.present, cmd, room.rules);
     return present === room.game.present ? room : { ...room, game: { ...room.game, present } };
   }
   if (cmd.type === "undo") {
