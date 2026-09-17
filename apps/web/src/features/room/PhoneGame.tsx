@@ -100,7 +100,13 @@ export function PhoneGame() {
       {!finished && (
         <div className="rounded-xl border border-border bg-surface p-3">
           {mySeat !== null ? (
-            <MyDiffs game={game.present} names={names} rules={room.rules} mySeat={mySeat} />
+            <MyDiffs
+              game={game.present}
+              seats={room.seats}
+              names={names}
+              rules={room.rules}
+              mySeat={mySeat}
+            />
           ) : (
             <DiffMatrix game={game.present} names={names} rules={room.rules} />
           )}
@@ -111,12 +117,12 @@ export function PhoneGame() {
         className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
         aria-label="功能"
       >
-        <div className="mx-auto flex max-w-md items-center justify-between px-4 pt-1.5 text-[11px] text-muted">
+        <div className="mx-auto flex max-w-md items-center gap-2 pt-1.5 pl-4 pr-2 text-[11px] text-muted">
           <span>
             房间 <span className="font-semibold tabular text-fg">{room.code}</span>
           </span>
-          <span className="ml-auto mr-3 truncate">{ICP.number}</span>
           <ConnectionBadge />
+          <span className="ml-auto truncate">{ICP.number}</span>
         </div>
         <div className="mx-auto grid max-w-md grid-cols-4">
           {NAV.map(([key, Icon, label]) => (

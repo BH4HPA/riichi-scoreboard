@@ -70,8 +70,14 @@ export function PointsGrid({
       {SEATS.map((seat) => {
         const isDealer = seat === dealer && game.status !== "finished";
         const tone = rankTone(ranks[seat]!, ranks);
+        // 手机上庄家标记并进自风：庄家的自风必然是东，把它做成实底即可
         const wind = (
-          <Badge tone="outline" size={st.badge} className="shrink-0">
+          <Badge
+            tone={phone && isDealer ? "accent" : "outline"}
+            size={st.badge}
+            className="shrink-0"
+            {...(phone && isDealer ? { "aria-label": "东（庄家）" } : {})}
+          >
             {WIND_LABELS[seatWind(seat, dealer)]}
           </Badge>
         );
@@ -114,12 +120,9 @@ export function PointsGrid({
                 <span data-testid={`points-${seat}`}>{formatPoints(game.points[seat]!)}</span>
               </span>
               {phone ? (
-                // 手机卡片窄：风位、庄冠挪到分数行，让第一行完整放下昵称
+                // 手机卡片窄：风位（庄家为实底）挪到分数行，让第一行完整放下昵称
                 <span className="flex flex-col items-end gap-1">
-                  <span className="flex items-center gap-1">
-                    {wind}
-                    {crown}
-                  </span>
+                  {wind}
                   {rank}
                 </span>
               ) : (
