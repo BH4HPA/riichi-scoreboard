@@ -1,6 +1,7 @@
 import type { HandInput, RoomRules } from "@riichi/core";
 import { Chip } from "@/ui/controls";
 import { cn } from "@/lib/utils";
+import { withRiichi } from "./handEdits";
 
 interface Flag {
   key: keyof HandInput;
@@ -36,15 +37,7 @@ export function FlagChips({
 
   const toggle = (f: Flag) => {
     const on = !hand[f.key];
-    if (f.key !== "riichi") return onChange({ ...hand, [f.key]: on });
-    // 取消立直会连带取消依赖它的旗标与里宝（与 TileKeyboard 的既有行为一致）
-    onChange({
-      ...hand,
-      riichi: on,
-      doubleRiichi: on ? hand.doubleRiichi : false,
-      ippatsu: on ? hand.ippatsu : false,
-      uraIndicators: on ? hand.uraIndicators : [],
-    });
+    onChange(f.key === "riichi" ? withRiichi(hand, on) : { ...hand, [f.key]: on });
   };
 
   return (
