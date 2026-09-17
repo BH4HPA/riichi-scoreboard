@@ -65,6 +65,10 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await expect(tv.getByTestId("music-float")).toContainText("西家立直 · 凌云");
   expect(await tv.getByTestId("riichi-music").getAttribute("data-track")).not.toBe(firstTrack);
 
+  // 手机 3 先开着荣和录入（稍后手机 0 记账后它应自动关闭）
+  await phones[3]!.getByRole("button", { name: "荣和", exact: true }).click();
+  await phones[3]!.getByRole("dialog").getByRole("button", { name: "2", exact: true }).click();
+
   // 手机 0（庄家）自摸 3 番 30 符 → 2000 all
   await phones[0]!.getByRole("button", { name: "自摸", exact: true }).click();
   await expect(tv.getByTestId("riichi-music")).toHaveCount(0);
@@ -83,7 +87,19 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await dialog.getByRole("button", { name: "3", exact: true }).click();
   await dialog.getByRole("button", { name: "30", exact: true }).click();
   await expect(tv.getByText("正在录入自摸结算")).toBeVisible();
+  // 关掉再开：草稿还在
+  await dialog.getByRole("button", { name: "取消" }).click();
+  await expect(phones[0]!.getByRole("dialog")).toHaveCount(0);
+  await phones[0]!.getByRole("button", { name: "自摸", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "30", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await dialog.getByRole("button", { name: "确认自摸" }).click();
+  // 手机 3 的荣和弹窗：局面变了自动关闭并提示，旧输入不会记到新局
+  await expect(phones[3]!.getByRole("dialog")).toHaveCount(0);
+  await expect(phones[3]!.getByText("局面已变化，结算已关闭")).toBeVisible();
+  await expect(phones[0]!.getByText("局面已变化，结算已关闭")).toHaveCount(0);
   await expect(tv.getByTestId("points-0")).toHaveText("31,000");
   await expect(tv.getByTestId("points-1")).toHaveText("23,000");
   await expect(phones[2]!.getByTestId("points-0")).toHaveText("31,000");
@@ -140,7 +156,7 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   expect(Math.abs(closedBox.y + closedBox.height - (meldBox.y + meldBox.height))).toBeLessThan(1);
   expect(Math.abs(closedBox.height - meldBox.height)).toBeLessThan(1);
   await handArea.getByRole("button", { name: "删除副露" }).click();
-  await ron.getByRole("button", { name: "清空" }).click();
+  await ron.getByRole("button", { name: "清空", exact: true }).click();
   // 123m 4筒 赤5筒 6筒 789s 789m 22p（和张 9m）：平和 + 赤宝牌 = 2 番 30 符 → 2000
   for (const t of [
     "1萬",
