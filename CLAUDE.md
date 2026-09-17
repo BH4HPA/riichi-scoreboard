@@ -49,7 +49,8 @@ Yarn workspaces monorepo:
   `storage/ObjectStore`: local disk (served at `/api/objects/*`) or Tencent COS (`QCLOUD_*` env, `riichi/`
   prefix, see `.env.template`). Serves the built web app with SPA fallback.
 - `apps/web` — Vite + React 19 + Tailwind v4 + radix primitives. Routes: `/` landing (device routing:
-  desktop → `/console`, tablet chooses, phone gets QR scan + six-cell code input), `/console` (TV: two
+  desktop → `/console`, tablet chooses, phone gets QR scan + six-cell code input, plus 「返回房间」 when the room in `riichi.room.last` still
+  exists), `/console` (TV: two
   columns ≥ 1280px with a draggable split — `features/console/split`, default scores 0.6, clamped by
   per-column minimum widths, remembered in `riichi.console.split` — otherwise single column with history
   drawer + QR dialog), `/r/:code` (phone).
