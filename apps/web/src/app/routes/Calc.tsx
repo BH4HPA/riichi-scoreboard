@@ -13,6 +13,7 @@ import { CalcReview } from "@/features/calc/review/CalcReview";
 import { CalcRulesDialog } from "@/features/calc/rules/CalcRulesDialog";
 import { useCalcRules } from "@/features/calc/rules/useCalcRules";
 import { useCalcShot } from "@/features/calc/shot/useCalcShot";
+import { conformDraftToRules } from "@/features/settlement/hand/conformRules";
 import { SiteBrand, SiteFooter } from "@/features/site/SiteFooter";
 
 /**
@@ -102,7 +103,10 @@ export function Calc() {
         open={rulesOpen}
         onOpenChange={setRulesOpen}
         rules={rules}
-        onApply={setRules}
+        onApply={(next) => {
+          setRules(next);
+          shot.setDraft((d) => conformDraftToRules(d, next));
+        }}
       />
       {shot.shooting && (
         <CameraSheet
