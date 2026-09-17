@@ -5,12 +5,15 @@ import {
   STOPS_MUSIC,
   TOLERATES_STALE,
   toRoomView,
+  validateEvaluateRequest,
   validateMusicTrack,
 } from "./protocol";
+import { DomainError } from "./progress/advance";
+import { RulesError } from "./rules/validate";
 import { MUSIC_TRACKS } from "./music";
 import { createRoom } from "./reducer/reduce";
 import { MLEAGUE_RULES } from "./rules/mleague";
-import type { PlayerRef, RoomState } from "./types/state";
+import type { HandInput, PlayerRef, RoomState } from "./types/state";
 
 const device = (id: string): PlayerRef => ({ id, name: id, avatar: null, kind: "device" });
 const local = (id: string): PlayerRef => ({ id, name: id, avatar: null, kind: "local" });
@@ -85,5 +88,37 @@ describe("并发提交", () => {
     for (const t of ["ron", "tsumo", "undo", "redo", "adjust", "setRules", "toLobby"] as const) {
       expect(TOLERATES_STALE[t]).toBe(false);
     }
+  });
+});
+
+describe("validateEvaluateRequest", () => {
+  const hand: HandInput = {
+    closed: [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 19, 19],
+    melds: [],
+    winTile: 19,
+    tsumo: false,
+    doraIndicators: [],
+    uraIndicators: [],
+    riichi: true,
+    doubleRiichi: false,
+    ippatsu: false,
+    afterKan: false,
+    lastTile: false,
+    firstTake: false,
+  };
+  const ok = { hand, rules: MLEAGUE_RULES, roundWind: 1, seatWind: 0 };
+
+  it("合法请求原样通过", () => {
+    expect(validateEvaluateRequest(ok)).toEqual(ok);
+  });
+  it("风位越界 / 牌面坏 / 规则坏分别报错", () => {
+    expect(() => validateEvaluateRequest({ ...ok, seatWind: 4 })).toThrow(DomainError);
+    expect(() => validateEvaluateRequest({ ...ok, hand: { ...hand, closed: "x" } })).toThrow(
+      DomainError,
+    );
+    expect(() =>
+      validateEvaluateRequest({ ...ok, rules: { ...MLEAGUE_RULES, hand: null } }),
+    ).toThrow(RulesError);
+    expect(() => validateEvaluateRequest(null)).toThrow(DomainError);
   });
 });
