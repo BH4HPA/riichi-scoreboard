@@ -63,7 +63,8 @@ jobs:
           if-no-files-found: ignore
 
   web:
-    needs: check
+    # 服务端先上线：新前端依赖新协议字段（旧前端能兼容新服务端，反过来不行）
+    needs: [check, server]
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment:
