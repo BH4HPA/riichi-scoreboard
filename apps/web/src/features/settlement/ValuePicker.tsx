@@ -1,12 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import {
-  scoreTier,
-  TIER_LABELS,
-  yakumanLabel,
-  type HandValue,
-  type RoomRules,
-  type Seat,
-} from "@riichi/core";
+import { scoreTier, TIER_LABELS, yakumanLabel, type RoomRules, type Seat } from "@riichi/core";
 import { ChipGroup, Label, Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/controls";
 import { useSocket } from "@/ws/useRoom";
 import { CommandError } from "@/ws/socket";
@@ -42,15 +35,18 @@ export function ValuePicker({
   /** 函数式更新：评估结果异步回来时只改仍然匹配的草稿 */
   onChange: (update: (d: ValueDraft) => ValueDraft) => void;
   rules: RoomRules;
-  seat: Seat;
+  /** 和牌者；还没选时为 null，牌面照常录入但不送评估 */
+  seat: Seat | null;
   /** 本局庄家座位 */
   dealer: Seat;
 }) {
   const socket = useSocket();
   const [evaluating, setEvaluating] = useState(false);
   const [evalError, setEvalError] = useState<string | null>(null);
-  const manualValue: HandValue = { han: draft.han, fu: draft.fu, yakuman: draft.yakuman };
-  const tier = scoreTier(manualValue, rules);
+  const tier =
+    draft.yakuman === 0 && draft.han !== null && draft.fu !== null
+      ? scoreTier({ han: draft.han, fu: draft.fu, yakuman: 0 }, rules)
+      : "normal";
   const maxYakuman = rules.scoring.yakumanStacking ? 6 : 1;
 
   // 牌面完整即自动算番；回包只在手牌快照未变时写回（防乱序与覆盖期间改动）。
@@ -62,7 +58,7 @@ export function ValuePicker({
   const handKey = JSON.stringify(draft.hand);
   const complete = isHandComplete(draft.hand);
   useEffect(() => {
-    if (!complete) return;
+    if (!complete || seat === null) return;
     const hand = JSON.parse(handKey) as ValueDraft["hand"];
     let cancelled = false;
     // 座位或手牌变了，旧结果立即失效
@@ -154,7 +150,7 @@ export function ValuePicker({
           rules={rules}
           evaluated={draft.evaluated}
           evaluating={evaluating}
-          evalError={evalError}
+          evalError={seat === null && complete ? "先选和牌者" : evalError}
           isDealer={seat === dealer}
           camera={
             <Suspense fallback={null}>

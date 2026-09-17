@@ -10,7 +10,7 @@ import { withHandEdit, type ValueDraft } from "./valueDraft";
 
 export function effectiveRiichi(
   stored: readonly boolean[],
-  wins: readonly { winner: Seat; draft: ValueDraft }[],
+  wins: readonly { winner: Seat | null; draft: ValueDraft }[],
 ): boolean[] {
   return stored.map((r, s) => wins.find((w) => w.winner === s)?.draft.hand.riichi ?? r);
 }
@@ -37,8 +37,10 @@ export function draftWithRiichi(draft: ValueDraft, on: boolean): ValueDraft {
 export function draftForWinner(
   draft: ValueDraft,
   stored: readonly boolean[],
-  from: Seat,
+  from: Seat | null,
   to: Seat,
 ): ValueDraft {
+  // 之前没选和牌者：手牌上的立直只可能来自牌面侧
+  if (from === null) return draft.hand.riichi ? draft : draftWithRiichi(draft, stored[to]!);
   return draft.hand.riichi !== stored[from] ? draft : draftWithRiichi(draft, stored[to]!);
 }

@@ -84,8 +84,12 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   expect(Math.abs(footerBox.y + footerBox.height - (dialogBox.y + dialogBox.height))).toBeLessThan(
     1,
   );
+  // 番符不给默认值：只选番时仍不能确认
   await dialog.getByRole("button", { name: "3", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "确认自摸" })).toBeDisabled();
+  await expect(dialog.getByTestId("settlement-summary")).toHaveText("还需选择：符");
   await dialog.getByRole("button", { name: "30", exact: true }).click();
+  await expect(dialog.getByTestId("settlement-summary")).toHaveText("东家 自摸 · 收入 +6,000");
   await expect(tv.getByText("正在录入自摸结算")).toBeVisible();
   // 关掉再开：草稿还在
   await dialog.getByRole("button", { name: "取消" }).click();
@@ -125,7 +129,12 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await expect(tvTsumo.getByText("立直情况")).toBeVisible();
   await expect(tvTsumo).not.toContainText(/上家|对家|下家|自己/);
   // 第一巡自摸按和牌者庄闲命名：东 1 局庄家东家 → 天和，换成南家 → 地和
+  // 主控台代记没有默认和牌者：未选时不能确认，底栏提示缺项
+  await expect(tvTsumo.getByRole("button", { name: "确认自摸" })).toBeDisabled();
+  await expect(tvTsumo.getByTestId("settlement-summary")).toHaveText("还需选择：自摸者、番、符");
   await tvTsumo.getByRole("tab", { name: "牌面" }).click();
+  await tvTsumo.getByRole("combobox").first().click();
+  await tv.getByRole("option", { name: "东家" }).click();
   await expect(tvTsumo.getByRole("checkbox", { name: "天和", exact: true })).toBeVisible();
   await tvTsumo.getByRole("combobox").first().click();
   await tv.getByRole("option", { name: "南家" }).click();

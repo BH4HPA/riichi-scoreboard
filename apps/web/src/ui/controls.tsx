@@ -122,7 +122,8 @@ export function Select<T extends string>({
   placeholder,
   disabled,
 }: {
-  value: T | undefined;
+  /** null = 还没选，显示 placeholder（始终受控：Radix 以空串表示未选） */
+  value: T | null;
   onValueChange: (v: T) => void;
   options: Array<{ value: T; label: ReactNode; disabled?: boolean }>;
   className?: string;
@@ -131,7 +132,7 @@ export function Select<T extends string>({
 }) {
   return (
     <SelectPrimitive.Root
-      {...(value !== undefined ? { value } : {})}
+      value={value ?? ""}
       onValueChange={(v) => onValueChange(v as T)}
       disabled={disabled ?? false}
     >
