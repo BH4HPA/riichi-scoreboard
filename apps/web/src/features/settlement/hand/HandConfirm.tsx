@@ -29,7 +29,7 @@ export function HandConfirm({
   rules: RoomRules;
   uncertain: readonly TileLoc[];
   riichiAuto: boolean;
-  /** 和牌者是否庄家：决定第一巡自摸叫天和还是地和；不在房间里（标注页）为 null */
+  /** 和牌者是否庄家：决定第一巡自摸叫天和还是地和；不在房间里（算点数页）为 null */
   isDealer: boolean | null;
   evaluated: EvaluatedHand | null;
   evaluating: boolean;

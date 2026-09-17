@@ -5,7 +5,7 @@ import { BAND_DEFAULT, bandRect, clampCenter, type Rect } from "./band";
 import { BandOverlay } from "./BandOverlay";
 
 /**
- * 相册里挑一张来识别（标注模式常驻；房间里相机用不了时给）。用的还是同一条取景带：
+ * 相册里挑一张来识别（算点数页常驻；房间里相机用不了时给）。用的还是同一条取景带：
  * 「带」这个概念在实时与静帧两处保持一致，仓库里不留第二套裁剪实现。
  * 解码走 `loadPhoto` 而不是裸 `createImageBitmap`——iOS 竖拍的方向全靠它的 EXIF 处理。
  */

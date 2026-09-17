@@ -13,7 +13,7 @@ interface Options {
   bottomInset: number;
   active: boolean;
   onFrame: (r: FrameResult) => void;
-  /** 这一帧实际送去推理的区域（检测框的坐标系），标注模式据此把框画回屏幕 */
+  /** 这一帧实际送去推理的区域（检测框的坐标系），算点数页据此把框画回屏幕 */
   onCrop?: (rect: Rect) => void;
 }
 

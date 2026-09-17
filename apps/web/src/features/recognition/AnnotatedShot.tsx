@@ -6,7 +6,7 @@ import { Button } from "@/ui/button";
 import { renderAnnotated } from "./annotate";
 
 /**
- * 标注模式里回看这一张：定格帧 + 烧进去的检测框。点开是灯箱，可以下载存档。
+ * 算点数页里回看这一张：定格帧 + 烧进去的检测框。点开是灯箱，可以下载存档。
  * 在这儿看框（而不是只在取景时一闪而过）才真能核对模型把什么认成了什么。
  */
 export function AnnotatedShot({ photo, detections }: { photo: Blob; detections: Detection[] }) {

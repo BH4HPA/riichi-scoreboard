@@ -85,7 +85,7 @@ export function BandOverlay({
       <div
         // touch-none 必不可少：不声明的话浏览器会把纵向拖拽当成页面滚动手势接管，
         // 派发 pointercancel，setPointerCapture 也拦不住，拖到一半就掉线。
-        // z-10 压在检测框之上：标注模式下带沿附近的框会抢走把手的触摸。
+        // z-10 压在检测框之上：算点数页下带沿附近的框会抢走把手的触摸。
         // 只在中间一小段可拖：整宽的话会盖住两侧的其它控件
         className="pointer-events-auto absolute left-1/2 z-10 flex h-8 w-24 -translate-x-1/2 touch-none items-center justify-center"
         // 把手的小横条落在框线下方一点（不压线）；触摸区仍跨着框线，好按

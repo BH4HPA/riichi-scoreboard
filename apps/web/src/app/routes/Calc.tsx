@@ -25,7 +25,7 @@ const RULES = MLEAGUE_RULES;
  * 与房间里那条路共用取景框和牌面编辑器，区别只有两个——多画检测框与牌图标签、
  * 提交的是训练真值而不是结算命令。提交完自动回到取景接着拍：连拍的手感就是这个页面的全部价值。
  */
-export function Label() {
+export function Calc() {
   const [shooting, setShooting] = useState(false);
   const [draft, setDraft] = useState<ValueDraft>(() => createValueDraft(false, "hand"));
   /** 这一张的定格帧与检测框：确认界面回看用，提交后清掉 */
@@ -120,7 +120,7 @@ export function Label() {
       {shooting && (
         <CameraSheet
           rules={RULES}
-          mode="label"
+          mode="calc"
           onCapture={onCapture}
           onClose={() => setShooting(false)}
         />
