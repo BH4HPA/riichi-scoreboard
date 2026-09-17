@@ -1,19 +1,16 @@
 import {
-  akaLimit,
   baseTile,
   DEFAULT_LAYOUT,
   isAka,
-  tileSuit,
   type Detection,
   type HandProvenance,
-  type Meld,
   type RecognitionResult,
   type RecognitionWarning,
   type RoomRules,
-  type Tile,
   type TileOrigin,
 } from "@riichi/core";
 import { hasLoc, type TileLoc } from "../hand/tileLoc";
+import { capAka } from "../settlement/hand/conformRules";
 import type { ValueDraft } from "@/features/settlement/valueDraft";
 
 /** 草稿里挂的识别信息：本次运行的 key（等上传用）、记录 id（上传完成后才有）、耗时、提示、没把握的位置。 */
@@ -58,39 +55,6 @@ function uncertainLocs(
   scan(prov.doraIndicators, "dora", doraKeep);
   scan(prov.uraIndicators, "ura", uraKeep);
   return locs;
-}
-
-/**
- * 手牌里赤五的规则收口。布局层不看规则、照实记（暗杠两张都认成赤就是两张），裁剪只在这里做一次：
- * - 不用赤五的房间全部折回普通五。照片里确实是赤，只是这桌不算，不打记号。
- * - 用赤五的房间只折超出每色上限的（akaLimit；各色上限之和恰为 akaCount，总数不必另查）。
- *   超额说明模型至少认错了一张，但认错的是哪张不知道：先到先得只是给个合法的默认值，
- *   所以这个花色的赤五**全部**标成要核对，留下的那张也标 —— 否则用户只会去点折掉的那张，
- *   而它因为名额已满改不回赤。
- */
-function capAka(
-  closed: readonly Tile[],
-  melds: readonly Meld[],
-  rules: RoomRules,
-): { closed: Tile[]; melds: Meld[]; capped: TileLoc[] } {
-  const { akaCount } = rules.hand;
-  const seen: Record<"m" | "p" | "s", TileLoc[]> = { m: [], p: [], s: [] };
-  const cap = (t: Tile, loc: TileLoc): Tile => {
-    if (!isAka(t)) return t;
-    if (akaCount === 0) return baseTile(t);
-    const suit = tileSuit(t) as "m" | "p" | "s";
-    seen[suit].push(loc);
-    return seen[suit].length <= akaLimit(suit, akaCount) ? t : baseTile(t);
-  };
-  const nextClosed = closed.map((t, i) => cap(t, { area: "closed", i }));
-  const nextMelds = melds.map((m, i) => ({
-    ...m,
-    tiles: m.tiles.map((t, j) => cap(t, { area: "meld", i, j })),
-  }));
-  const capped = (["m", "p", "s"] as const).flatMap((suit) =>
-    seen[suit].length > akaLimit(suit, akaCount) ? seen[suit] : [],
-  );
-  return { closed: nextClosed, melds: nextMelds, capped };
 }
 
 /**
