@@ -80,7 +80,7 @@ test("取景 → 自动定格 → 填入牌面并自动算番 → 检测框与�
   const { phone: p, dialog } = await openRonHandTab(browser, withDetector(patches));
 
   await shoot(p, dialog);
-  await expect(dialog.getByTestId("recognize-status")).toHaveText(/^识别完成 · \d+ ms$/);
+  await expect(dialog.getByTestId("recognize-button")).toHaveText("重新拍照");
 
   // 识别自洽 → 收起键盘，只剩一排牌
   const confirm = dialog.getByTestId("hand-confirm");
@@ -117,7 +117,7 @@ test("连拍两张：第二次打开取景框仍能识别（模型字节被转�
   // 第二次：Worker 重建，用的是同一份缓存的模型字节
   await shoot(p, dialog);
   await expect(dialog.getByTestId("hand-confirm")).toBeVisible();
-  await expect(dialog.getByTestId("recognize-status")).toHaveText(/^识别完成 · \d+ ms$/);
+  await expect(dialog.getByTestId("recognize-button")).toHaveText("重新拍照");
 });
 
 test("模型加载失败 → 取景页给出错误，牌面不变", async ({ browser }) => {
