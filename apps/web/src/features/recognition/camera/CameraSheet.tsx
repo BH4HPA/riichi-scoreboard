@@ -46,8 +46,8 @@ export function CameraSheet({
   onClose,
 }: {
   rules: RoomRules;
-  /** label：多画检测框与牌图标签，多给一个相册入口（标注模式才有） */
-  mode?: "room" | "label";
+  /** calc（拍照算点数页）：多画检测框与牌图标签，多给一个相册入口 */
+  mode?: "room" | "calc";
   onCapture: (c: Capture) => void;
   onClose: () => void;
 }) {
@@ -245,7 +245,7 @@ export function CameraSheet({
     bottomInset: panelHeight,
     active: active && ready,
     onFrame,
-    ...(mode === "label" ? { onCrop: setCropRect } : {}),
+    ...(mode === "calc" ? { onCrop: setCropRect } : {}),
   });
 
   /** 相机用不了（权限、无设备、占用、非 HTTPS）：快门没有意义，给相册入口 */
@@ -308,7 +308,7 @@ export function CameraSheet({
               hint="把手牌、副露和宝牌指示牌放进框里"
             />
           )}
-          {mode === "label" && live && !paused && (
+          {mode === "calc" && live && !paused && (
             <div
               className="absolute inset-x-0"
               style={{ top: `${((1 - band) / 2) * 100}%`, height: `${band * 100}%` }}
@@ -428,8 +428,8 @@ export function CameraSheet({
             </button>
           </span>
           <span className="flex shrink-0 items-center gap-2">
-            {/* 相册：标注模式常驻；房间里就地拍一张成本接近零，只在相机用不了时才给 */}
-            {(mode === "label" || camBroken) && (
+            {/* 相册：算点数页常驻；房间里就地拍一张成本接近零，只在相机用不了时才给 */}
+            {(mode === "calc" || camBroken) && (
               <label
                 className="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-lg border border-white/40 px-2.5 text-sm text-white"
                 aria-label="从相册选一张"
@@ -439,7 +439,7 @@ export function CameraSheet({
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  data-testid="label-album"
+                  data-testid="camera-album"
                   onChange={(e) => {
                     const f = e.target.files?.[0] ?? null;
                     e.target.value = "";

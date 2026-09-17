@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/ui/controls";
 import { Landing } from "@/app/routes/Landing";
 import { Console } from "@/app/routes/Console";
 import { Room } from "@/app/routes/Room";
-import { LazyLabel } from "@/app/routes/lazyLabel";
+import { LazyCalc } from "@/app/routes/lazyCalc";
 import "./index.css";
 
 const router = createBrowserRouter([
@@ -13,10 +13,10 @@ const router = createBrowserRouter([
   { path: "/console", element: <Console /> },
   { path: "/r/:code", element: <Room /> },
   {
-    path: "/label",
+    path: "/calc",
     element: (
       <Suspense fallback={null}>
-        <LazyLabel />
+        <LazyCalc />
       </Suspense>
     ),
   },

@@ -81,7 +81,7 @@ function spawn(modelId: string, imgsz: number, onProgress?: LoadProgress): Promi
       };
       // **两份字节都只能克隆，不能转移**：它们同属 bytes.ts 里那个永不清空的下载缓存，
       // 转移一次就把 ArrayBuffer detach 掉，第二次打开取景框时 postMessage 会抛 DataCloneError。
-      // 克隆 24 MB 只发生在建线程那一下，换来的是「再拍一张」和标注页连拍能用。
+      // 克隆 24 MB 只发生在建线程那一下，换来的是「再拍一张」和算点数页连拍能用。
       const init: ToWorker = { type: "init", wasm, model, imgsz };
       worker.postMessage(init);
     });

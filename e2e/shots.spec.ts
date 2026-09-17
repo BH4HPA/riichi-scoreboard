@@ -178,7 +178,7 @@ test("截图：Pad 横屏/竖屏的大厅与对局页", async ({ browser }) => {
   }
 });
 
-test("截图：取景框、确认态与标注页", async ({ browser }) => {
+test("截图：取景框、确认态与算点数页", async ({ browser }) => {
   const DETECTOR = path.join(import.meta.dirname, "fixtures/detector.onnx");
   const withDetector = async (page: Page) => {
     await page.route("**/riichi/models/*.onnx", (route) =>
@@ -187,11 +187,11 @@ test("截图：取景框、确认态与标注页", async ({ browser }) => {
     await page.route("**/api/recognitions/*", (route) => route.fulfill({ status: 204 }));
   };
 
-  // 标注页：取景框（带检测框与牌图标签）→ 定格后的确认态
+  // 算点数页：取景框（带检测框与牌图标签）→ 定格后的确认态
   const labelCtx = await newContext(browser, { viewport: { width: 400, height: 860 } });
   const lab = await labelCtx.newPage();
   await withDetector(lab);
-  await lab.goto("/label");
+  await lab.goto("/calc");
   await lab.screenshot({ path: `${OUT}/phone-label-entry.png` });
   await lab.getByRole("button", { name: /开始拍/ }).click();
   const sheet = lab.getByTestId("camera-sheet");
@@ -213,7 +213,7 @@ test("截图：取景框、确认态与标注页", async ({ browser }) => {
   const guideCtx = await newContext(browser, { viewport: { width: 400, height: 860 } });
   const guide = await guideCtx.newPage();
   await guide.route("**/riichi/models/*.onnx", (route) => route.abort());
-  await guide.goto("/label");
+  await guide.goto("/calc");
   await guide.getByRole("button", { name: /开始拍/ }).click();
   await guide.getByRole("button", { name: "怎么摆" }).click();
   await guide.getByText("怎么摆，识别最准").waitFor();
