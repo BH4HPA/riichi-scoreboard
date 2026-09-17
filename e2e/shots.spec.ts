@@ -69,7 +69,7 @@ test("截图：番符表与主控台", async ({ browser }) => {
     await keyboard.getByRole("button", { name: t, exact: true }).click();
   }
   await phones[2]!.screenshot({ path: `${OUT}/phone-ron-melds.png` });
-  await ron.getByRole("button", { name: "清空" }).click();
+  await ron.getByRole("button", { name: "清空", exact: true }).click();
   const removeMeld = ron.getByRole("button", { name: "删除副露" });
   while ((await removeMeld.count()) > 0) await removeMeld.first().click();
   for (const t of [

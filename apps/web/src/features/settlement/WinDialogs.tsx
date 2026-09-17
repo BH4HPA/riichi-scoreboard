@@ -24,6 +24,7 @@ import { NO_FLAGS, incomeBreakdown, seatsOf } from "./format";
 import { previewRon, previewTsumo } from "./preview";
 import { PaoPicker, SeatFlags, SeatSelect } from "./SeatFlags";
 import { useMirror } from "./useMirror";
+import { useDraft } from "./drafts/useDraft";
 
 export interface WinDialogProps {
   open: boolean;
@@ -55,6 +56,17 @@ function mirrorWin(winner: Seat, draft: ValueDraft, valueText: string | null): S
   };
 }
 
+/** 草稿动过才出现：清空当前录入，回到默认值。 */
+function ResetDraft({ onReset }: { onReset: () => void }) {
+  return (
+    <div className="-mb-2 flex justify-end">
+      <Button variant="ghost" size="sm" className="h-7 text-muted" onClick={onReset}>
+        清空重填
+      </Button>
+    </div>
+  );
+}
+
 function description(game: GameState, names: string[]): string {
   return `${roundLabel(game.kyoku, game.honba)}，庄家：${names[dealerOf(game.kyoku)]}`;
 }
@@ -70,24 +82,44 @@ export function TsumoDialog(props: WinDialogProps) {
   );
 }
 
-/** 每次打开重新挂载：默认和牌者为操作者自己，草稿不跨次残留。 */
+interface TsumoFormState {
+  winner: Seat;
+  draft: ValueDraft;
+  riichi: boolean[];
+  pao: Seat | null;
+}
+
+/** 表单状态存在草稿里：关掉再开还在；局面变了弹窗自动关闭（见 useDraft）。 */
 function TsumoForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
   const send = useCommand();
-  const [winner, setWinner] = useState<Seat>(mySeat ?? 0);
-  const [draft, setDraft] = useState<ValueDraft>(() => createValueDraft(true, readValueMode()));
-  const [riichi, setRiichi] = useState(NO_FLAGS);
-  const [pao, setPao] = useState<Seat | null>(null);
+  const form = useDraft<TsumoFormState>(
+    "tsumo",
+    () => ({
+      winner: mySeat ?? 0,
+      draft: createValueDraft(true, readValueMode()),
+      riichi: NO_FLAGS,
+      pao: null,
+    }),
+    onDone,
+  );
+  const { winner, draft, riichi, pao } = form.state;
+  const setDraft = (fn: (d: ValueDraft) => ValueDraft) =>
+    form.update((st) => ({ ...st, draft: fn(st.draft) }));
   const [busy, setBusy] = useState(false);
 
   const flags = effectiveRiichi(riichi, [{ winner, draft }]);
-  const changeRiichi = (next: boolean[]) => {
-    setRiichi(storeRiichiClick(riichi, flags, next));
-    setDraft((d) => draftWithRiichi(d, next[winner]!));
-  };
-  const changeWinner = (next: Seat) => {
-    setWinner(next);
-    setDraft((d) => draftForWinner(d, riichi, winner, next));
-  };
+  const changeRiichi = (next: boolean[]) =>
+    form.update((st) => ({
+      ...st,
+      riichi: storeRiichiClick(st.riichi, flags, next),
+      draft: draftWithRiichi(st.draft, next[st.winner]!),
+    }));
+  const changeWinner = (next: Seat) =>
+    form.update((st) => ({
+      ...st,
+      winner: next,
+      draft: draftForWinner(st.draft, st.riichi, st.winner, next),
+    }));
 
   const value = draftValue(draft);
   const paoAllowed = rules.scoring.pao && value !== null && value.yakuman > 0;
@@ -114,13 +146,15 @@ function TsumoForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
 
   const confirm = async () => {
     setBusy(true);
-    const ok = await send({
-      type: "tsumo",
-      winner,
-      value: draftToClientValue(draft),
-      riichi: seatsOf(flags),
-      ...(effectivePao !== null ? { pao: effectivePao } : {}),
-    });
+    const ok = await form.submit(() =>
+      send({
+        type: "tsumo",
+        winner,
+        value: draftToClientValue(draft),
+        riichi: seatsOf(flags),
+        ...(effectivePao !== null ? { pao: effectivePao } : {}),
+      }),
+    );
     setBusy(false);
     if (ok) {
       confirmRecognized(draft, useSession.getState().token);
@@ -131,6 +165,7 @@ function TsumoForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
   return (
     <>
       <div className="space-y-3">
+        {form.touched && <ResetDraft onReset={form.reset} />}
         <SeatSelect
           label="自摸者"
           names={names}
@@ -153,7 +188,13 @@ function TsumoForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
           dealer={dealerOf(game.kyoku)}
         />
         {paoAllowed && (
-          <PaoPicker names={names} mySeat={mySeat} winner={winner} value={pao} onChange={setPao} />
+          <PaoPicker
+            names={names}
+            mySeat={mySeat}
+            winner={winner}
+            value={pao}
+            onChange={(p) => form.update((st) => ({ ...st, pao: p }))}
+          />
         )}
         <div>
           <Label>结算预览</Label>
@@ -210,15 +251,28 @@ interface RonWinDraftState {
   pao: Seat | null;
 }
 
+interface RonFormState {
+  loser: Seat;
+  wins: RonWinDraftState[];
+  riichi: boolean[];
+}
+
 function RonForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
   const send = useCommand();
   const maxWins = { atamahane: 1, double: 2, triple: 3 }[rules.win.multiRon];
   const me = mySeat ?? 0;
-  const [loser, setLoser] = useState<Seat>(SEATS.find((s) => s !== me) ?? 1);
-  const [wins, setWins] = useState<RonWinDraftState[]>(() => [
-    { winner: me, draft: createValueDraft(false, readValueMode()), pao: null },
-  ]);
-  const [riichi, setRiichi] = useState(NO_FLAGS);
+  const form = useDraft<RonFormState>(
+    "ron",
+    () => ({
+      loser: SEATS.find((s) => s !== me) ?? 1,
+      wins: [{ winner: me, draft: createValueDraft(false, readValueMode()), pao: null }],
+      riichi: NO_FLAGS,
+    }),
+    onDone,
+  );
+  const { loser, wins, riichi } = form.state;
+  const setWins = (fn: (ws: RonWinDraftState[]) => RonWinDraftState[]) =>
+    form.update((st) => ({ ...st, wins: fn(st.wins) }));
   const [busy, setBusy] = useState(false);
   const flags = effectiveRiichi(riichi, wins);
 
@@ -265,16 +319,18 @@ function RonForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
 
   const confirm = async () => {
     setBusy(true);
-    const ok = await send({
-      type: "ron",
-      loser,
-      wins: wins.map((w, i) => ({
-        winner: w.winner,
-        value: draftToClientValue(w.draft),
-        ...(drafts[i]!.pao !== null ? { pao: drafts[i]!.pao! } : {}),
-      })),
-      riichi: seatsOf(flags),
-    });
+    const ok = await form.submit(() =>
+      send({
+        type: "ron",
+        loser,
+        wins: wins.map((w, i) => ({
+          winner: w.winner,
+          value: draftToClientValue(w.draft),
+          ...(drafts[i]!.pao !== null ? { pao: drafts[i]!.pao! } : {}),
+        })),
+        riichi: seatsOf(flags),
+      }),
+    );
     setBusy(false);
     if (ok) {
       const token = useSession.getState().token;
@@ -284,23 +340,26 @@ function RonForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
   };
 
   const setWin = (i: number, patch: Partial<RonWinDraftState>) =>
-    setWins(wins.map((w, k) => (k === i ? { ...w, ...patch } : w)));
-  const changeRiichi = (next: boolean[]) => {
-    setRiichi(storeRiichiClick(riichi, flags, next));
-    setWins((ws) => ws.map((w) => ({ ...w, draft: draftWithRiichi(w.draft, next[w.winner]!) })));
-  };
+    setWins((ws) => ws.map((w, k) => (k === i ? { ...w, ...patch } : w)));
+  const changeRiichi = (next: boolean[]) =>
+    form.update((st) => ({
+      ...st,
+      riichi: storeRiichiClick(st.riichi, flags, next),
+      wins: st.wins.map((w) => ({ ...w, draft: draftWithRiichi(w.draft, next[w.winner]!) })),
+    }));
   const changeWinner = (i: number, winner: Seat) =>
-    setWins((ws) =>
-      ws.map((w, k) =>
-        k === i ? { ...w, winner, draft: draftForWinner(w.draft, riichi, w.winner, winner) } : w,
+    form.update((st) => ({
+      ...st,
+      wins: st.wins.map((w, k) =>
+        k === i ? { ...w, winner, draft: draftForWinner(w.draft, st.riichi, w.winner, winner) } : w,
       ),
-    );
+    }));
   const removeWin = (i: number) => setWins((ws) => ws.filter((_, k) => k !== i));
   const addWin = () =>
-    setWins((ws) => {
-      const winner = SEATS.find((s) => s !== loser && !ws.some((w) => w.winner === s)) ?? 0;
-      const draft = draftWithRiichi(createValueDraft(false, readValueMode()), riichi[winner]!);
-      return [...ws, { winner, draft, pao: null }];
+    form.update((st) => {
+      const winner = SEATS.find((s) => s !== st.loser && !st.wins.some((w) => w.winner === s)) ?? 0;
+      const draft = draftWithRiichi(createValueDraft(false, readValueMode()), st.riichi[winner]!);
+      return { ...st, wins: [...st.wins, { winner, draft, pao: null }] };
     });
   /** 评估结果异步回来时用函数式更新，避免覆盖期间的改动 */
   const updateDraft = (i: number, update: (d: ValueDraft) => ValueDraft) =>
@@ -309,12 +368,13 @@ function RonForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
   return (
     <>
       <div className="space-y-3">
+        {form.touched && <ResetDraft onReset={form.reset} />}
         <SeatSelect
           label="放铳者"
           names={names}
           mySeat={mySeat}
           value={loser}
-          onChange={setLoser}
+          onChange={(l) => form.update((st) => ({ ...st, loser: l }))}
         />
         <SeatFlags
           label="立直情况"

@@ -76,6 +76,10 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   `validateRules` output), otherwise 自定义. Personal presets only take part in the editor's select.
 - Win input has two shapes: `manual` (han/fu) and `hand` (tiles; evaluated server-side; the hand is kept
   in `WinRecord.hand` for history display; also the input shape for the future photo-recognition feature).
+  Tsumo/ron form state lives in `settlement/drafts` (memory only, keyed `roomCode:kind`, with a
+  `generation` so late async writes cannot land in a newer draft): closing the dialog keeps it; the dialog
+  closes itself with a notice when `draftStamp` (gameNo/kyoku/honba/status/history) changes under it, except
+  while its own submit is in flight.
 - Room phases: `lobby` → `playing` → `finished` (→ `lobby` via `toLobby`), plus `closed` after `dissolve`
   (any phase; `rooms.closed_at` short-circuits replay; WS close code 4010).
 - Players: `device` (has a token, joins from a phone) or `local` (no token, created and seated by the console
