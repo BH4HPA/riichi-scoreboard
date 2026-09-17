@@ -155,10 +155,31 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await expect(ron.getByText("2 番 30 符")).toBeVisible();
   await expect(ron.getByText("赤宝牌 1 番")).toBeVisible();
   // 立直情况勾上和牌者自己 → 手牌立直旗标跟着亮、番数 +1；手牌里取消 → 立直情况跟着取消
+  // 电视在重算期间按住上一份牌面，不闪：逐帧采样，牌面一帧都不能消失
+  const tvGaps = tv.evaluate(
+    () =>
+      new Promise<number>((resolve) => {
+        let gaps = 0;
+        const end = performance.now() + 1200;
+        const tick = () => {
+          if (!document.querySelector('[role="img"][aria-label="赤5筒"]')) gaps++;
+          if (performance.now() < end) requestAnimationFrame(tick);
+          else resolve(gaps);
+        };
+        tick();
+      }),
+  );
   await riichiRows.nth(2).click();
   const handRiichi = ron.getByRole("checkbox", { name: "立直", exact: true });
   await expect(handRiichi).toBeChecked();
   await expect(ron.getByText("3 番 30 符")).toBeVisible();
+  expect(await tvGaps).toBe(0);
+  await handRiichi.click();
+  await expect(riichiRows.nth(2)).not.toBeChecked();
+  await expect(ron.getByText("2 番 30 符")).toBeVisible();
+  // 反向：手牌里勾上立直 → 立直情况跟着勾上；再取消复原
+  await handRiichi.click();
+  await expect(riichiRows.nth(2)).toBeChecked();
   await handRiichi.click();
   await expect(riichiRows.nth(2)).not.toBeChecked();
   await expect(ron.getByText("2 番 30 符")).toBeVisible();
