@@ -201,7 +201,7 @@ function TsumoForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
     );
     setBusy(false);
     if (ok) {
-      confirmRecognized(draft, useSession.getState().token);
+      void confirmRecognized(draft, useSession.getState().token);
       onDone();
     }
   };
@@ -430,7 +430,7 @@ function RonForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
     setBusy(false);
     if (ok) {
       const token = useSession.getState().token;
-      for (const w of wins) confirmRecognized(w.draft, token);
+      for (const w of wins) void confirmRecognized(w.draft, token);
       onDone();
     }
   };

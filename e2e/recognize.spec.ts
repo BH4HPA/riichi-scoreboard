@@ -358,7 +358,9 @@ test("确认态：点牌替换、改和张、改牌展开全键盘后不再自�
   await expect(dialog.getByTestId("hand-confirm")).toHaveCount(0);
 });
 
-test("算点数页：主页进入、检测框可见、连拍一张提交真值", async ({ browser }) => {
+test("算点数页：设场况 → 拍 → 重新拍 → 识别正确出番符点数 → 改自摸重算 → 继续拍", async ({
+  browser,
+}) => {
   const patches: Record<string, unknown>[] = [];
   const ctx = await newContext(browser, { viewport: { width: 400, height: 800 } });
   const p = await ctx.newPage();
@@ -370,12 +372,19 @@ test("算点数页：主页进入、检测框可见、连拍一张提交真值",
 
   await p.goto("/?stay=1");
   await p.getByRole("link", { name: /给模型标牌/ }).click();
-  await expect(p.getByRole("heading", { name: "给模型标牌" })).toBeVisible();
+  await expect(p.getByRole("heading", { name: "拍照算点数" })).toBeVisible();
+  await expect(p).toHaveURL(/\/calc$/);
+
+  // 闲家（自风南）、1 本场
+  await p.getByRole("button", { name: "南", exact: true }).nth(1).click();
+  await p.getByRole("button", { name: "本场加一" }).click();
+  await expect(p.getByTestId("calc-honba")).toHaveText("1");
 
   await p.getByRole("button", { name: /开始拍/ }).click();
   const sheet = p.getByTestId("camera-sheet");
   await expect(sheet).toBeVisible();
-  // 相册入口只在算点数页给（房间里就地拍一张的成本已经接近零）
+  await expect(sheet.getByText("拍下的牌面照片会用来改进识别")).toBeVisible();
+  // 相册入口在算点数页常驻（房间里就地拍一张的成本已经接近零）
   await expect(p.getByTestId("camera-album")).toBeAttached();
   // 算点数页才画检测框；每个框贴一张同款牌图当标签。框一出现基本就到第三帧了，
   // 所以这里用「要么看到框、要么已经定格」来判，避免和自动定格抢时序
@@ -389,7 +398,7 @@ test("算点数页：主页进入、检测框可见、连拍一张提交真值",
     .toBe(true);
   await expect(sheet).toHaveCount(0, { timeout: 30_000 });
 
-  // 照片以 source=label 上传，确认后回填真值并自动回到取景
+  // 照片以 source=label 上传；识别情况 = 带框定格照 + 可改的牌面
   await expect.poll(() => posts.some((u) => u.includes("source=label"))).toBe(true);
   await expect(p.getByTestId("hand-confirm")).toBeVisible();
 
@@ -406,12 +415,34 @@ test("算点数页：主页进入、检测框可见、连拍一张提交真值",
   await lightbox.getByRole("button", { name: "关闭" }).click();
   await expect(lightbox).toHaveCount(0);
 
-  await p.getByTestId("label-submit").click();
+  // 重新拍：再定格一次，仍停在核对
+  await p.getByRole("button", { name: "重新拍" }).click();
+  await expect(sheet).toBeVisible();
+  await expect(sheet).toHaveCount(0, { timeout: 30_000 });
+  await expect(p.getByTestId("hand-confirm")).toBeVisible();
+
+  // 识别正确：平和 + 赤 = 2 番 30 符，闲家荣和 2000 + 本场 300
+  await p.getByTestId("calc-confirm").click();
+  const result = p.getByTestId("calc-result");
+  await expect(result.getByText("2 番 30 符")).toBeVisible();
+  await expect(p.getByTestId("calc-points")).toContainText("2300 点");
+  await expect(p.getByTestId("calc-points")).toContainText("含本场 300");
   await expect.poll(() => patches.some((x) => "corrected" in x)).toBe(true);
   expect((patches.find((x) => "corrected" in x)!.corrected as { closed: number[] }).closed).toEqual(
     CLOSED,
   );
-  // 提交后自动回到取景，上一张的标注图跟着清掉
+
+  // 结果页改成自摸：门清自摸 + 平和 + 赤 = 3 番 20 符，700/1300 各加本场 100
+  await p.getByRole("button", { name: "自摸", exact: true }).click();
+  await expect(result.getByText("3 番 20 符")).toBeVisible();
+  await expect(p.getByTestId("calc-points")).toContainText("800 / 1400 点");
+
+  // 继续拍：直接回到取景，上一张的标注图跟着清掉；荣和/自摸保留
+  await p.getByTestId("calc-next").click();
   await expect(p.getByTestId("camera-sheet")).toBeVisible();
   await expect(p.getByTestId("annotated-shot")).toHaveCount(0);
+  await expect(p.getByRole("button", { name: "自摸", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
 });

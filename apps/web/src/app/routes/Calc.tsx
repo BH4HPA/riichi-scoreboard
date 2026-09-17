@@ -1,128 +1,115 @@
-import { useCallback, useState } from "react";
-import { Camera } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, Camera } from "lucide-react";
 import { Link } from "react-router";
-import { MLEAGUE_RULES, type Detection } from "@riichi/core";
-import { useSession } from "@/api/session";
+import { RECOGNITION_MANIFEST } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Notice } from "@/ui/notice";
 import { canUseCamera } from "@/lib/device";
-import { AnnotatedShot } from "@/features/recognition/AnnotatedShot";
-import { CameraSheet, type Capture } from "@/features/recognition/camera/CameraSheet";
-import { applyRecognized } from "@/features/recognition/applyRecognized";
-import { patchRecognition } from "@/features/recognition/api";
-import { uploadRecognition } from "@/features/recognition/recognize";
-import { HandEditor } from "@/features/settlement/hand/HandEditor";
-import { createValueDraft, type ValueDraft } from "@/features/settlement/valueDraft";
-import { useRoomStore } from "@/ws/store";
+import { CameraSheet } from "@/features/recognition/camera/CameraSheet";
+import { CalcContextCard, type CalcContext } from "@/features/calc/context/CalcContextCard";
+import { useEvaluation } from "@/features/calc/evaluate/useEvaluation";
+import { CalcResult } from "@/features/calc/result/CalcResult";
+import { CalcReview } from "@/features/calc/review/CalcReview";
+import { CalcRulesDialog } from "@/features/calc/rules/CalcRulesDialog";
+import { useCalcRules } from "@/features/calc/rules/useCalcRules";
+import { useCalcShot } from "@/features/calc/shot/useCalcShot";
+import { SiteBrand, SiteFooter } from "@/features/site/SiteFooter";
 
 /**
- * 标注固定用 M-League：杠宝、里宝都开，指示牌不会被截；赤五是赤 3（每色一张），
- * 认出超额的赤五会被折回并打「请核对」记号，回流时这类记录送人工
- */
-const RULES = MLEAGUE_RULES;
-/**
- * 给模型标牌：不进房间，取景 → 定格 → 改到全对 → 「就是这手」把真值传回去。
- * 与房间里那条路共用取景框和牌面编辑器，区别只有两个——多画检测框与牌图标签、
- * 提交的是训练真值而不是结算命令。提交完自动回到取景接着拍：连拍的手感就是这个页面的全部价值。
+ * 拍照算点数：不进房间，设好场况 → 拍 → 核对识别结果 →「识别正确」出番符与点数 → 继续拍。
+ * 与房间结算共用取景框和牌面编辑器；确认的手牌同时回填为识别的训练真值。
  */
 export function Calc() {
-  const [shooting, setShooting] = useState(false);
-  const [draft, setDraft] = useState<ValueDraft>(() => createValueDraft(false, "hand"));
-  /** 这一张的定格帧与检测框：确认界面回看用，提交后清掉 */
-  const [shot, setShot] = useState<{ photo: Blob; detections: Detection[] } | null>(null);
-  const [saved, setSaved] = useState(0);
-  const notify = useRoomStore((s) => s.notify);
-
-  const onCapture = useCallback(({ blob, result }: Capture) => {
-    setShooting(false);
-    setShot({ photo: blob, detections: result.detections });
-    const key = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-    setDraft((d) => applyRecognized(d, result, RULES, key));
-    void useSession
-      .getState()
-      .ensure()
-      .then(({ token }) =>
-        uploadRecognition(
-          key,
-          blob,
-          result,
-          token,
-          "label",
-          (id) =>
-            setDraft((d) =>
-              d.recognition?.key === key ? { ...d, recognition: { ...d.recognition, id } } : d,
-            ),
-          (message) =>
-            useRoomStore.getState().notify("error", `照片上传失败（${message}），这张先不算`),
-        ),
-      )
-      .catch(() => useRoomStore.getState().notify("error", "照片上传失败，这张先不算"));
-  }, []);
-
-  const submit = async () => {
-    const rec = draft.recognition;
-    if (!rec?.id) return notify("error", "照片还在上传，稍等一下");
-    try {
-      const { token } = await useSession.getState().ensure();
-      await patchRecognition(rec.id, { corrected: draft.hand }, token);
-    } catch {
-      return notify("error", "提交失败，这张先留着再试一次");
-    }
-    setSaved((n) => n + 1);
-    setDraft(createValueDraft(false, "hand"));
-    setShot(null);
-    notify("info", "已记下，接着拍");
-    setShooting(true);
-  };
+  const [rules, setRules] = useCalcRules();
+  const [context, setContext] = useState<CalcContext>({ roundWind: 0, seatWind: 0, honba: 0 });
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const shot = useCalcShot(rules);
+  const isDealer = context.seatWind === 0;
+  const evaluation = useEvaluation(
+    shot.phase === "result"
+      ? {
+          hand: shot.draft.hand,
+          rules,
+          roundWind: context.roundWind,
+          seatWind: context.seatWind,
+        }
+      : null,
+  );
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-4 py-6">
-      <div className="flex items-baseline justify-between">
-        <h1 className="text-xl font-semibold">给模型标牌</h1>
-        <Link to="/" className="text-sm text-muted underline-offset-2 hover:underline">
-          返回首页
-        </Link>
-      </div>
-      <p className="text-sm text-muted">
-        拍一手牌，把认错的改对，提交的就是训练真值。本页不进房间，也不影响任何牌局。
-        {saved > 0 && ` 本次已提交 ${saved} 张。`}
-      </p>
-
-      {!canUseCamera() ? (
-        <p className="text-sm text-neg">相机需要 HTTPS 才能打开，请用正式地址访问本页。</p>
-      ) : (
-        <Button variant="accent" size="lg" onClick={() => setShooting(true)}>
-          <Camera className="mr-1 h-5 w-5" />
-          {draft.recognition ? "再拍一张" : "开始拍"}
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-4 pt-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <header className="flex items-center gap-2">
+        <Button asChild variant="ghost" size="icon" aria-label="返回首页">
+          <Link to="/">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
         </Button>
-      )}
+        <h1 className="text-xl font-semibold">拍照算点数</h1>
+      </header>
+      <p className="text-sm text-muted">拍下和了的一手牌，核对识别结果，算出番符和点数。</p>
 
-      {draft.recognition && (
-        <>
-          {shot && <AnnotatedShot photo={shot.photo} detections={shot.detections} />}
-          <HandEditor
-            draft={draft}
-            onChange={(update) => setDraft(update)}
-            rules={RULES}
-            evaluated={null}
-            evaluating={false}
-            evalError={null}
-            camera={null}
-            showValue={false}
-            isDealer={null}
-          />
-          <Button variant="accent" onClick={() => void submit()} data-testid="label-submit">
-            就是这手
+      <CalcContextCard
+        context={context}
+        onContextChange={setContext}
+        tsumo={shot.draft.hand.tsumo}
+        onTsumoChange={shot.setTsumo}
+        rules={rules}
+        onEditRules={() => setRulesOpen(true)}
+      />
+
+      {shot.phase === "idle" &&
+        (!RECOGNITION_MANIFEST.model ? (
+          <p className="text-sm text-muted">识别模型还没有发布，暂时不能拍照识别。</p>
+        ) : !canUseCamera() ? (
+          <p className="text-sm text-neg">相机需要 HTTPS 才能打开，请用正式地址访问本页。</p>
+        ) : (
+          <Button variant="accent" size="lg" onClick={shot.shoot}>
+            <Camera className="h-5 w-5" />
+            开始拍
           </Button>
-        </>
+        ))}
+      {shot.phase === "review" && (
+        <CalcReview
+          shot={shot.shot}
+          draft={shot.draft}
+          onDraftChange={shot.setDraft}
+          rules={rules}
+          isDealer={isDealer}
+          onRetake={shot.shoot}
+          onConfirm={shot.confirm}
+        />
+      )}
+      {shot.phase === "result" && (
+        <CalcResult
+          hand={shot.draft.hand}
+          rules={rules}
+          isDealer={isDealer}
+          honba={context.honba}
+          evaluated={evaluation.evaluated}
+          evaluating={evaluation.evaluating}
+          error={evaluation.error}
+          onBack={shot.backToReview}
+          onNext={shot.next}
+        />
       )}
 
-      {shooting && (
+      <div className="mt-auto flex flex-col items-center gap-2 pt-6">
+        <SiteBrand />
+        <SiteFooter className="justify-center" />
+      </div>
+
+      <CalcRulesDialog
+        open={rulesOpen}
+        onOpenChange={setRulesOpen}
+        rules={rules}
+        onApply={setRules}
+      />
+      {shot.shooting && (
         <CameraSheet
-          rules={RULES}
+          rules={rules}
           mode="calc"
-          onCapture={onCapture}
-          onClose={() => setShooting(false)}
+          onCapture={shot.onCapture}
+          onClose={shot.closeCamera}
         />
       )}
       <Notice />

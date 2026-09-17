@@ -422,7 +422,7 @@ export function CameraSheet({
         {/* 最后一行：左边说明，右边相册与快门。min-h-8 按按钮高度留位，快门出现/消失时底栏不伸缩 */}
         <div className="flex min-h-8 items-center justify-between gap-3 text-xs text-white/70">
           <span className="flex min-w-0 items-center gap-3">
-            {mode === "room" && <span className="truncate">拍下的牌面照片会用来改进识别</span>}
+            <span className="truncate">拍下的牌面照片会用来改进识别</span>
             <button type="button" className="shrink-0 underline" onClick={() => setGuide(true)}>
               怎么摆
             </button>
