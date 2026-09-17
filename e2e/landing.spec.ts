@@ -53,6 +53,15 @@ test("手机 UA 直接看到加入面板；HTTP 下扫码入口隐藏并提示�
   await page.getByLabel("房间码").fill(code.toLowerCase());
   await expect(page).toHaveURL(new RegExp(`/r/${code}$`));
   await expect(page.getByTestId("seat-0")).toBeVisible();
+  // 回首页：上次的房间仍在 → 「返回房间」一键回去
+  await page.goto("/");
+  await page.getByRole("link", { name: `返回房间 ${code}` }).click();
+  await expect(page.getByTestId("seat-0")).toBeVisible();
+  // 不存在的房间链接：有原因、有出口
+  await page.goto("/r/AAAAAA");
+  await expect(page.getByText("房间 AAAAAA 不存在")).toBeVisible();
+  await page.getByRole("link", { name: "返回首页" }).click();
+  await expect(page.getByLabel("房间码")).toBeAttached();
   await ctx.close();
   await tvCtx.close();
 });

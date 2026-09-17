@@ -4,6 +4,7 @@ import { Monitor, Smartphone } from "lucide-react";
 import { deviceKind } from "@/lib/device";
 import { Button } from "@/ui/button";
 import { JoinPanel } from "@/features/join/JoinPanel";
+import { LastRoomButton } from "@/features/join/LastRoomButton";
 import { SiteFooter } from "@/features/site/SiteFooter";
 
 /**
@@ -28,7 +29,10 @@ export function Landing() {
           <p className="mt-1 text-sm text-muted">扫描主控台二维码或者输入房间码，加入远程控制。</p>
         </div>
         {showJoin ? (
-          <JoinPanel />
+          <>
+            <LastRoomButton />
+            <JoinPanel />
+          </>
         ) : (
           <div className="grid gap-3">
             <Button asChild size="lg" variant="accent" className="h-16 justify-start">

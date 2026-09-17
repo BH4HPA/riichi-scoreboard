@@ -8,6 +8,7 @@ import { PhoneLobby } from "@/features/lobby/PhoneLobby";
 import { PhoneGame } from "@/features/room/PhoneGame";
 import { RoomConnecting, RoomDissolved, RoomUnavailable } from "@/features/room/RoomGate";
 import { prefetchDetector } from "@/features/recognition/prefetch";
+import { clearLastRoom, writeLastRoom } from "@/features/join/lastRoom";
 
 /** 手机房间入口：连接房间，按连接状态与阶段装配大厅或对局页。 */
 export function Room() {
@@ -23,9 +24,18 @@ export function Room() {
   useEffect(() => {
     if (joined) prefetchDetector();
   }, [joined]);
+  // 记住进过的房间供首页「返回房间」；房间没了（或身份失效）就忘掉
+  useEffect(() => {
+    if (joined && roomCode) writeLastRoom(roomCode);
+  }, [joined, roomCode]);
+  useEffect(() => {
+    if (closedReason) clearLastRoom();
+  }, [closedReason]);
 
   if (closedReason === "dissolved") return <RoomDissolved code={roomCode} />;
-  if (status === "closed" && !room) return <RoomUnavailable code={roomCode} />;
+  if (status === "closed" && !room) {
+    return <RoomUnavailable code={roomCode} reason={closedReason} />;
+  }
   if (!socket || !room) return <RoomConnecting code={roomCode} />;
   const mySeat = seatOfPlayer(room.seats, playerId);
 
