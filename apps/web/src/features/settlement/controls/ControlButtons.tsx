@@ -1,5 +1,5 @@
 import { Check, RefreshCcw, Redo2, Undo2, XCircle } from "lucide-react";
-import type { GameView, RoomRules } from "@riichi/core";
+import type { GameView, RoomRules, Seat } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Tip } from "@/ui/controls";
 import { useCommand } from "@/ws/useRoom";
@@ -10,12 +10,14 @@ import type { ControlDialog } from "./useControlDialogs";
 export function ControlButtons({
   game,
   rules,
+  mySeat,
   size = "md",
   dissolvable = false,
   onOpen,
 }: {
   game: GameView;
   rules: RoomRules;
+  mySeat: Seat | null;
   size?: "sm" | "md" | "lg";
   /** 主控台专属：最后一段放「解散房间」 */
   dissolvable?: boolean;
@@ -26,7 +28,7 @@ export function ControlButtons({
 
   return (
     <div className="space-y-3">
-      <RiichiSection disabled={finished} size={size} />
+      <RiichiSection game={game.present} rules={rules} mySeat={mySeat} size={size} />
       <section>
         <h3 className="mb-1.5 text-xs font-medium text-muted">结算</h3>
         <div className="grid grid-cols-3 gap-1.5">

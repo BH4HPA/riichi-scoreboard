@@ -263,6 +263,10 @@ export class RoomRegistry {
       case "leave":
         own(cmd.seat, "离开", true);
         return cmd;
+      case "declareRiichi":
+        if (state.phase !== "playing") throw new DomainError("no_game", "对局未在进行中");
+        own(cmd.seat, "立直");
+        return cmd;
       case "setReady":
         // reducer 对 setReady 没有阶段校验（历史事件按原样重放），在命令入口挡住：
         // 豁免 baseSeq 后，开局瞬间到达的「取消准备」会写进事件流，虽不影响判定但是脏数据

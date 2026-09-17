@@ -123,6 +123,7 @@ export function ConsoleGame({
           <ControlButtons
             game={game}
             rules={room.rules}
+            mySeat={null}
             size="lg"
             dissolvable
             onOpen={(key) => {

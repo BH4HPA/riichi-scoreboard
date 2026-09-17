@@ -101,6 +101,11 @@ export interface GameState {
    * 座位固定东南西北，庄家 = kyoku % 4。
    */
   kyoku: number;
+  /**
+   * 本局已声明立直的座位（`declareRiichi`）：只供结算表单预勾，扣点仍随结算命令的 `riichi` 发生。
+   * 声明替换 present 但不入撤销栈；换局清空，所以撤销一笔结算时声明随快照回来。
+   */
+  riichi: boolean[];
   history: HistoryEntry[];
   tobi: TobiRecord | null;
   startedAt: number;

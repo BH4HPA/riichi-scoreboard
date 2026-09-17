@@ -98,6 +98,44 @@ describe("RoomRegistry：在线状态、离线座位回收、自动开局", () =
     expect(last(a).ready[0]).toBe(false);
   });
 
+  it("立直声明：只能声明自己的座位、容忍落后的 baseSeq、从事件流重建后仍在", () => {
+    const tv = fakeClient(device("主控台").id);
+    registry.join(room, tv);
+    const phone = fakeClient(device("甲").id);
+    registry.join(room, phone);
+    registry.apply(room, room.seq, { type: "sit", seat: 0 }, actorOf(phone));
+    const locals = ["乙", "丙", "丁"].map((n) => players.createLocal(n, tv.playerId, now));
+    locals.forEach((l, i) =>
+      registry.apply(
+        room,
+        room.seq,
+        { type: "sitLocal", seat: (i + 1) as 1 | 2 | 3, playerId: l.id },
+        actorOf(tv),
+      ),
+    );
+    expect(() =>
+      registry.apply(room, room.seq, { type: "declareRiichi", seat: 0 }, actorOf(phone)),
+    ).toThrow(/对局未在进行中/);
+    registry.apply(room, room.seq, { type: "start", force: true }, actorOf(tv));
+
+    const other = fakeClient(device("戊").id);
+    registry.join(room, other);
+    expect(() =>
+      registry.apply(room, room.seq, { type: "declareRiichi", seat: 0 }, actorOf(other)),
+    ).toThrow(/自己的座位/);
+    registry.apply(room, room.seq - 1, { type: "declareRiichi", seat: 0 }, actorOf(phone));
+    expect(last(tv).game?.present.riichi).toEqual([true, false, false, false]);
+
+    const rebuilt = new RoomRegistry(
+      new RoomsRepo(db),
+      new ResultsRepo(db),
+      players,
+      () => now,
+      AUTO_MS,
+    );
+    expect(rebuilt.get(room.code).state.game?.present.riichi).toEqual([true, false, false, false]);
+  });
+
   it("baseSeq 落后：座位类命令照常执行（广播还没到就点按钮），牌局类仍然拒绝", () => {
     const a = fakeClient(device("甲").id);
     const b = fakeClient(device("乙").id);

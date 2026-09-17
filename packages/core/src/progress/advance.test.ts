@@ -13,6 +13,7 @@ function game(partial: Partial<GameState> = {}): GameState {
     kyotaku: 0,
     honba: 0,
     kyoku: 0,
+    riichi: [false, false, false, false],
     history: [],
     tobi: null,
     startedAt: 0,

@@ -60,7 +60,7 @@ export interface MusicState {
 
 /**
  * 提交后应停止立直音乐的命令：这一局结束或对局阶段变化。穷举，新增命令时必须表态。
- * redo 等于再提交一次结算所以停；undo 回到这一局，不停。
+ * redo 等于再提交一次结算所以停；undo 回到这一局，不停；declareRiichi 就是放曲的同一下点击，不停。
  */
 export const STOPS_MUSIC: Record<Command["type"], boolean> = {
   tsumo: true,
@@ -69,6 +69,7 @@ export const STOPS_MUSIC: Record<Command["type"], boolean> = {
   abortive: true,
   chombo: true,
   adjust: true,
+  declareRiichi: false,
   endGame: true,
   newGame: true,
   toLobby: true,
@@ -86,7 +87,7 @@ export const STOPS_MUSIC: Record<Command["type"], boolean> = {
 /**
  * baseSeq 落后时仍然执行的命令：可行性完全由服务端按当前快照判定，不需要发起者看到的是最新状态
  * （座位类的目标是绝对的座位号，权限按当前占位者重校验；start 由 requireLobby + 满座判定；
- * dissolve 任何阶段都合法）。穷举，新增命令时必须表态。
+ * dissolve 任何阶段都合法；declareRiichi 只看当前点数与对局状态，且幂等）。穷举，新增命令时必须表态。
  *
  * 其余命令都必须拒绝：结算/撤销/重做/调整/终局/回大厅的含义是「对我看到的这一局」，别人刚提交的
  * 结算会改变它的后果；setRules 是整份规则覆盖，落后的提交会盖掉别人刚改的。
@@ -113,6 +114,7 @@ export const TOLERATES_STALE: Record<ClientCommand["type"], boolean> = {
   abortive: false,
   chombo: false,
   adjust: false,
+  declareRiichi: true,
   undo: false,
   redo: false,
   endGame: false,

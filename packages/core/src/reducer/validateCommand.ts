@@ -177,6 +177,8 @@ export function validateCommand(input: unknown): ClientCommand {
     }
     case "chombo":
       return { type: "chombo", offender: seat(input.offender, "错和者") };
+    case "declareRiichi":
+      return { type: "declareRiichi", seat: seat(input.seat, "立直座位") };
     case "adjust":
       return {
         type: "adjust",
