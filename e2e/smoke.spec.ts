@@ -103,6 +103,8 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await expect(phones[3]!.getByTestId("points-0")).toHaveText("25,000");
   // 主控台没有座位：选人控件不标相对方位
   await tv.getByRole("button", { name: "自摸", exact: true }).click();
+  // 同时只留一层：打开结算时操作面板已收起
+  await expect(tv.getByRole("dialog")).toHaveCount(1);
   const tvTsumo = tv.getByRole("dialog").filter({ hasText: "自摸结算" });
   await expect(tvTsumo.getByText("立直情况")).toBeVisible();
   await expect(tvTsumo).not.toContainText(/上家|对家|下家|自己/);
@@ -113,7 +115,7 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await tv.getByRole("option", { name: "南家" }).click();
   await expect(tvTsumo.getByRole("checkbox", { name: "地和", exact: true })).toBeVisible();
   await tvTsumo.getByRole("button", { name: "取消" }).click();
-  await tv.keyboard.press("Escape");
+  await expect(tv.getByRole("dialog")).toHaveCount(0);
 
   // 牌面形态：手机 2 荣和手机 3，平和 1 番 30 符 = 1000
   await phones[2]!.getByRole("button", { name: "荣和", exact: true }).click();
