@@ -56,13 +56,13 @@ Yarn workspaces monorepo:
   exists), `/console` (TV: two
   columns ≥ 1280px with a draggable split — `features/console/split`, default scores 0.6, clamped by
   per-column minimum widths, remembered in `riichi.console.split` — otherwise single column with history
-  drawer + QR dialog), `/r/:code` (phone).
+  drawer + QR dialog), `/r/:code` (phone), `/calc` (拍照算点数, see Photo recognition).
   Phone settlement dialogs mirror to the TV as a full-screen modal (`features/mirror/SettlementMirror`),
   carrying the hand only once the engine has evaluated it. Looking up the 番符表/rules on a phone stays on the phone
   unless its 「投到电视」 switch (`features/mirror/CastSwitch`, reset whenever the sheet closes) is on. Site credits (copyright, ICP record) live in
   `features/site/`: landing centers them at the page bottom, the narrow console lobby puts them in its button row, the narrow
   console game centers them at the page bottom, the wide console pins them
-  left-aligned at the bottom of its left column; the phone game nav shows the ICP number as plain grey text. PWA = `public/manifest.json` + icons only, deliberately no Service Worker (the app is useless
+  left-aligned at the bottom of its left column, `/calc` stacks `SiteBrand` over them at the page bottom; the phone game nav shows the ICP number as plain grey text. PWA = `public/manifest.json` + icons only, deliberately no Service Worker (the app is useless
   without its WebSocket, and caching index would pin stale versions); logo master in `docs/brand/`. Tile images are flat SVGs from mahjong_graphic (`src/assets/tiles`, see NOTICE.md), rendered by
   `features/hand/TileFace`.
 
@@ -122,7 +122,7 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   `applyRecognized` fills the `ValueDraft`, `ValuePicker` auto-evaluates → after the win command is
   accepted the final hand is `PATCH`ed back as `corrected` (training truth). Warnings are two-tier
   (`severity` set at the emission site, not looked up by code): `blocking` shows in red and forces the
-  keyboard open, `info` is only shown in label mode. `layoutHand` also returns `provenance` (which
+  keyboard open, `info` is never shown to users (it stays in the stored result). `layoutHand` also returns `provenance` (which
   detection each tile came from, plus `usedDetections`) — the UI degrades it into "which tiles to
   double-check" at the `applyRecognized` boundary, and the reflow pipeline uses it to relabel boxes.
   The settlement's 拍照识别 button is enabled whenever a model is published: an unusable camera (no
@@ -138,11 +138,18 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   `init` so it fails before `ready` instead of showing a silent black screen). One mkcert certificate in
   `ci/dev-tls/certs/` (gitignored) covers both: `yarn dev` picks it up automatically when present, and the
   dev machine gets TLS from `docker-compose.dev.yml` (caddy, `:8443`). The phone trusts the root CA once.
-  `/label` (linked from the landing page) is the same viewfinder + `HandEditor` outside any room: it adds
-  `DetectionOverlay` (boxes labelled with the tile's own SVG, tap for class + confidence) and an album
-  entry (`StillPicker` reuses the same band), and submits `corrected` as training truth instead of a win
-  command, then returns to the viewfinder. Its rows are stored with `source: "label"` (`recognitions.source`,
-  migration v5, query param on `POST`; default `room`), which the reflow pipeline must always select.
+  `/calc` 拍照算点数 (linked from the landing page while a model is published) is the same viewfinder +
+  `HandEditor` outside any room (`features/calc/`): the user sets round wind, seat wind (东 = dealer), honba,
+  ron/tsumo and rules (`RulesEditor` in a dialog, presets included; rules remembered in `riichi.calc.rules`,
+  the rest memory only). Phases: idle → review (`AnnotatedShot` + blocking warnings + editable hand, 「重新拍」)
+  → 「识别正确」 → result (`POST /api/evaluate` with `{hand, rules, roundWind, seatWind}` — the server maps it
+  to `dealer: 0, seat: seatWind` — plus core `winPoints` for payments incl. honba, recomputed whenever the
+  context changes; 「返回修改」/「继续拍」). The viewfinder in `mode="calc"` adds `DetectionOverlay` (boxes
+  labelled with the tile's own SVG, tap for class + confidence) and an album entry (`StillPicker` reuses
+  the same band); the privacy line shows in both modes. 「识别正确」 PATCHes `corrected` via
+  `confirmRecognized` (serialized per page, repeat confirmations overwrite). Its rows are stored with
+  `source: "label"` (`recognitions.source`, migration v5, query param on `POST`; default `room`; the value
+  predates the rename and is kept as a data contract), which the reflow pipeline must always select.
   Layout convention (photo): closed tiles contiguous with the **win tile turned
   sideways** at either end (3n+2 tiles); melds are groups of 3/4 that contain a sideways tile (kan may
   have two: the added tile is stacked sideways on top; back-X-X-back = closed kan) and may sit

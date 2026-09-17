@@ -191,7 +191,13 @@ test("截图：取景框、确认态与算点数页", async ({ browser }) => {
   const calcCtx = await newContext(browser, { viewport: { width: 400, height: 860 } });
   const calc = await calcCtx.newPage();
   await withDetector(calc);
+  // 非手机首页：没有主控台提示，次要链接组只剩一行
+  await calc.goto("/?stay=1");
+  await calc.getByRole("link", { name: /拍照算点数/ }).waitFor();
+  await calc.screenshot({ path: `${OUT}/desktop-narrow-landing.png` });
   await calc.goto("/calc");
+  // 页面是懒加载的：等标题出来再截
+  await calc.getByRole("heading", { name: "拍照算点数" }).waitFor();
   await calc.screenshot({ path: `${OUT}/phone-calc-entry.png` });
   await calc.getByRole("button", { name: "M-League" }).click();
   await calc.getByRole("dialog").waitFor();
