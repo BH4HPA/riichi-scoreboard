@@ -50,6 +50,7 @@ export function PhoneGame() {
   const game = room.game!;
   const names = seatNames(room);
   const mySeat = seatOfPlayer(room.seats, playerId);
+  const finished = game.present.status === "finished";
   const closeSheet = (open: boolean) => {
     if (open) return;
     setSheet(null);
@@ -59,6 +60,18 @@ export function PhoneGame() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col gap-3 px-4 pb-28 pt-4">
       <RoundHeader game={game.present} names={names} rules={room.rules} />
+      {finished && (
+        <div className="rounded-xl border border-pos/40 bg-surface p-3">
+          <h2 className="mb-1 text-base font-semibold">终局结算</h2>
+          <FinalPanel
+            game={game.present}
+            seats={room.seats}
+            names={names}
+            rules={room.rules}
+            compact
+          />
+        </div>
+      )}
       <PointsGrid
         game={game.present}
         seats={room.seats}
@@ -66,12 +79,6 @@ export function PhoneGame() {
         rules={room.rules}
         mySeat={mySeat}
       />
-      {game.present.status === "finished" && (
-        <div className="rounded-xl border border-pos/40 bg-surface p-3">
-          <h2 className="mb-1 text-base font-semibold">终局结算</h2>
-          <FinalPanel game={game.present} seats={room.seats} names={names} rules={room.rules} />
-        </div>
-      )}
       <div className="rounded-xl border border-border bg-surface p-3">
         <ControlButtons
           game={game}
@@ -90,13 +97,15 @@ export function PhoneGame() {
         mirror
         mySeat={mySeat}
       />
-      <div className="rounded-xl border border-border bg-surface p-3">
-        {mySeat !== null ? (
-          <MyDiffs game={game.present} names={names} rules={room.rules} mySeat={mySeat} />
-        ) : (
-          <DiffMatrix game={game.present} names={names} rules={room.rules} />
-        )}
-      </div>
+      {!finished && (
+        <div className="rounded-xl border border-border bg-surface p-3">
+          {mySeat !== null ? (
+            <MyDiffs game={game.present} names={names} rules={room.rules} mySeat={mySeat} />
+          ) : (
+            <DiffMatrix game={game.present} names={names} rules={room.rules} />
+          )}
+        </div>
+      )}
 
       <nav
         className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"

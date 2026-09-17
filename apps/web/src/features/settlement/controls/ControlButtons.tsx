@@ -28,38 +28,33 @@ export function ControlButtons({
 
   return (
     <div className="space-y-3">
-      <RiichiSection game={game.present} rules={rules} mySeat={mySeat} size={size} />
+      {!finished && <RiichiSection game={game.present} rules={rules} mySeat={mySeat} size={size} />}
       <section>
-        <h3 className="mb-1.5 text-xs font-medium text-muted">结算</h3>
+        <h3 className="mb-1.5 text-xs font-medium text-muted">{finished ? "操作记录" : "结算"}</h3>
         <div className="grid grid-cols-3 gap-1.5">
-          <Button size={size} variant="accent" disabled={finished} onClick={() => onOpen("tsumo")}>
-            自摸
-          </Button>
-          <Button size={size} variant="accent" disabled={finished} onClick={() => onOpen("ron")}>
-            荣和
-          </Button>
-          <Button size={size} variant="outline" disabled={finished} onClick={() => onOpen("draw")}>
-            流局
-          </Button>
-          {rules.progress.abortiveDraws && (
-            <Button
-              size={size}
-              variant="outline"
-              disabled={finished}
-              onClick={() => onOpen("abortive")}
-            >
-              途中流局
-            </Button>
-          )}
-          {rules.progress.chombo !== "none" && (
-            <Button
-              size={size}
-              variant="outline"
-              disabled={finished}
-              onClick={() => onOpen("chombo")}
-            >
-              错和
-            </Button>
+          {/* 终局后不再有自摸/荣和等：只留撤销（撤回终局）与重做 */}
+          {!finished && (
+            <>
+              <Button size={size} variant="accent" onClick={() => onOpen("tsumo")}>
+                自摸
+              </Button>
+              <Button size={size} variant="accent" onClick={() => onOpen("ron")}>
+                荣和
+              </Button>
+              <Button size={size} variant="outline" onClick={() => onOpen("draw")}>
+                流局
+              </Button>
+              {rules.progress.abortiveDraws && (
+                <Button size={size} variant="outline" onClick={() => onOpen("abortive")}>
+                  途中流局
+                </Button>
+              )}
+              {rules.progress.chombo !== "none" && (
+                <Button size={size} variant="outline" onClick={() => onOpen("chombo")}>
+                  错和
+                </Button>
+              )}
+            </>
           )}
           <Tip content={game.undoDepth > 0 ? "撤销上一次操作" : "暂无可撤销的结算"}>
             <Button
