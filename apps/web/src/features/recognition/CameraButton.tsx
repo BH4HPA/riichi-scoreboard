@@ -57,26 +57,17 @@ export function CameraButton({
   const usable = canUseCamera();
 
   return (
-    <div className="space-y-2 rounded-lg border border-border p-2.5" data-testid="recognize">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setOpen(true)}
-          disabled={!usable}
-          data-testid="recognize-button"
-        >
-          <Camera className="mr-1 h-4 w-4" />
-          拍照识别
-        </Button>
-      </div>
-      <div className="text-xs text-muted" aria-live="polite" data-testid="recognize-status">
-        {!usable
-          ? "相机需要 HTTPS 才能打开，请用正式地址访问"
-          : rec
-            ? `识别完成 · ${rec.ms} ms`
-            : "对准手牌、副露和宝牌指示牌，稳住约一秒自动定格"}
-      </div>
+    <div className="space-y-2" data-testid="recognize">
+      <Button
+        variant="outline"
+        className="w-full"
+        onClick={() => setOpen(true)}
+        disabled={!usable}
+        data-testid="recognize-button"
+      >
+        <Camera className="mr-1 h-4 w-4" />
+        {!usable ? "拍照识别需要 HTTPS" : rec ? "重新拍照" : "拍照识别"}
+      </Button>
       {/* 只报用户此刻能动手的：结果自洽时模型的内务（丢了几个低置信框之类）对用户零价值 */}
       {blocking.length > 0 && (
         <ul className="space-y-0.5 text-xs text-neg">
