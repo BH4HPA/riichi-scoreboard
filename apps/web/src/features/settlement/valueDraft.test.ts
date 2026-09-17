@@ -18,9 +18,9 @@ function rec(warnings: RecognitionWarning[] = []): DraftRecognition {
 /** 一手认全了的牌面草稿 */
 function recognized(over: Partial<ValueDraft> = {}): ValueDraft {
   return {
-    ...createValueDraft(false),
+    ...createValueDraft(false, "manual"),
     mode: "hand",
-    hand: { ...createValueDraft(false).hand, closed: [...CLOSED14], winTile: TILE.M9 },
+    hand: { ...createValueDraft(false, "manual").hand, closed: [...CLOSED14], winTile: TILE.M9 },
     recognition: rec(),
     ...over,
   };
@@ -28,7 +28,7 @@ function recognized(over: Partial<ValueDraft> = {}): ValueDraft {
 
 describe("closedCapacity / isHandComplete", () => {
   it("每组副露折 3 张；录满且指定和张才算完整", () => {
-    const base = createValueDraft(false).hand;
+    const base = createValueDraft(false, "manual").hand;
     expect(closedCapacity(base)).toBe(14);
     expect(closedCapacity({ melds: [{ open: true, tiles: [1, 2, 3] }] })).toBe(11);
     expect(isHandComplete(base)).toBe(false);

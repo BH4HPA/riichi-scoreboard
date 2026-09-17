@@ -17,6 +17,7 @@ const CameraButton = lazy(() =>
   import("@/features/recognition/CameraButton").then((m) => ({ default: m.CameraButton })),
 );
 import { isHandComplete, type ValueDraft } from "./valueDraft";
+import { writeValueMode } from "./valueModePref";
 
 const HAN_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((n) => ({
   value: n,
@@ -92,7 +93,11 @@ export function ValuePicker({
   return (
     <Tabs
       value={draft.mode}
-      onValueChange={(v) => onChange((d) => ({ ...d, mode: v as ValueDraft["mode"] }))}
+      onValueChange={(v) => {
+        const mode = v as ValueDraft["mode"];
+        writeValueMode(mode);
+        onChange((d) => ({ ...d, mode }));
+      }}
     >
       <TabsList className="w-full">
         <TabsTrigger value="manual" className="flex-1">

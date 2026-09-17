@@ -27,7 +27,7 @@ const RULES = MLEAGUE_RULES;
  */
 export function Label() {
   const [shooting, setShooting] = useState(false);
-  const [draft, setDraft] = useState<ValueDraft>(() => createValueDraft(false));
+  const [draft, setDraft] = useState<ValueDraft>(() => createValueDraft(false, "hand"));
   /** 这一张的定格帧与检测框：确认界面回看用，提交后清掉 */
   const [shot, setShot] = useState<{ photo: Blob; detections: Detection[] } | null>(null);
   const [saved, setSaved] = useState(0);
@@ -69,7 +69,7 @@ export function Label() {
       return notify("error", "提交失败，这张先留着再试一次");
     }
     setSaved((n) => n + 1);
-    setDraft(createValueDraft(false));
+    setDraft(createValueDraft(false, "hand"));
     setShot(null);
     notify("info", "已记下，接着拍");
     setShooting(true);

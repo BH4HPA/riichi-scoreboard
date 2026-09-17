@@ -43,9 +43,9 @@ export function isHandComplete(hand: HandInput): boolean {
   return hand.closed.length === closedCapacity(hand) && hand.winTile > 0;
 }
 
-export function createValueDraft(tsumo: boolean): ValueDraft {
+export function createValueDraft(tsumo: boolean, mode: ValueDraft["mode"]): ValueDraft {
   return {
-    mode: "manual",
+    mode,
     han: 3,
     fu: 40,
     yakuman: 0,
