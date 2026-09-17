@@ -24,6 +24,7 @@ import { ReferenceSheet } from "@/features/reference/ReferenceSheet";
 import { RulesEditor } from "@/features/rules/RulesEditor";
 import { ProfileEditor, StatsPanel } from "@/features/profile/ProfileEditor";
 import { useMirror } from "@/features/settlement/useMirror";
+import { CastSwitch } from "@/features/mirror/CastSwitch";
 import { ICP } from "@/features/site/site";
 
 type Sheet = "reference" | "rules" | "history" | "me" | null;
@@ -42,12 +43,17 @@ export function PhoneGame() {
   const [sheet, setSheet] = useState<Sheet>(null);
   const [refView, setRefView] = useState<ReferenceView>(DEFAULT_REFERENCE_VIEW);
   const controls = useControlDialogs();
-  useMirror(sheet === "reference", { kind: "reference", ...refView }, true);
-  useMirror(sheet === "rules", { kind: "rules" }, true);
+  const [cast, setCast] = useState(false);
+  useMirror(cast && sheet === "reference", { kind: "reference", ...refView }, true);
+  useMirror(cast && sheet === "rules", { kind: "rules" }, true);
   const game = room.game!;
   const names = seatNames(room);
   const mySeat = seatOfPlayer(room.seats, playerId);
-  const closeSheet = (open: boolean) => !open && setSheet(null);
+  const closeSheet = (open: boolean) => {
+    if (open) return;
+    setSheet(null);
+    setCast(false);
+  };
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col gap-3 px-4 pb-28 pt-4">
@@ -120,11 +126,8 @@ export function PhoneGame() {
         </DialogContent>
       </Dialog>
       <Dialog open={sheet === "reference"} onOpenChange={closeSheet}>
-        <DialogContent
-          title="番符表"
-          description="打开时电视会同步显示"
-          className="h-[92dvh] sm:max-w-2xl"
-        >
+        <DialogContent title="番符表" className="h-[92dvh] sm:max-w-2xl">
+          <CastSwitch checked={cast} onCheckedChange={setCast} />
           <ReferenceSheet rules={room.rules} view={refView} onViewChange={setRefView} />
         </DialogContent>
       </Dialog>
@@ -133,6 +136,7 @@ export function PhoneGame() {
           title="房间规则"
           description={`${presetNameOf(room.rules)} · 对局进行中，规则已锁定`}
         >
+          <CastSwitch checked={cast} onCheckedChange={setCast} />
           <RulesEditor value={room.rules} onChange={() => undefined} editable={false} />
         </DialogContent>
       </Dialog>

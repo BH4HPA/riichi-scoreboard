@@ -102,6 +102,7 @@ test("截图：番符表与主控台", async ({ browser }) => {
 
   // 番符表：手机打开，电视镜像
   await phones[1]!.getByRole("button", { name: "番符表" }).click();
+  await phones[1]!.getByRole("switch", { name: "投到电视" }).click();
   await tv.getByText("正在查看番符表").waitFor();
   await tv.screenshot({ path: `${OUT}/tv-ref-yaku.png` });
   await phones[1]!.screenshot({ path: `${OUT}/phone-ref-yaku.png` });

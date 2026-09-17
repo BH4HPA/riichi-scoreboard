@@ -52,7 +52,8 @@ Yarn workspaces monorepo:
   desktop → `/console`, tablet chooses, phone gets QR scan + six-cell code input), `/console` (TV: two
   columns ≥ 1280px, otherwise single column with history drawer + QR dialog), `/r/:code` (phone).
   Phone settlement dialogs mirror to the TV as a full-screen modal (`features/mirror/SettlementMirror`),
-  carrying the hand only once the engine has evaluated it. Site credits (copyright, ICP record) live in
+  carrying the hand only once the engine has evaluated it. Looking up the 番符表/rules on a phone stays on the phone
+  unless its 「投到电视」 switch (`features/mirror/CastSwitch`, reset whenever the sheet closes) is on. Site credits (copyright, ICP record) live in
   `features/site/`: landing centers them at the page bottom, the narrow console lobby puts them in its button row, the narrow
   console game centers them at the page bottom, the wide console pins them
   left-aligned at the bottom of its left column; the phone game nav shows the ICP number as plain grey text. PWA = `public/manifest.json` + icons only, deliberately no Service Worker (the app is useless
