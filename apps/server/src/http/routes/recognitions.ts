@@ -71,8 +71,9 @@ export function recognitionRoutes(deps: Deps): Hono {
     if (!deps.modelId) return c.json({ error: "no_model", message: "尚未发布识别模型" }, 409);
     // 请求体已经被裸 JPEG 占用，来源只能走 query
     const source = c.req.query("source") ?? "room";
-    if (source !== "room" && source !== "label") {
-      return c.json({ error: "bad_source", message: "来源只能是 room 或 label" }, 400);
+    // label 仍收：旧前端（开发者标注页）在新服务端上线后还可能发
+    if (source !== "room" && source !== "label" && source !== "calc") {
+      return c.json({ error: "bad_source", message: "来源只能是 room、label 或 calc" }, 400);
     }
     const player = c.get("player");
     const t = now();

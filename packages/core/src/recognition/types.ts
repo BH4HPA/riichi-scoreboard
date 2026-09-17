@@ -29,7 +29,7 @@ export type RecognitionWarningCode =
  * 分两档，**在发出处指定**而不是按 code 查表：同一个 code 在不同上下文语义不同
  * （`too_many_dora` / `extra_rows` 也被 web 层用来发「已按房间规则截断」「认出里宝已勾立直」这类信息）。
  * - `blocking` 结果不自洽，用户必须动手：生产界面红字 + 强制展开全键盘。
- * - `info` 结果已自洽，模型在汇报自己的内务：生产界面不渲染，只在标注模式展示。
+ * - `info` 结果已自洽，模型在汇报自己的内务：任何界面都不渲染，也不随 PATCH 留存。
  */
 export type RecognitionSeverity = "blocking" | "info";
 
@@ -79,11 +79,12 @@ export interface RecognitionResult {
 }
 
 /**
- * 记录来自哪条路：`room` = 牌局里结算时拍的，`label` = 主页标注模式显式提交的真值。
- * 回流时两个群体的可信度不同（房间里靠「结算被牌桌接受」背书，标注模式是用户明说的），
- * 所以导出必须带上这一列。
+ * 记录来自哪条路，回流时三个群体的可信度不同，所以导出必须带上这一列：
+ * - `room` = 牌局里结算时拍的，靠「结算被牌桌接受」背书；
+ * - `label` = 已下线的开发者标注页显式提交的真值（历史记录，新前端不再写）；
+ * - `calc` = 拍照算点数页，玩家点「识别正确」时回填，只有玩家自己把关。
  */
-export type RecognitionSource = "room" | "label";
+export type RecognitionSource = "room" | "label" | "calc";
 
 /** POST /api/recognitions 的响应：照片已存、记录已建 */
 export interface RecognitionCreated {

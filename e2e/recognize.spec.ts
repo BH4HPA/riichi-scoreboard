@@ -398,8 +398,8 @@ test("算点数页：设场况 → 拍 → 重新拍 → 识别正确出番符�
     .toBe(true);
   await expect(sheet).toHaveCount(0, { timeout: 30_000 });
 
-  // 照片以 source=label 上传；识别情况 = 带框定格照 + 可改的牌面
-  await expect.poll(() => posts.some((u) => u.includes("source=label"))).toBe(true);
+  // 照片以 source=calc 上传；识别情况 = 带框定格照 + 可改的牌面
+  await expect.poll(() => posts.some((u) => u.includes("source=calc"))).toBe(true);
   await expect(p.getByTestId("hand-confirm")).toBeVisible();
 
   // 定格帧连同烧进去的检测框一起回看：点开是灯箱，可以下载存档

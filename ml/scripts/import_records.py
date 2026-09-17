@@ -13,7 +13,7 @@ TypeScript，Python 复刻它等于养第二份布局规则），这里只负责
   data/raw/records/pending/           status=manual 的样本 + 预标注的 Label Studio 任务
 照片从 COS 拉（需要 QCLOUD_SECRET_ID / QCLOUD_SECRET_KEY 与 coscmd）；本地存储模式
 用 --photos <目录> 直接指到 DATA_DIR/objects。
-用法：uv run scripts/import_records.py <records.ndjson> [--photos 目录] [--source room|label]
+用法：uv run scripts/import_records.py <records.ndjson> [--photos 目录] [--source room|label|calc]
 """
 
 import argparse
@@ -66,7 +66,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("records", type=Path, help="export-recognitions.ts 的 NDJSON")
     ap.add_argument("--photos", type=Path, help="本地照片根目录（DATA_DIR/objects），不给则走 COS")
-    ap.add_argument("--source", choices=["room", "label"], help="只导入某一种来源")
+    ap.add_argument("--source", choices=["room", "label", "calc"], help="只导入某一种来源")
     args = ap.parse_args()
 
     images = OUT / "images"

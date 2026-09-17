@@ -122,7 +122,7 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   `applyRecognized` fills the `ValueDraft`, `ValuePicker` auto-evaluates → after the win command is
   accepted the final hand is `PATCH`ed back as `corrected` (training truth). Warnings are two-tier
   (`severity` set at the emission site, not looked up by code): `blocking` shows in red and forces the
-  keyboard open, `info` is never shown to users (it stays in the stored result). `layoutHand` also returns `provenance` (which
+  keyboard open, `info` is not rendered anywhere and not persisted. `layoutHand` also returns `provenance` (which
   detection each tile came from, plus `usedDetections`) — the UI degrades it into "which tiles to
   double-check" at the `applyRecognized` boundary, and the reflow pipeline uses it to relabel boxes.
   The settlement's 拍照识别 button is enabled whenever a model is published: an unusable camera (no
@@ -148,8 +148,9 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   labelled with the tile's own SVG, tap for class + confidence) and an album entry (`StillPicker` reuses
   the same band); the privacy line shows in both modes. 「识别正确」 PATCHes `corrected` via
   `confirmRecognized` (serialized per page, repeat confirmations overwrite). Its rows are stored with
-  `source: "label"` (`recognitions.source`, migration v5, query param on `POST`; default `room`; the value
-  predates the rename and is kept as a data contract), which the reflow pipeline must always select.
+  `source: "calc"` (`recognitions.source`, migration v5, query param on `POST`; default `room`; `label` is
+  still accepted and marks rows from the retired developer labeling page — a different trust tier), and the
+  export must keep the column so reflow can tell the three apart.
   Layout convention (photo): closed tiles contiguous with the **win tile turned
   sideways** at either end (3n+2 tiles); melds are groups of 3/4 that contain a sideways tile (kan may
   have two: the added tile is stacked sideways on top; back-X-X-back = closed kan) and may sit

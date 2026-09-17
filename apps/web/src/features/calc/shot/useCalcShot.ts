@@ -46,7 +46,7 @@ export function useCalcShot(rules: RoomRules) {
           blob,
           result,
           token,
-          "label",
+          "calc",
           (id) =>
             setDraft((d) =>
               d.recognition?.key === key ? { ...d, recognition: { ...d.recognition, id } } : d,
