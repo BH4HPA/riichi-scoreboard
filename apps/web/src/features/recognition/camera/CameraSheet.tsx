@@ -253,10 +253,10 @@ export function CameraSheet({
   /** 快门只在真能拍的时候出现：模型就绪、画面在出、相机可用 */
   const canShoot = detector !== null && ready && painted && live !== null && !camBroken;
   const downloading = !detector && !error && progress < 1;
-  const hint =
-    live && stable > 0
-      ? `认出 ${live.hand.closed.length} 张 · 稳定 ${stable}/${STABLE_FRAMES}`
-      : "把手牌、副露和宝牌指示牌放进框里";
+  /** 右上角的小字进度：认出几张（副露按 3 张折算）· 连续几帧一致 */
+  const progressText = live
+    ? `${Math.min(14, live.hand.closed.length + live.hand.melds.length * 3)}/14 · ${stable}/${STABLE_FRAMES}`
+    : null;
 
   // portal 到 body：DialogContent 在 ≥640px 上有 translate，transform 祖先会让 fixed 以它为
   // 包含块，取景框就被压进对话框里不再全屏；顺带让背后的内容退出无障碍树。
@@ -291,9 +291,23 @@ export function CameraSheet({
           data-testid="camera-preview"
           data-painted={painted || undefined}
         />
+        {/* 取景带下方的暗色遮罩一直铺到屏幕底部：底栏压在暗区上，颜色连成一片 */}
+        {!paused && (
+          <div
+            className="absolute inset-x-0 bottom-0 bg-black/60"
+            style={{ height: panelHeight }}
+            aria-hidden
+          />
+        )}
         {/* 取景带只在底栏以上的可见部分里（画面铺满整屏，底栏浮在下面） */}
         <div className="absolute inset-x-0 top-0" style={{ bottom: panelHeight }}>
-          {!paused && <BandOverlay band={band} onBandChange={setBand} hint={hint} />}
+          {!paused && (
+            <BandOverlay
+              band={band}
+              onBandChange={setBand}
+              hint="把手牌、副露和宝牌指示牌放进框里"
+            />
+          )}
           {mode === "label" && live && !paused && (
             <div
               className="absolute inset-x-0"
@@ -325,6 +339,14 @@ export function CameraSheet({
         >
           <X className="h-5 w-5" />
         </button>
+        {progressText && !paused && (
+          <span
+            className="pointer-events-none absolute right-3 top-4 text-xs tabular text-white/80 drop-shadow"
+            data-testid="camera-progress"
+          >
+            {progressText}
+          </span>
+        )}
         {flash && (
           <span
             className="pointer-events-none absolute inset-0 bg-white/70"
@@ -355,7 +377,7 @@ export function CameraSheet({
       <div
         ref={setPanel}
         data-testid="camera-panel"
-        className="absolute inset-x-0 bottom-0 space-y-2 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 text-white"
+        className="absolute inset-x-0 bottom-0 space-y-2 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 text-white"
       >
         {camError && <p className="text-sm text-neg">{camError}</p>}
         {error && (
@@ -369,8 +391,8 @@ export function CameraSheet({
           </div>
         )}
         {/* 固定高度（一行手牌 + 一行指示牌）：模型下载进度、认出/没认出来回切换都在这一格里，
-            底栏不能伸缩，否则取景带跟着跳。快门能点时才出现，放在指示牌那一行的右端 */}
-        <div className="relative h-[70px] overflow-hidden" data-testid="camera-live">
+            底栏不能伸缩，否则取景带跟着跳 */}
+        <div className="h-[70px] overflow-hidden" data-testid="camera-live">
           {downloading ? (
             <div>
               <p className="text-xs">
@@ -385,8 +407,7 @@ export function CameraSheet({
             </div>
           ) : (
             live && (
-              // 右侧固定留出快门的位置：快门出现/消失时不跳，横滑到头最右的牌也不压在按钮下
-              <div className="overflow-x-auto py-1 pl-1 pr-16">
+              <div className="overflow-x-auto px-1 py-1">
                 <HandView
                   hand={live.hand}
                   size="xs"
@@ -397,45 +418,47 @@ export function CameraSheet({
               </div>
             )
           )}
-          {canShoot && (
-            <Button
-              variant="accent"
-              size="sm"
-              className="absolute bottom-1 right-0"
-              onClick={() => void capture()}
-              data-testid="camera-shutter"
-            >
-              快门
-            </Button>
-          )}
         </div>
-        <div className="flex items-center justify-between gap-3 text-xs text-white/70">
+        {/* 最后一行：左边说明，右边相册与快门。min-h-8 按按钮高度留位，快门出现/消失时底栏不伸缩 */}
+        <div className="flex min-h-8 items-center justify-between gap-3 text-xs text-white/70">
           <span className="flex min-w-0 items-center gap-3">
-            {mode === "room" && <span className="truncate">定格的照片会上传，用于改进识别</span>}
+            {mode === "room" && <span className="truncate">拍下的牌面照片会用来改进识别</span>}
             <button type="button" className="shrink-0 underline" onClick={() => setGuide(true)}>
               怎么摆
             </button>
           </span>
-          {/* 相册：标注模式常驻；房间里就地拍一张成本接近零，只在相机用不了时才给 */}
-          {(mode === "label" || camBroken) && (
-            <label
-              className="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-lg border border-white/40 px-2.5 text-sm text-white"
-              aria-label="从相册选一张"
-            >
-              <Images className="h-4 w-4" />
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                data-testid="label-album"
-                onChange={(e) => {
-                  const f = e.target.files?.[0] ?? null;
-                  e.target.value = "";
-                  if (f) setFile(f);
-                }}
-              />
-            </label>
-          )}
+          <span className="flex shrink-0 items-center gap-2">
+            {/* 相册：标注模式常驻；房间里就地拍一张成本接近零，只在相机用不了时才给 */}
+            {(mode === "label" || camBroken) && (
+              <label
+                className="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-lg border border-white/40 px-2.5 text-sm text-white"
+                aria-label="从相册选一张"
+              >
+                <Images className="h-4 w-4" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  data-testid="label-album"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    e.target.value = "";
+                    if (f) setFile(f);
+                  }}
+                />
+              </label>
+            )}
+            {canShoot && (
+              <Button
+                variant="accent"
+                size="sm"
+                onClick={() => void capture()}
+                data-testid="camera-shutter"
+              >
+                快门
+              </Button>
+            )}
+          </span>
         </div>
       </div>
 

@@ -90,6 +90,7 @@ function sampleViewfinder(p: Page) {
         clipped: boolean;
         uncovered: boolean;
         shown: boolean;
+        progress: boolean;
       }>((resolve) => {
         let min = Infinity;
         let max = 0;
@@ -97,6 +98,7 @@ function sampleViewfinder(p: Page) {
         let clipped = false;
         let uncovered = false;
         let shown = false;
+        let progress = false;
         let seen = false;
         const tick = () => {
           const area = document.querySelector('[data-testid="camera-area"]');
@@ -131,9 +133,12 @@ function sampleViewfinder(p: Page) {
             }
             const slot = document.querySelector('[data-testid="camera-live"]');
             live ||= Boolean(slot?.querySelector("img"));
+            progress ||= /^\d+\/14 · \d\/3$/.test(
+              document.querySelector('[data-testid="camera-progress"]')?.textContent ?? "",
+            );
             clipped ||= slot !== null && slot.scrollHeight > slot.clientHeight + 1;
           } else if (seen) {
-            return resolve({ min, max, live, clipped, uncovered, shown });
+            return resolve({ min, max, live, clipped, uncovered, shown, progress });
           }
           requestAnimationFrame(tick);
         };
@@ -153,6 +158,8 @@ test("取景 → 自动定格 → 填入牌面并自动算番 → 检测框与�
   expect(measured.max - measured.min).toBeLessThan(1);
   expect(measured.clipped).toBe(false);
   expect(measured.shown).toBe(true);
+  // 右上角小字进度「14/14 · 1/3」
+  expect(measured.progress).toBe(true);
   expect(measured.uncovered).toBe(false);
   await expect(dialog.getByTestId("recognize-button")).toHaveText("重新拍照");
 
@@ -258,7 +265,7 @@ test("相机不可用 → 取景页仍能打开：说明原因、不出快门、
   const panelBox = (await sheet.getByTestId("camera-panel").boundingBox())!;
   expect(bandBox.y + bandBox.height).toBeLessThanOrEqual(panelBox.y + 1);
   await expect(sheet.getByLabel("从相册选一张")).toBeVisible();
-  await expect(sheet.getByText("定格的照片会上传，用于改进识别")).toBeVisible();
+  await expect(sheet.getByText("拍下的牌面照片会用来改进识别")).toBeVisible();
   await sheet.getByRole("button", { name: "怎么摆" }).click();
   await expect(sheet.getByText("手牌连成一排", { exact: false })).toBeVisible();
   await sheet.getByRole("button", { name: "知道了" }).click();
