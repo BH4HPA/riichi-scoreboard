@@ -36,6 +36,7 @@ export function ConsoleGame({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const controls = useControlDialogs();
+  const finished = game.present.status === "finished";
   const { attach, ratio, ratioAt, set: setRatio } = useSplit();
   return (
     <div className={wide ? "flex h-dvh flex-col gap-4 p-6" : "flex min-h-dvh flex-col gap-3 p-4"}>
@@ -67,15 +68,7 @@ export function ConsoleGame({
       >
         <div className={wide ? "flex min-h-0 flex-col gap-2" : "contents"}>
           <div className={wide ? "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto" : "contents"}>
-            <PointsGrid
-              game={game.present}
-              seats={room.seats}
-              names={names}
-              rules={room.rules}
-              size={wide ? "tv" : "pad"}
-            />
-            <MirrorOverlay intents={intents} names={names} rules={room.rules} />
-            {game.present.status === "finished" && (
+            {finished && (
               <div className="rounded-xl border border-pos/40 bg-surface p-4">
                 <h2 className="mb-2 text-lg font-semibold">终局结算</h2>
                 <FinalPanel
@@ -87,14 +80,24 @@ export function ConsoleGame({
                 />
               </div>
             )}
-            <div className="rounded-xl border border-border bg-surface p-3">
-              <DiffMatrix
-                game={game.present}
-                names={names}
-                rules={room.rules}
-                size={wide ? "tv" : "pad"}
-              />
-            </div>
+            <PointsGrid
+              game={game.present}
+              seats={room.seats}
+              names={names}
+              rules={room.rules}
+              size={wide ? "tv" : "pad"}
+            />
+            <MirrorOverlay intents={intents} names={names} rules={room.rules} />
+            {!finished && (
+              <div className="rounded-xl border border-border bg-surface p-3">
+                <DiffMatrix
+                  game={game.present}
+                  names={names}
+                  rules={room.rules}
+                  size={wide ? "tv" : "pad"}
+                />
+              </div>
+            )}
           </div>
           {wide && <SiteFooter className="shrink-0" />}
         </div>

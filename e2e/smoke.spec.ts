@@ -361,6 +361,20 @@ test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手�
   await expect(tv.getByTestId("points-0")).toHaveText("25,000");
   await expect(phones[1]!.getByTestId("points-1")).toHaveText("25,000");
 
+  // 终局：手机只留终局表与撤销/重做/调整场况/返回大厅/重开，不再有自摸荣和、立直与点差
+  await tv.getByRole("button", { name: "操作" }).click();
+  await tv.getByRole("button", { name: "终局结算" }).click();
+  await tv.getByRole("button", { name: "确认终局" }).click();
+  await expect(phones[0]!.getByRole("heading", { name: "终局结算" })).toBeVisible();
+  await expect(phones[0]!.getByRole("button", { name: "自摸", exact: true })).toHaveCount(0);
+  await expect(phones[0]!.getByRole("button", { name: "立直", exact: true })).toHaveCount(0);
+  await expect(phones[0]!.getByText("我的点差")).toHaveCount(0);
+  await expect(phones[0]!.getByRole("button", { name: "调整场况" })).toBeVisible();
+  await expect(phones[0]!.getByRole("button", { name: "返回大厅" })).toBeVisible();
+  // 撤回终局，回到对局中
+  await phones[0]!.getByRole("button", { name: "撤销" }).click();
+  await expect(phones[0]!.getByRole("button", { name: "自摸", exact: true })).toBeVisible();
+
   // 对局中解散（入口在「操作」对话框）：手机看到提示，主控台自动开新房，且没有错误提示
   await tv.getByRole("button", { name: "操作" }).click();
   await tv.getByRole("button", { name: "解散房间" }).click();

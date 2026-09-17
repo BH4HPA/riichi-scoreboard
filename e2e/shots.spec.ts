@@ -128,6 +128,18 @@ test("截图：番符表与主控台", async ({ browser }) => {
   await tv.waitForTimeout(300);
   await tv.screenshot({ path: `${OUT}/tv-ref-fu.png` });
   await phones[1]!.screenshot({ path: `${OUT}/phone-ref-fu.png`, fullPage: true });
+  await phones[1]!.keyboard.press("Escape");
+
+  // 窄屏手机（360）对局页与终局页
+  await phones[1]!.setViewportSize({ width: 360, height: 780 });
+  await phones[1]!.screenshot({ path: `${OUT}/phone-game-360.png`, fullPage: true });
+  await tv.getByRole("button", { name: "操作" }).click();
+  await tv.getByRole("button", { name: "终局结算" }).click();
+  await tv.getByRole("button", { name: "确认终局" }).click();
+  await phones[1]!.getByRole("heading", { name: "终局结算" }).waitFor();
+  await phones[1]!.screenshot({ path: `${OUT}/phone-final-360.png`, fullPage: true });
+  await tv.getByRole("heading", { name: "终局结算" }).waitFor();
+  await tv.screenshot({ path: `${OUT}/tv-final.png` });
   await tvCtx.close();
 });
 
