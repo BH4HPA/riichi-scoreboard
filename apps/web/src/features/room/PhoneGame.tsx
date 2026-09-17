@@ -165,8 +165,9 @@ export function PhoneGame() {
           <ProfileEditor />
           <h3 className="mb-2 mt-4 text-sm font-medium">战绩</h3>
           <StatsPanel />
-          <Button asChild variant="ghost" size="sm" className="mt-4 w-full text-muted">
-            <Link to="/">退出房间（座位保留，回来扫码即恢复）</Link>
+          {/* 对局中离开只是暂离：座位保留，回首页点「返回房间」或重新扫码即可回来 */}
+          <Button asChild variant="outline" size="sm" className="mt-4 w-full">
+            <Link to="/">暂离房间</Link>
           </Button>
         </DialogContent>
       </Dialog>
