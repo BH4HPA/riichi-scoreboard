@@ -265,6 +265,21 @@ test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手�
   // 两部手机准备 → 倒计时开始（本地玩家入座即准备）→ 主控台在倒计时内手动开局
   await phones[0]!.getByRole("button", { name: "准备", exact: true }).click();
   await expect(tv.getByRole("button", { name: /开局 ·/ })).toHaveCount(0);
+  // 手机 2 改规则 → 手机 1 的准备被清并提示；本地玩家保持已准备；改的人自己不提示
+  await expect(phones[0]!.getByRole("button", { name: "取消准备" })).toBeVisible();
+  await phones[1]!.getByRole("button", { name: "修改规则" }).click();
+  const rulesDlg = phones[1]!.getByRole("dialog");
+  await rulesDlg
+    .getByText("切上满贯", { exact: true })
+    .locator("xpath=../..")
+    .getByRole("switch")
+    .click();
+  await rulesDlg.getByRole("button", { name: "应用规则" }).click();
+  await expect(phones[0]!.getByText("规则已修改，请重新准备")).toBeVisible();
+  await expect(phones[0]!.getByRole("button", { name: "准备", exact: true })).toBeVisible();
+  await expect(tv.getByTestId("seat-0")).toContainText("已准备");
+  await expect(phones[1]!.getByText("规则已修改，请重新准备")).toHaveCount(0);
+  await phones[0]!.getByRole("button", { name: "准备", exact: true }).click();
   await phones[1]!.getByRole("button", { name: "准备", exact: true }).click();
   await tv.getByRole("button", { name: /开局 ·/ }).click();
   await expect(tv.getByTestId("points-0")).toHaveText("25,000");

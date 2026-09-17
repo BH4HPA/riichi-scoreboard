@@ -87,6 +87,9 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
 - Auto-start: when the lobby is full, everyone is ready, every device player is online and at least one
   device player is seated, the server starts a 3 s countdown (`RoomView.autoStartAt`) and commits `start` as
   the system actor; any change that breaks the condition cancels it. Four locals never auto-start.
+  A `setRules` that actually changes the rules (canonical `rulesKey`) is enriched with `resetReady` and
+  clears device players' ready (locals keep it); the flag lives only in new events, so replay of old
+  rooms is unchanged.
 - Deployed split-hosted: `WEB_DIST=` (empty) disables the SPA in the server image; app paths then 302 to
   the first `CORS_ORIGINS` entry.
 - Photo recognition: a YOLO11n detector over 38 classes (`1m..9m,0m,1p..9p,0p,1s..9s,0s,1z..7z,back`).

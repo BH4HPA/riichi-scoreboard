@@ -77,6 +77,27 @@ describe("RoomRegistry：在线状态、离线座位回收、自动开局", () =
     expect(last(b).seats[0]).toBeNull();
   });
 
+  it("改规则：规则确有变化才补 resetReady 清设备玩家准备；相同规则不动准备", () => {
+    const a = fakeClient(device("甲").id);
+    registry.join(room, a);
+    registry.apply(room, room.seq, { type: "sit", seat: 0 }, actorOf(a));
+    registry.apply(room, room.seq, { type: "setReady", seat: 0, ready: true }, actorOf(a));
+
+    const same = registry.apply(
+      room,
+      room.seq,
+      { type: "setRules", rules: MLEAGUE_RULES },
+      actorOf(a),
+    );
+    expect(same.command).toEqual({ type: "setRules", rules: MLEAGUE_RULES });
+    expect(last(a).ready[0]).toBe(true);
+
+    const rules = { ...MLEAGUE_RULES, scoring: { ...MLEAGUE_RULES.scoring, kiriageMangan: false } };
+    const changed = registry.apply(room, room.seq, { type: "setRules", rules }, actorOf(a));
+    expect(changed.command).toMatchObject({ type: "setRules", resetReady: true });
+    expect(last(a).ready[0]).toBe(false);
+  });
+
   it("baseSeq 落后：座位类命令照常执行（广播还没到就点按钮），牌局类仍然拒绝", () => {
     const a = fakeClient(device("甲").id);
     const b = fakeClient(device("乙").id);
