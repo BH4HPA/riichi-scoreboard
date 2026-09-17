@@ -1,4 +1,3 @@
-import { Crown } from "lucide-react";
 import {
   computeRanks,
   dealerOf,
@@ -70,21 +69,15 @@ export function PointsGrid({
       {SEATS.map((seat) => {
         const isDealer = seat === dealer && game.status !== "finished";
         const tone = rankTone(ranks[seat]!, ranks);
-        // 手机上庄家标记并进自风：庄家的自风必然是东，把它做成实底即可
+        // 庄家标记并进自风：庄家的自风必然是东，把它做成实底即可
         const wind = (
           <Badge
-            tone={phone && isDealer ? "accent" : "outline"}
+            tone={isDealer ? "accent" : "outline"}
             size={st.badge}
             className="shrink-0"
-            {...(phone && isDealer ? { "aria-label": "东（庄家）" } : {})}
+            {...(isDealer ? { "aria-label": "东（庄家）" } : {})}
           >
             {WIND_LABELS[seatWind(seat, dealer)]}
-          </Badge>
-        );
-        const crown = isDealer && (
-          <Badge tone="accent" size={st.badge} aria-label="庄家" className="shrink-0">
-            <Crown className="h-3 w-3" />
-            {!phone && "庄家"}
           </Badge>
         );
         const rank = (
@@ -111,9 +104,8 @@ export function PointsGrid({
                     我
                   </Badge>
                 )}
-                {!phone && wind}
               </div>
-              {!phone && crown}
+              {!phone && wind}
             </div>
             <div className="mt-2 flex items-end justify-between gap-2">
               <span className={cn("font-semibold tabular leading-none", st.points)}>
