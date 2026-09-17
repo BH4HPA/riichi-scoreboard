@@ -35,7 +35,7 @@ function hold(frameId: number, bitmap: ImageBitmap): void {
 
 async function init(wasm: Uint8Array, model: Uint8Array, size: number): Promise<void> {
   // iOS 16.3 及更早没有 OffscreenCanvas，会在第一帧推理时才抛 ReferenceError —— 那时界面已经
-  // 显示「对准后会自动定格」，用户只看到永远不动的黑屏。提前到 init 里失败，走已有的错误展示。
+  // 取景页看着正常，用户只看到永远不动的黑屏。提前到 init 里失败，走已有的错误展示。
   if (typeof OffscreenCanvas === "undefined") {
     throw new Error("拍照识别需要 iOS 16.4 或更新的系统");
   }

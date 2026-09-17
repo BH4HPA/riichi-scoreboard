@@ -52,7 +52,7 @@ function spawn(modelId: string, imgsz: number, onProgress?: LoadProgress): Promi
         grabbing = null;
         worker.terminate();
         release();
-        // ready 之后 reject 是空操作，所以失败必须另有出口，否则界面照旧显示「对准后会自动定格」
+        // ready 之后 reject 是空操作，所以失败必须另有出口，否则取景页照旧像正常工作一样
         errors.forEach((fn) => fn(message));
         results.forEach((fn) => fn(null));
         reject(new Error(message));

@@ -16,10 +16,10 @@ import { BAND_DEFAULT, fitLongEdge, STILL_MAX_EDGE, type Rect } from "./band";
 import { BandOverlay } from "./BandOverlay";
 import { DetectionOverlay } from "./DetectionOverlay";
 import { StillPicker } from "./StillPicker";
-import { EMPTY_CAPTURE, feedFrame, HINT_AFTER_MS, STABLE_FRAMES } from "./autoCapture";
+import { EMPTY_CAPTURE, feedFrame, STABLE_FRAMES } from "./autoCapture";
 import { LayoutGuide } from "./LayoutGuide";
 import { useCameraStream } from "./useCameraStream";
-import { useCoverVideo } from "./useCoverVideo";
+import { useCanvasPreview } from "./useCanvasPreview";
 import { useElementHeight } from "./useElementHeight";
 import { useLiveDetect } from "./useLiveDetect";
 
@@ -59,7 +59,6 @@ export function CameraSheet({
   const [stable, setStable] = useState(0);
   const [paused, setPaused] = useState(false);
   const [openedAt] = useState(() => Date.now());
-  const [now, setNow] = useState(() => Date.now());
 
   const [file, setFile] = useState<File | null>(null);
   /** 相册那张正在推理：实时循环让开，免得两边抢 Worker 互相把对方的帧挤掉 */
@@ -88,7 +87,8 @@ export function CameraSheet({
   const [area, setArea] = useState<HTMLDivElement | null>(null);
   const [panel, setPanel] = useState<HTMLDivElement | null>(null);
   const panelHeight = useElementHeight(panel);
-  const videoStyle = useCoverVideo(area, videoRef);
+  const [preview, setPreview] = useState<HTMLCanvasElement | null>(null);
+  const painted = useCanvasPreview(videoRef, preview);
 
   // 识别线程随取景页开关：一局牌九成时间用不上，几十 MB 的会话不必常驻
   useEffect(() => {
@@ -130,11 +130,10 @@ export function CameraSheet({
     return () => document.removeEventListener("keydown", onKey, true);
   }, []);
 
-  // 一秒一跳，只为驱动「5 秒提示快门」与「60 秒停流」两个时间判断
+  // 一秒一跳，只为「60 秒没认出牌就停流」的判断
   useEffect(() => {
     if (!active) return;
     const t = setInterval(() => {
-      setNow(Date.now());
       if (Date.now() - lastGoodRef.current > IDLE_STOP_MS) setPaused(true);
     }, 1000);
     return () => clearInterval(t);
@@ -251,8 +250,9 @@ export function CameraSheet({
 
   /** 相机用不了（权限、无设备、占用、非 HTTPS）：快门没有意义，给相册入口 */
   const camBroken = camError !== null;
+  /** 快门只在真能拍的时候出现：模型就绪、画面在出、相机可用 */
+  const canShoot = detector !== null && ready && painted && live !== null && !camBroken;
   const downloading = !detector && !error && progress < 1;
-  const overdue = now - openedAt > HINT_AFTER_MS && !paused;
   const hint =
     live && stable > 0
       ? `认出 ${live.hand.closed.length} 张 · 稳定 ${stable}/${STABLE_FRAMES}`
@@ -276,15 +276,20 @@ export function CameraSheet({
         className="absolute inset-0 overflow-hidden"
         data-testid="camera-area"
       >
-        {/* 尺寸由 useCoverVideo 算好的像素给出；首帧真正画出来之前不显示（见 useCoverVideo） */}
+        {/* 画面由盖在上面的 canvas 逐帧绘制（纯黑底、完全遮住视频）：绕开 iOS 视频图层开流后尺寸画错的问题。
+            视频本身保持可见，识别循环的逐帧回调照常工作 */}
         <video
           ref={videoRef}
-          // 用透明度藏而不是 visibility：隐藏的视频不进合成，首帧回调可能永远不来
-          className={videoStyle ? "block" : "absolute opacity-0"}
-          style={videoStyle ?? undefined}
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
           muted
           playsInline
           data-testid="camera-video"
+        />
+        <canvas
+          ref={setPreview}
+          className="absolute inset-0 h-full w-full bg-black"
+          data-testid="camera-preview"
+          data-painted={painted || undefined}
         />
         {/* 取景带只在底栏以上的可见部分里（画面铺满整屏，底栏浮在下面） */}
         <div className="absolute inset-x-0 top-0" style={{ bottom: panelHeight }}>
@@ -364,8 +369,8 @@ export function CameraSheet({
           </div>
         )}
         {/* 固定高度（一行手牌 + 一行指示牌）：模型下载进度、认出/没认出来回切换都在这一格里，
-            底栏不能伸缩，否则取景画面和框跟着跳 */}
-        <div className="h-[70px] overflow-hidden" data-testid="camera-live">
+            底栏不能伸缩，否则取景带跟着跳。快门能点时才出现，放在指示牌那一行的右端 */}
+        <div className="relative h-[70px] overflow-hidden" data-testid="camera-live">
           {downloading ? (
             <div>
               <p className="text-xs">
@@ -380,59 +385,58 @@ export function CameraSheet({
             </div>
           ) : (
             live && (
-              <div className="overflow-x-auto px-1 py-1">
+              // 右侧固定留出快门的位置：快门出现/消失时不跳，横滑到头最右的牌也不压在按钮下
+              <div className="overflow-x-auto py-1 pl-1 pr-16">
                 <HandView
                   hand={live.hand}
                   size="xs"
                   showUra={rules.hand.uraDora}
+                  indicatorClassName="text-white/70"
                   className="w-max"
                 />
               </div>
             )
           )}
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <span className="flex items-center gap-3 text-xs text-white/70">
-            {!camBroken && (overdue ? "对不齐？直接按快门" : "对准后会自动定格")}
-            <button type="button" className="underline" onClick={() => setGuide(true)}>
-              怎么摆
-            </button>
-          </span>
-          <div className="flex items-center gap-2">
-            {/* 相册：标注模式常驻；房间里就地拍一张成本接近零，只在相机用不了时才给 */}
-            {(mode === "label" || camBroken) && (
-              <label
-                className="inline-flex h-8 cursor-pointer items-center rounded-lg border border-white/40 px-2.5 text-sm"
-                aria-label="从相册选一张"
-              >
-                <Images className="h-4 w-4" />
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  data-testid="label-album"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0] ?? null;
-                    e.target.value = "";
-                    if (f) setFile(f);
-                  }}
-                />
-              </label>
-            )}
+          {canShoot && (
             <Button
-              variant={overdue ? "accent" : "outline"}
+              variant="accent"
               size="sm"
+              className="absolute bottom-1 right-0"
               onClick={() => void capture()}
-              disabled={!detector || !ready || camBroken}
               data-testid="camera-shutter"
             >
               快门
             </Button>
-          </div>
+          )}
         </div>
-        {mode === "room" && (
-          <p className="text-[11px] text-white/50">定格的照片会上传，用于改进识别</p>
-        )}
+        <div className="flex items-center justify-between gap-3 text-xs text-white/70">
+          <span className="flex min-w-0 items-center gap-3">
+            {mode === "room" && <span className="truncate">定格的照片会上传，用于改进识别</span>}
+            <button type="button" className="shrink-0 underline" onClick={() => setGuide(true)}>
+              怎么摆
+            </button>
+          </span>
+          {/* 相册：标注模式常驻；房间里就地拍一张成本接近零，只在相机用不了时才给 */}
+          {(mode === "label" || camBroken) && (
+            <label
+              className="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-lg border border-white/40 px-2.5 text-sm text-white"
+              aria-label="从相册选一张"
+            >
+              <Images className="h-4 w-4" />
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                data-testid="label-album"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  e.target.value = "";
+                  if (f) setFile(f);
+                }}
+              />
+            </label>
+          )}
+        </div>
       </div>
 
       {file && (
