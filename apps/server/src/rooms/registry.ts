@@ -11,6 +11,7 @@ import {
   reduceRoom,
   replay,
   rulesKey,
+  describeRevert,
   seatOfPlayer,
   seatsOnline,
   STOPS_MUSIC,
@@ -29,13 +30,14 @@ import {
   type RoomEvent,
   type RoomRules,
   type RoomState,
+  type ServerMessage,
   type RoomView,
   type Seat,
   type UiState,
   type WinValue,
   WS_CLOSE,
 } from "@riichi/core";
-import { toPlayerRef, type PlayersRepo } from "../db/players";
+import { DEFAULT_PLAYER_NAME, toPlayerRef, type PlayersRepo } from "../db/players";
 import type { RoomsRepo } from "../db/rooms";
 import type { ResultsRepo } from "../db/results";
 import { evaluateHand } from "../engine/evaluate";
@@ -199,7 +201,8 @@ export class RoomRegistry {
 
   private commit(room: LiveRoom, command: Command, actor: EventActor): RoomEvent {
     const event: RoomEvent = { seq: room.seq + 1, at: this.now(), actor, command };
-    const next = reduceRoom(room.state, event);
+    const prev = room.state;
+    const next = reduceRoom(prev, event);
     this.roomsRepo.transaction(() => {
       this.roomsRepo.appendEvent(room.code, event);
       this.resultsRepo.onTransition(room.state, next);
@@ -211,7 +214,23 @@ export class RoomRegistry {
     if (STOPS_MUSIC[command.type]) room.music = null;
     this.reconcileAutoStart(room);
     this.broadcastState(room);
+    if ((command.type === "undo" || command.type === "redo") && prev.game && next.game) {
+      this.broadcast(room, {
+        type: "reverted",
+        op: command.type,
+        by: this.actorName(room, actor),
+        what: describeRevert(prev.game.present, next.game.present),
+      });
+    }
     return event;
+  }
+
+  /** 提示里怎么称呼操作者：在座用座位上的昵称；没入座的设备用档案昵称，没改过默认名的就是主控台。 */
+  private actorName(room: LiveRoom, actor: EventActor): string {
+    const seat = seatOfPlayer(room.state.seats, actor.playerId);
+    if (seat !== null) return room.state.seats[seat]!.name;
+    const name = room.clients.get(actor.clientId)?.name;
+    return name && name !== DEFAULT_PLAYER_NAME ? name : "主控台";
   }
 
   /**
@@ -376,7 +395,11 @@ export class RoomRegistry {
   }
 
   broadcastUi(room: LiveRoom): void {
-    const payload = JSON.stringify({ type: "ui", intents: this.uiList(room) });
+    this.broadcast(room, { type: "ui", intents: this.uiList(room) });
+  }
+
+  private broadcast(room: LiveRoom, message: ServerMessage): void {
+    const payload = JSON.stringify(message);
     for (const c of room.clients.values()) c.send(payload);
   }
 

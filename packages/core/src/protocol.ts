@@ -364,4 +364,6 @@ export type ServerMessage =
   | { type: "ack"; id: string; seq: number }
   | { type: "error"; id: string | null; code: string; message: string }
   | { type: "evaluate"; id: string; result: EvaluatedHand }
+  /** 撤销/重做生效后发给全房间：谁撤了（重做了）哪一笔，各端弹一条提示 */
+  | { type: "reverted"; op: "undo" | "redo"; by: string; what: string }
   | { type: "pong" };

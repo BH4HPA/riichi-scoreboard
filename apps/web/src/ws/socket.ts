@@ -187,6 +187,9 @@ export class RoomSocket {
         else store.notify("error", msg.message);
         return;
       }
+      case "reverted":
+        store.notify("info", `${msg.by} ${msg.op === "undo" ? "撤销" : "重做"}了：${msg.what}`);
+        return;
       case "pong":
         return;
     }

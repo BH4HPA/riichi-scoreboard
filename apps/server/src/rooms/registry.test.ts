@@ -8,15 +8,20 @@ import { MLEAGUE_RULES } from "@riichi/core";
 import { RoomRegistry, type LiveRoom, type RoomClient } from "./registry";
 
 /** 假客户端：收集广播，供断言最后一次状态。 */
-function fakeClient(playerId: string): RoomClient & { states: RoomView[] } {
+function fakeClient(
+  playerId: string,
+): RoomClient & { states: RoomView[]; messages: ServerMessage[] } {
   const states: RoomView[] = [];
+  const messages: ServerMessage[] = [];
   return {
     clientId: `c-${playerId}-${Math.random().toString(36).slice(2, 6)}`,
     playerId,
     name: playerId,
     states,
+    messages,
     send(m) {
       const msg = JSON.parse(m) as ServerMessage;
+      messages.push(msg);
       if (msg.type === "state") states.push(msg.room);
     },
     close() {},
@@ -134,6 +139,50 @@ describe("RoomRegistry：在线状态、离线座位回收、自动开局", () =
       AUTO_MS,
     );
     expect(rebuilt.get(room.code).state.game?.present.riichi).toEqual([true, false, false, false]);
+  });
+
+  it("撤销/重做后向全房间广播谁撤了哪一笔（在座用座位昵称，未入座且默认名的是主控台）", () => {
+    // 主控台没改过昵称：连接名是注册默认名
+    const tv = { ...fakeClient(players.create("玩家", now).id), name: "玩家" };
+    registry.join(room, tv);
+    const phone = fakeClient(device("甲").id);
+    registry.join(room, phone);
+    registry.apply(room, room.seq, { type: "sit", seat: 3 }, actorOf(phone));
+    const locals = ["乙", "丙", "丁"].map((n) => players.createLocal(n, tv.playerId, now));
+    locals.forEach((l, i) =>
+      registry.apply(
+        room,
+        room.seq,
+        { type: "sitLocal", seat: i as 0 | 1 | 2, playerId: l.id },
+        actorOf(tv),
+      ),
+    );
+    registry.apply(room, room.seq, { type: "start", force: true }, actorOf(tv));
+    registry.apply(
+      room,
+      room.seq,
+      {
+        type: "ron",
+        loser: 0,
+        wins: [{ winner: 3, value: { kind: "manual", han: 2, fu: 30, yakuman: 0 } }],
+        riichi: [],
+      },
+      actorOf(phone),
+    );
+    const reverted = (c: { messages: ServerMessage[] }) =>
+      c.messages.filter((m) => m.type === "reverted");
+
+    registry.apply(room, room.seq, { type: "undo" }, actorOf(phone));
+    expect(reverted(tv)).toEqual([
+      { type: "reverted", op: "undo", by: "甲", what: "东1局0本场 甲荣和" },
+    ]);
+    registry.apply(room, room.seq, { type: "redo" }, actorOf(tv));
+    expect(reverted(phone).at(-1)).toEqual({
+      type: "reverted",
+      op: "redo",
+      by: "主控台",
+      what: "东1局0本场 甲荣和",
+    });
   });
 
   it("baseSeq 落后：座位类命令照常执行（广播还没到就点按钮），牌局类仍然拒绝", () => {
