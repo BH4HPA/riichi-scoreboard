@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { BAND_MAX, BAND_MIN, bandRect, boxStyle, clampBand, type Viewport } from "./band";
+import {
+  BAND_MAX,
+  BAND_MIN,
+  bandRect,
+  boxStyle,
+  clampBand,
+  clampCenter,
+  fitBox,
+  type Viewport,
+} from "./band";
 
 /** 横向视频（1920×1080）放进竖屏手机（390×780）：object-cover 会把左右各裁掉一大块 */
 const portrait: Viewport = {
@@ -84,5 +93,47 @@ describe("boxStyle", () => {
 
   it("裁剪尺寸退化时不给出无穷大的样式", () => {
     expect(boxStyle([0, 0, 1, 1], { x: 0, y: 0, width: 0, height: 200 })).toBeNull();
+  });
+});
+
+describe("相册照片：完整显示、取景带可上下移动", () => {
+  // 细长的竖拍截图 720×1920 放进 390×780 的区域：contain 按高度缩放，左右留黑边
+  const photo: Viewport = {
+    videoWidth: 720,
+    videoHeight: 1920,
+    displayWidth: 390,
+    displayHeight: 780,
+    fit: "contain",
+  };
+
+  it("contain 的摆放：整张照片都在区域里", () => {
+    const box = fitBox(photo)!;
+    expect(box.scale).toBeCloseTo(780 / 1920);
+    expect(box.top).toBeCloseTo(0);
+    expect(box.left).toBeGreaterThan(0);
+  });
+
+  it("横向覆盖整张照片宽度；中线下移，裁剪区跟着下移", () => {
+    const mid = bandRect(photo, 0.3)!;
+    expect(mid.x).toBe(0);
+    expect(Math.round(mid.width)).toBe(720);
+    const lower = bandRect(photo, 0.3, 0.8)!;
+    expect(lower.y).toBeGreaterThan(mid.y);
+    expect(Math.round(lower.height)).toBe(Math.round(mid.height));
+    // 中线 0.8、带高 0.3：下沿 0.95，仍在照片内
+    expect(lower.y + lower.height).toBeLessThanOrEqual(1920 + 1e-6);
+  });
+
+  it("中线夹在带不出界的范围内", () => {
+    expect(clampCenter(0.05, 0.3)).toBeCloseTo(0.15);
+    expect(clampCenter(0.99, 0.3)).toBeCloseTo(0.85);
+    expect(clampCenter(0.5, 0.3)).toBe(0.5);
+  });
+
+  it("横拍照片放进竖屏：带超出照片的上下黑边部分不算进裁剪", () => {
+    const wide: Viewport = { ...photo, videoWidth: 1920, videoHeight: 1080 };
+    const r = bandRect(wide, 0.7)!;
+    expect(r.y).toBe(0);
+    expect(Math.round(r.height)).toBe(1080);
   });
 });

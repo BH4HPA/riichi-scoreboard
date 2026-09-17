@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/ui/button";
 import { loadPhoto } from "../photoFile";
-import { BAND_DEFAULT, bandRect, type Rect } from "./band";
+import { BAND_DEFAULT, bandRect, clampCenter, type Rect } from "./band";
 import { BandOverlay } from "./BandOverlay";
 
 /**
- * 相册里挑一张来识别（只在标注模式给）。用的还是同一条取景带：
+ * 相册里挑一张来识别（标注模式常驻；房间里相机用不了时给）。用的还是同一条取景带：
  * 「带」这个概念在实时与静帧两处保持一致，仓库里不留第二套裁剪实现。
  * 解码走 `loadPhoto` 而不是裸 `createImageBitmap`——iOS 竖拍的方向全靠它的 EXIF 处理。
  */
@@ -20,6 +20,7 @@ export function StillPicker({
 }) {
   const [bitmap, setBitmap] = useState<ImageBitmap | null>(null);
   const [band, setBand] = useState(BAND_DEFAULT);
+  const [center, setCenter] = useState(0.5);
   const [error, setError] = useState<string | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const url = useMemo(() => URL.createObjectURL(file), [file]);
@@ -49,8 +50,10 @@ export function StillPicker({
         videoHeight: bitmap.height,
         displayWidth: box.clientWidth,
         displayHeight: box.clientHeight,
+        fit: "contain",
       },
       band,
+      center,
     );
     if (rect) onPick(bitmap, rect);
   };
@@ -58,8 +61,22 @@ export function StillPicker({
   return (
     <div className="fixed inset-0 z-[76] flex flex-col bg-black" data-testid="still-picker">
       <div ref={boxRef} className="relative min-h-0 flex-1 overflow-hidden">
-        <img src={url} alt="" className="h-full w-full object-cover" />
-        <BandOverlay band={band} onBandChange={setBand} hint="把手牌放进框里，牌河留在暗区" />
+        {/* 照片完整显示（contain）：牌不一定在正中，裁边会把它裁没 */}
+        <img
+          src={url}
+          alt=""
+          className="absolute inset-0 h-full w-full max-w-none object-contain"
+        />
+        <BandOverlay
+          band={band}
+          center={center}
+          onBandChange={(b) => {
+            setBand(b);
+            setCenter((c) => clampCenter(c, b));
+          }}
+          onCenterChange={setCenter}
+          hint="拖动框对准手牌，拉下沿调高度"
+        />
       </div>
       <div className="flex items-center justify-between gap-3 bg-black/90 px-4 py-3">
         {error ? <span className="text-sm text-neg">{error}</span> : <span />}

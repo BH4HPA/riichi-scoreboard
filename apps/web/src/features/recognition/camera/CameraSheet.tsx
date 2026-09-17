@@ -19,6 +19,7 @@ import { StillPicker } from "./StillPicker";
 import { EMPTY_CAPTURE, feedFrame, HINT_AFTER_MS, STABLE_FRAMES } from "./autoCapture";
 import { LayoutGuide } from "./LayoutGuide";
 import { useCameraStream } from "./useCameraStream";
+import { useCoverVideo } from "./useCoverVideo";
 import { useLiveDetect } from "./useLiveDetect";
 
 /** 一直没认出有效牌面就停流，省电防烫（用户拍板 60 秒） */
@@ -81,6 +82,8 @@ export function CameraSheet({
   const active = !paused && file === null && !stillBusy && !guide;
   const lost = useCallback(() => setPaused(true), []);
   const { videoRef, error: camError, ready } = useCameraStream(active, lost);
+  const [area, setArea] = useState<HTMLDivElement | null>(null);
+  const videoStyle = useCoverVideo(area, videoRef);
 
   // 识别线程随取景页开关：一局牌九成时间用不上，几十 MB 的会话不必常驻
   useEffect(() => {
@@ -187,6 +190,14 @@ export function CameraSheet({
     [capture],
   );
 
+  // 相册那张的结果单独收：实时循环此刻是停着的（相机用不了、或正在让路给这一张），它的监听不在
+  useEffect(() => {
+    if (!detector) return;
+    return detector.onResult((r) => {
+      if (r && r.frameId === stillRef.current) onFrame(r);
+    });
+  }, [detector, onFrame]);
+
   const runStill = useCallback(
     async (src: ImageBitmap, rect: Rect) => {
       if (!detector) return setFile(null);
@@ -203,6 +214,7 @@ export function CameraSheet({
   useLiveDetect({
     detector,
     videoRef,
+    area,
     band,
     active: active && ready,
     onFrame,
@@ -230,11 +242,16 @@ export function CameraSheet({
       aria-label="拍照识别取景"
       data-testid="camera-sheet"
     >
-      <div className="relative min-h-0 flex-1 overflow-hidden">
-        {/* absolute 铺满：百分比高度在 flex 子项里 WebKit 不一定当确定值，首帧前会按视频固有尺寸缩在中间 */}
+      <div
+        ref={setArea}
+        className="relative min-h-0 flex-1 overflow-hidden"
+        data-testid="camera-area"
+      >
+        {/* 尺寸由 useCoverVideo 算好的像素给出；算出来之前不显示，免得先缩在中间一小块 */}
         <video
           ref={videoRef}
-          className="absolute inset-0 h-full w-full object-cover"
+          className={videoStyle ? "block" : "invisible absolute"}
+          style={videoStyle ?? undefined}
           muted
           playsInline
           data-testid="camera-video"
@@ -311,7 +328,7 @@ export function CameraSheet({
         )}
         {/* 固定高度（一行手牌 + 一行指示牌）：模型下载进度、认出/没认出来回切换都在这一格里，
             底栏不能伸缩，否则取景画面和框跟着跳 */}
-        <div className="h-[62px] overflow-hidden" data-testid="camera-live">
+        <div className="h-[70px] overflow-hidden" data-testid="camera-live">
           {downloading ? (
             <div>
               <p className="text-xs">
@@ -326,7 +343,7 @@ export function CameraSheet({
             </div>
           ) : (
             live && (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto px-1 py-1">
                 <HandView
                   hand={live.hand}
                   size="xs"

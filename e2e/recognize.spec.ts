@@ -4,6 +4,8 @@ import { newContext } from "./helpers";
 
 /** 假检测器（ml/scripts/e2e_detector.py）：恒定输出下面这副手牌的检测框，链路其余部分都是真的 */
 const DETECTOR = path.join(import.meta.dirname, "fixtures/detector.onnx");
+/** 相册入口用的任意一张图：假检测器不看内容 */
+const PHOTO = path.join(import.meta.dirname, "../docs/screenshots/tv-game.png");
 
 /** 123m 4筒 赤5筒 6筒 789s 789m 22p，和张 9m：平和 + 赤宝牌 = 2 番 30 符 */
 const CLOSED = [1, 2, 3, 13, 36, 15, 25, 26, 27, 7, 8, 11, 11, 9];
@@ -79,27 +81,43 @@ test("取景 → 自动定格 → 填入牌面并自动算番 → 检测框与�
   const patches: Record<string, unknown>[] = [];
   const { phone: p, dialog } = await openRonHandTab(browser, withDetector(patches));
 
-  // 取景期间逐帧量画面高度：实时识别结果出现/消失时底栏不伸缩，画面与取景框不跳
+  // 取景期间逐帧量：取景区域高度不变（识别结果出现/消失时底栏不伸缩）；视频一旦显示就铺满区域
   const heights = p.evaluate(
     () =>
-      new Promise<{ min: number; max: number; live: boolean; clipped: boolean }>((resolve) => {
+      new Promise<{
+        min: number;
+        max: number;
+        live: boolean;
+        clipped: boolean;
+        uncovered: boolean;
+      }>((resolve) => {
         let min = Infinity;
         let max = 0;
         let live = false;
         let clipped = false;
+        let uncovered = false;
         let seen = false;
         const tick = () => {
+          const area = document.querySelector('[data-testid="camera-area"]');
           const video = document.querySelector('[data-testid="camera-video"]');
-          if (video) {
+          if (area && video) {
             seen = true;
-            const h = video.getBoundingClientRect().height;
-            min = Math.min(min, h);
-            max = Math.max(max, h);
+            const a = area.getBoundingClientRect();
+            min = Math.min(min, a.height);
+            max = Math.max(max, a.height);
+            if (getComputedStyle(video).visibility === "visible") {
+              const v = video.getBoundingClientRect();
+              uncovered ||=
+                v.left > a.left + 1 ||
+                v.top > a.top + 1 ||
+                v.right < a.right - 1 ||
+                v.bottom < a.bottom - 1;
+            }
             const slot = document.querySelector('[data-testid="camera-live"]');
             live ||= Boolean(slot?.querySelector("img"));
             clipped ||= slot !== null && slot.scrollHeight > slot.clientHeight + 1;
           } else if (seen) {
-            return resolve({ min, max, live, clipped });
+            return resolve({ min, max, live, clipped, uncovered });
           }
           requestAnimationFrame(tick);
         };
@@ -111,6 +129,7 @@ test("取景 → 自动定格 → 填入牌面并自动算番 → 检测框与�
   expect(measured.live).toBe(true);
   expect(measured.max - measured.min).toBeLessThan(1);
   expect(measured.clipped).toBe(false);
+  expect(measured.uncovered).toBe(false);
   await expect(dialog.getByTestId("recognize-button")).toHaveText("重新拍照");
 
   // 识别自洽 → 收起键盘，只剩一排牌
@@ -197,7 +216,20 @@ test("相机不可用 → 取景页仍能打开：说明原因、快门禁用、
   await sheet.getByRole("button", { name: "怎么摆" }).click();
   await expect(sheet.getByText("手牌连成一排", { exact: false })).toBeVisible();
   await sheet.getByRole("button", { name: "知道了" }).click();
-  await sheet.getByRole("button", { name: "关闭取景" }).click();
+
+  // 相册选一张：取景带可以拖着移动，「用这块识别」后定格回填牌面
+  await sheet.getByTestId("label-album").setInputFiles(PHOTO);
+  const picker = p.getByTestId("still-picker");
+  const body = picker.getByTestId("band-body");
+  const before = (await body.boundingBox())!;
+  await p.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(before.x + before.width / 2, before.y + before.height / 2 + 80, { steps: 5 });
+  await p.mouse.up();
+  expect((await body.boundingBox())!.y).toBeGreaterThan(before.y + 40);
+  await picker.getByRole("button", { name: "用这块识别" }).click();
+  await expect(sheet).toHaveCount(0, { timeout: 30_000 });
+  await expect(dialog.getByTestId("hand-confirm")).toBeVisible();
 });
 
 test("确认态：点牌替换、改和张、改牌展开全键盘后不再自动收回", async ({ browser }) => {

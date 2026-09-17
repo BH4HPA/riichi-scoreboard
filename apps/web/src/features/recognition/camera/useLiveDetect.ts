@@ -6,6 +6,8 @@ import { bandRect, type Rect, type Viewport } from "./band";
 interface Options {
   detector: Detector | null;
   videoRef: React.RefObject<HTMLVideoElement | null>;
+  /** 取景区域（视频按 cover 铺在里面）：取景带的比例以它为准 */
+  area: HTMLElement | null;
   band: number;
   active: boolean;
   onFrame: (r: FrameResult) => void;
@@ -21,6 +23,7 @@ interface Options {
 export function useLiveDetect({
   detector,
   videoRef,
+  area,
   band,
   active,
   onFrame,
@@ -38,7 +41,7 @@ export function useLiveDetect({
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!detector || !video || !active) return;
+    if (!detector || !video || !area || !active) return;
     let stopped = false;
     let inFlight = false;
     let handle = 0;
@@ -56,8 +59,8 @@ export function useLiveDetect({
       const view: Viewport = {
         videoWidth: video.videoWidth,
         videoHeight: video.videoHeight,
-        displayWidth: video.clientWidth,
-        displayHeight: video.clientHeight,
+        displayWidth: area.clientWidth,
+        displayHeight: area.clientHeight,
       };
       const rect = bandRect(view, bandRef.current);
       if (!rect) return;
@@ -89,5 +92,5 @@ export function useLiveDetect({
       if ("cancelVideoFrameCallback" in video) video.cancelVideoFrameCallback(handle);
       else cancelAnimationFrame(handle);
     };
-  }, [detector, videoRef, active]);
+  }, [detector, videoRef, area, active]);
 }
