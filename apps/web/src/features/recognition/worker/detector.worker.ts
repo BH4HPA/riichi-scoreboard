@@ -1,7 +1,12 @@
 /// <reference lib="webworker" />
 import type * as OrtModule from "onnxruntime-web/wasm";
 import type { InferenceSession } from "onnxruntime-web/wasm";
-import { decodeNmsOutput, layoutHand, RECOGNITION_CLASSES } from "@riichi/core";
+import {
+  decodeNmsOutput,
+  layoutHand,
+  RECOGNITION_CLASSES,
+  RECOGNITION_PHOTO_MAX_BYTES,
+} from "@riichi/core";
 import { toModelInput } from "./preprocess";
 import type { FromWorker, ToWorker } from "./protocol";
 
@@ -69,8 +74,13 @@ async function grab(quality: number): Promise<void> {
   const { bitmap, frameId } = held;
   const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
   canvas.getContext("2d")!.drawImage(bitmap, 0, 0);
-  // 必须显式指定类型：convertToBlob 默认出 PNG，同尺寸能大 10 倍，会撞服务端 2 MB 的上限
-  const blob = await canvas.convertToBlob({ type: "image/jpeg", quality });
+  // 必须显式指定类型：convertToBlob 默认出 PNG，同尺寸能大 10 倍，会撞服务端 2 MB 的上限。
+  // 纹理密的画面（桌布、噪点）同尺寸 JPEG 也可能超：按字节兜底，逐级降质量，任何来源的帧都成立
+  let blob = await canvas.convertToBlob({ type: "image/jpeg", quality });
+  for (const q of [0.7, 0.5, 0.3]) {
+    if (blob.size <= RECOGNITION_PHOTO_MAX_BYTES || q >= quality) continue;
+    blob = await canvas.convertToBlob({ type: "image/jpeg", quality: q });
+  }
   post({ type: "grabbed", frameId, blob });
 }
 

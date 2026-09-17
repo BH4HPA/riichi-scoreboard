@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../../app";
 import { loadConfig } from "../../config";
 import type { RecognitionRow } from "../../db/recognitions";
-import { PHOTO_MAX_BYTES } from "../photos";
+import { RECOGNITION_PHOTO_MAX_BYTES } from "@riichi/core";
 import { UPLOADS_PER_HOUR, UploadLimiter } from "./recognitions";
 
 /** 最小合法 JPEG 头（只需通过魔数嗅探） */
@@ -104,7 +104,7 @@ describe("POST /api/recognitions", () => {
   });
 
   it("超过 2MB → 413 JSON（HTTPException 透传，不再变成 500）", async () => {
-    const big = new Uint8Array(PHOTO_MAX_BYTES + 1);
+    const big = new Uint8Array(RECOGNITION_PHOTO_MAX_BYTES + 1);
     big.set(JPEG);
     const res = await post(big);
     expect(res.status).toBe(413);

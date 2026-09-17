@@ -12,7 +12,7 @@ import { Button } from "@/ui/button";
 import { HandView } from "@/features/hand/HandView";
 import { closeDetector, openDetector, type Detector } from "../worker/client";
 import type { FrameResult } from "../worker/protocol";
-import { BAND_DEFAULT, type Rect } from "./band";
+import { BAND_DEFAULT, fitLongEdge, STILL_MAX_EDGE, type Rect } from "./band";
 import { BandOverlay } from "./BandOverlay";
 import { DetectionOverlay } from "./DetectionOverlay";
 import { StillPicker } from "./StillPicker";
@@ -20,6 +20,7 @@ import { EMPTY_CAPTURE, feedFrame, HINT_AFTER_MS, STABLE_FRAMES } from "./autoCa
 import { LayoutGuide } from "./LayoutGuide";
 import { useCameraStream } from "./useCameraStream";
 import { useCoverVideo } from "./useCoverVideo";
+import { useElementHeight } from "./useElementHeight";
 import { useLiveDetect } from "./useLiveDetect";
 
 /** 一直没认出有效牌面就停流，省电防烫（用户拍板 60 秒） */
@@ -74,6 +75,8 @@ export function CameraSheet({
   });
   const captureRef = useRef(EMPTY_CAPTURE);
   const stillRef = useRef(0);
+  /** 已经处理过的相册帧：实时监听若也收到它，不能再当实时帧计数 */
+  const stillDoneRef = useRef(0);
   const grabbingRef = useRef(false);
   const lastGoodRef = useRef(openedAt);
   const framesRef = useRef(new Map<number, FrameResult>());
@@ -83,6 +86,8 @@ export function CameraSheet({
   const lost = useCallback(() => setPaused(true), []);
   const { videoRef, error: camError, ready } = useCameraStream(active, lost);
   const [area, setArea] = useState<HTMLDivElement | null>(null);
+  const [panel, setPanel] = useState<HTMLDivElement | null>(null);
+  const panelHeight = useElementHeight(panel);
   const videoStyle = useCoverVideo(area, videoRef);
 
   // 识别线程随取景页开关：一局牌九成时间用不上，几十 MB 的会话不必常驻
@@ -169,7 +174,9 @@ export function CameraSheet({
       for (const id of map.keys()) if (id < r.frameId - FRAME_MEMORY) map.delete(id);
 
       // 相册那张是一次性的：结果一到就直接定格，不参与连续三帧的稳定判断
+      if (r.frameId === stillDoneRef.current) return;
       if (r.frameId === stillRef.current) {
+        stillDoneRef.current = r.frameId;
         stillRef.current = 0;
         setStillBusy(false);
         setFlash(true);
@@ -194,7 +201,15 @@ export function CameraSheet({
   useEffect(() => {
     if (!detector) return;
     return detector.onResult((r) => {
-      if (r && r.frameId === stillRef.current) onFrame(r);
+      if (stillRef.current === 0) return;
+      if (r) {
+        if (r.frameId === stillRef.current) onFrame(r);
+        return;
+      }
+      // null = 被背压丢掉了：相册那张不会再有结果，复位让用户重来
+      stillRef.current = 0;
+      setStillBusy(false);
+      setError("这张没识别成功，请重试");
     });
   }, [detector, onFrame]);
 
@@ -205,8 +220,20 @@ export function CameraSheet({
       // 用户点了「用这块识别」却什么也不发生
       setStillBusy(true);
       setFile(null);
-      const cropped = await createImageBitmap(src, rect.x, rect.y, rect.width, rect.height);
-      stillRef.current = detector.infer(cropped);
+      try {
+        // 相册原图动辄 4000px：裁出来的一条按实时帧的尺度缩小再送（识别尺度一致，定格照片也不至于太大）
+        const size = fitLongEdge(rect.width, rect.height, STILL_MAX_EDGE);
+        const canvas = new OffscreenCanvas(size.width, size.height);
+        const ctx = canvas.getContext("2d")!;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(src, rect.x, rect.y, rect.width, rect.height, 0, 0, size.width, size.height);
+        stillRef.current = detector.infer(canvas.transferToImageBitmap());
+      } catch (err) {
+        // 失败要复位：否则 stillBusy 一直为真，实时取景再也不会恢复
+        stillRef.current = 0;
+        setStillBusy(false);
+        setError(err instanceof Error ? err.message : "这张照片处理失败");
+      }
     },
     [detector],
   );
@@ -216,6 +243,7 @@ export function CameraSheet({
     videoRef,
     area,
     band,
+    bottomInset: panelHeight,
     active: active && ready,
     onFrame,
     ...(mode === "label" ? { onCrop: setCropRect } : {}),
@@ -236,7 +264,7 @@ export function CameraSheet({
     <div
       // pointer-events-auto 不能省：radix 的 Dialog 打开时会给 body 挂 pointer-events:none，
       // 只在它自己的 content 里放开；portal 出来的我们是 body 的另一个孩子，不声明就点不动。
-      className="pointer-events-auto fixed inset-0 z-[75] flex touch-none flex-col overscroll-contain bg-black"
+      className="pointer-events-auto fixed inset-0 z-[75] touch-none overscroll-contain bg-black"
       role="dialog"
       aria-modal="true"
       aria-label="拍照识别取景"
@@ -244,29 +272,34 @@ export function CameraSheet({
     >
       <div
         ref={setArea}
-        className="relative min-h-0 flex-1 overflow-hidden"
+        // 画面铺满整屏，底栏浮在上面（沉浸）：取景带与裁剪都以整屏为准
+        className="absolute inset-0 overflow-hidden"
         data-testid="camera-area"
       >
-        {/* 尺寸由 useCoverVideo 算好的像素给出；算出来之前不显示，免得先缩在中间一小块 */}
+        {/* 尺寸由 useCoverVideo 算好的像素给出；首帧真正画出来之前不显示（见 useCoverVideo） */}
         <video
           ref={videoRef}
-          className={videoStyle ? "block" : "invisible absolute"}
+          // 用透明度藏而不是 visibility：隐藏的视频不进合成，首帧回调可能永远不来
+          className={videoStyle ? "block" : "absolute opacity-0"}
           style={videoStyle ?? undefined}
           muted
           playsInline
           data-testid="camera-video"
         />
-        {!paused && <BandOverlay band={band} onBandChange={setBand} hint={hint} />}
-        {mode === "label" && live && !paused && (
-          <div
-            className="absolute inset-x-0"
-            style={{ top: `${((1 - band) / 2) * 100}%`, height: `${band * 100}%` }}
-          >
-            {cropRect && (
-              <DetectionOverlay detections={live.detections} crop={cropRect} onPick={setPicked} />
-            )}
-          </div>
-        )}
+        {/* 取景带只在底栏以上的可见部分里（画面铺满整屏，底栏浮在下面） */}
+        <div className="absolute inset-x-0 top-0" style={{ bottom: panelHeight }}>
+          {!paused && <BandOverlay band={band} onBandChange={setBand} hint={hint} />}
+          {mode === "label" && live && !paused && (
+            <div
+              className="absolute inset-x-0"
+              style={{ top: `${((1 - band) / 2) * 100}%`, height: `${band * 100}%` }}
+            >
+              {cropRect && (
+                <DetectionOverlay detections={live.detections} crop={cropRect} onPick={setPicked} />
+              )}
+            </div>
+          )}
+        </div>
         {paused && (
           <button
             type="button"
@@ -314,7 +347,11 @@ export function CameraSheet({
         )}
       </div>
 
-      <div className="space-y-2 bg-black/90 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 text-white">
+      <div
+        ref={setPanel}
+        data-testid="camera-panel"
+        className="absolute inset-x-0 bottom-0 space-y-2 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 text-white"
+      >
         {camError && <p className="text-sm text-neg">{camError}</p>}
         {error && (
           <div className="flex items-center justify-between gap-3">
