@@ -125,20 +125,24 @@ export function ConsoleGame({
             rules={room.rules}
             size="lg"
             dissolvable
-            onOpen={controls.open}
-          />
-          <ControlHost
-            dialog={controls.dialog}
-            onClose={controls.close}
-            game={game.present}
-            names={names}
-            rules={room.rules}
-            mirror={false}
-            mySeat={null}
-            dissolveCode={room.code}
+            onOpen={(key) => {
+              // 同时只留一层：子对话框打开前先收起操作面板
+              setPanelOpen(false);
+              controls.open(key);
+            }}
           />
         </DialogContent>
       </Dialog>
+      <ControlHost
+        dialog={controls.dialog}
+        onClose={controls.close}
+        game={game.present}
+        names={names}
+        rules={room.rules}
+        mirror={false}
+        mySeat={null}
+        dissolveCode={room.code}
+      />
     </div>
   );
 }
