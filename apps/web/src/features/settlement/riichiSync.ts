@@ -1,6 +1,6 @@
 import type { Seat } from "@riichi/core";
 import { withRiichi } from "./hand/handEdits";
-import type { ValueDraft } from "./valueDraft";
+import { withHandEdit, type ValueDraft } from "./valueDraft";
 
 /*
  * 「立直情况」里和牌者那一格与其手牌的立直旗标是同一件事，只显示一份：和牌者以手牌为准
@@ -27,11 +27,7 @@ export function storeRiichiClick(
 /** 让草稿跟随立直情况里的勾选；未变化时原样返回。取消时连带清掉「识别替你勾的」记号。 */
 export function draftWithRiichi(draft: ValueDraft, on: boolean): ValueDraft {
   if (draft.hand.riichi === on) return draft;
-  return {
-    ...draft,
-    hand: withRiichi(draft.hand, on),
-    riichiAuto: on && draft.riichiAuto,
-  };
+  return { ...withHandEdit(draft, withRiichi(draft.hand, on)), riichiAuto: on && draft.riichiAuto };
 }
 
 /**

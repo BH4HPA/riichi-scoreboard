@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { EvaluatedHand, HandInput, RoomRules, Tile } from "@riichi/core";
 import { withoutLoc, type TileLoc } from "@/features/hand/tileLoc";
-import { confirmable, type ValueDraft } from "../valueDraft";
+import { confirmable, withHandEdit, type ValueDraft } from "../valueDraft";
 import { TileKeyboard } from "../TileKeyboard";
 import { HandConfirm } from "./HandConfirm";
 import { replaceAt, withWinTile } from "./handEdits";
@@ -36,8 +36,7 @@ export function HandEditor({
 
   const setHand = (next: HandInput, clear?: TileLoc) =>
     onChange((d) => ({
-      ...d,
-      hand: next,
+      ...withHandEdit(d, next),
       evaluated: null,
       // 换完这一张就别再提示它了；增删牌会让下标失配，那时整批清掉（在 TileKeyboard 那条路上）
       recognition:
@@ -54,8 +53,7 @@ export function HandEditor({
           hand={draft.hand}
           onChange={(hand) =>
             onChange((d) => ({
-              ...d,
-              hand,
+              ...withHandEdit(d, hand),
               evaluated: null,
               // 增删牌之后下标全错位，记号宁可全清也不能钉在别的牌上
               recognition: d.recognition ? { ...d.recognition, uncertain: [] } : null,

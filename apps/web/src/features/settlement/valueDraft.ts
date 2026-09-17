@@ -1,4 +1,4 @@
-import type { ClientWinValue, EvaluatedHand, HandInput, HandValue } from "@riichi/core";
+import type { ClientWinValue, EvaluatedHand, HandInput, HandValue, Tile } from "@riichi/core";
 import type { DraftRecognition } from "@/features/recognition/applyRecognized";
 
 export interface ValueDraft {
@@ -14,6 +14,8 @@ export interface ValueDraft {
   riichiAuto: boolean;
   /** 用户在确认态点过「改牌」：此后一直留在编辑态，直到下一次识别 */
   editing: boolean;
+  /** 取消立直时暂存的里宝指示牌：重新勾上立直就还原，误点一下不丢识别结果 */
+  uraStash: Tile[];
 }
 
 export function emptyHand(tsumo: boolean): HandInput {
@@ -54,7 +56,24 @@ export function createValueDraft(tsumo: boolean, mode: ValueDraft["mode"]): Valu
     recognition: null,
     riichiAuto: false,
     editing: false,
+    uraStash: [],
   };
+}
+
+/**
+ * 手牌编辑落到草稿的唯一入口：取消立直时（`withRiichi` 会清空里宝）把里宝暂存，
+ * 重新勾上且里宝为空时还原，张数不超过当前宝牌指示牌。
+ */
+export function withHandEdit(draft: ValueDraft, hand: HandInput): ValueDraft {
+  const prev = draft.hand;
+  if (prev.riichi && !hand.riichi && prev.uraIndicators.length > 0) {
+    return { ...draft, hand, uraStash: prev.uraIndicators };
+  }
+  if (!prev.riichi && hand.riichi && hand.uraIndicators.length === 0 && draft.uraStash.length) {
+    const uraIndicators = draft.uraStash.slice(0, hand.doraIndicators.length);
+    return { ...draft, hand: { ...hand, uraIndicators }, uraStash: [] };
+  }
+  return { ...draft, hand };
 }
 
 /**
