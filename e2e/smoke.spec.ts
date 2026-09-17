@@ -101,6 +101,12 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await tv.getByRole("button", { name: "撤销" }).click();
   await expect(tv.getByTestId("points-0")).toHaveText("25,000");
   await expect(phones[3]!.getByTestId("points-0")).toHaveText("25,000");
+  // 主控台没有座位：选人控件不标相对方位
+  await tv.getByRole("button", { name: "自摸", exact: true }).click();
+  const tvTsumo = tv.getByRole("dialog").filter({ hasText: "自摸结算" });
+  await expect(tvTsumo.getByText("立直情况")).toBeVisible();
+  await expect(tvTsumo).not.toContainText(/上家|对家|下家|自己/);
+  await tvTsumo.getByRole("button", { name: "取消" }).click();
   await tv.keyboard.press("Escape");
 
   // 牌面形态：手机 2 荣和手机 3，平和 1 番 30 符 = 1000
@@ -108,6 +114,12 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   const ron = phones[2]!.getByRole("dialog");
   await ron.getByRole("combobox").first().click();
   await phones[2]!.getByRole("option", { name: "北家" }).click();
+  // 西家视角：北家是下家，立直情况在番符/牌面之上
+  await expect(ron.getByRole("combobox").first()).toHaveText("北家下家");
+  const riichiRows = ron.getByText("立直情况").locator("..").getByRole("checkbox");
+  expect((await riichiRows.first().boundingBox())!.y).toBeLessThan(
+    (await ron.getByRole("tab", { name: "牌面" }).boundingBox())!.y,
+  );
   await ron.getByRole("tab", { name: "牌面" }).click();
   const keyboard = ron.getByTestId("tile-keyboard");
   // 闭牌（可点击 button）与副露（不可点击 span）底边对齐
@@ -142,6 +154,14 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   }
   await expect(ron.getByText("2 番 30 符")).toBeVisible();
   await expect(ron.getByText("赤宝牌 1 番")).toBeVisible();
+  // 立直情况勾上和牌者自己 → 手牌立直旗标跟着亮、番数 +1；手牌里取消 → 立直情况跟着取消
+  await riichiRows.nth(2).click();
+  const handRiichi = ron.getByRole("checkbox", { name: "立直", exact: true });
+  await expect(handRiichi).toBeChecked();
+  await expect(ron.getByText("3 番 30 符")).toBeVisible();
+  await handRiichi.click();
+  await expect(riichiRows.nth(2)).not.toBeChecked();
+  await expect(ron.getByText("2 番 30 符")).toBeVisible();
   // 电视全屏镜像：和牌者、牌面、番符、役种
   await expect(tv.getByText("正在录入荣和结算")).toBeVisible();
   await expect(tv.getByText("2 番 30 符", { exact: true })).toBeVisible();
@@ -150,6 +170,10 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await ron.getByRole("button", { name: "确认荣和" }).click();
   await expect(tv.getByText("正在录入荣和结算")).toHaveCount(0);
   await expect(tv.getByTestId("points-2")).toHaveText("27,000");
+  // 页签记忆：再开荣和默认停在牌面
+  await phones[2]!.getByRole("button", { name: "荣和", exact: true }).click();
+  await expect(ron.getByRole("tab", { name: "牌面" })).toHaveAttribute("aria-selected", "true");
+  await ron.getByRole("button", { name: "取消" }).click();
   await expect(tv.getByTestId("points-3")).toHaveText("23,000");
   await expect(
     tv.getByText("闲家 西家 荣和 北家 2 番 30 符，共 2,000 点，共收入 2,000 点。"),
