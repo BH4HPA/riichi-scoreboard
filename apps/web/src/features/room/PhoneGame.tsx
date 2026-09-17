@@ -15,6 +15,7 @@ import { useRoomStore } from "@/ws/store";
 import { RoundHeader } from "@/features/scoreboard/RoundHeader";
 import { PointsGrid } from "@/features/scoreboard/PointsGrid";
 import { DiffMatrix } from "@/features/scoreboard/DiffMatrix";
+import { MyDiffs } from "@/features/scoreboard/MyDiffs";
 import { HistoryList } from "@/features/history/HistoryTable";
 import { FinalPanel } from "@/features/final/FinalPanel";
 import { ControlButtons } from "@/features/settlement/controls/ControlButtons";
@@ -63,7 +64,7 @@ export function PhoneGame() {
         seats={room.seats}
         names={names}
         rules={room.rules}
-        highlightSeat={mySeat}
+        mySeat={mySeat}
       />
       {game.present.status === "finished" && (
         <div className="rounded-xl border border-pos/40 bg-surface p-3">
@@ -76,7 +77,7 @@ export function PhoneGame() {
           game={game}
           rules={room.rules}
           mySeat={mySeat}
-          size="sm"
+          size="md"
           onOpen={controls.open}
         />
       </div>
@@ -90,11 +91,15 @@ export function PhoneGame() {
         mySeat={mySeat}
       />
       <div className="rounded-xl border border-border bg-surface p-3">
-        <DiffMatrix game={game.present} names={names} rules={room.rules} />
+        {mySeat !== null ? (
+          <MyDiffs game={game.present} names={names} rules={room.rules} mySeat={mySeat} />
+        ) : (
+          <DiffMatrix game={game.present} names={names} rules={room.rules} />
+        )}
       </div>
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 backdrop-blur"
+        className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
         aria-label="功能"
       >
         <div className="mx-auto flex max-w-md items-center justify-between px-4 pt-1.5 text-[11px] text-muted">

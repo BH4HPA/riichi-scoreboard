@@ -51,23 +51,41 @@ export function PointsGrid({
   names,
   rules,
   size = "phone",
-  highlightSeat = null,
+  mySeat = null,
 }: {
   game: GameState;
   seats: (PlayerRef | null)[];
   names: string[];
   rules: RoomRules;
   size?: ScoreSize;
-  highlightSeat?: number | null;
+  /** 手机端自己的座位：名字后标「我」 */
+  mySeat?: number | null;
 }) {
   const ranks = computeRanks(game.points, rules.final.tieRule);
   const dealer = dealerOf(game.kyoku);
   const st = STYLE[size];
+  const phone = size === "phone";
   return (
     <div className={cn("grid grid-cols-2", st.gap)}>
       {SEATS.map((seat) => {
         const isDealer = seat === dealer && game.status !== "finished";
         const tone = rankTone(ranks[seat]!, ranks);
+        const wind = (
+          <Badge tone="outline" size={st.badge} className="shrink-0">
+            {WIND_LABELS[seatWind(seat, dealer)]}
+          </Badge>
+        );
+        const crown = isDealer && (
+          <Badge tone="accent" size={st.badge} aria-label="庄家" className="shrink-0">
+            <Crown className="h-3 w-3" />
+            {!phone && "庄家"}
+          </Badge>
+        );
+        const rank = (
+          <Badge tone={tone} size={st.badge} className="shrink-0 whitespace-nowrap">
+            第 {ranks[seat]} 名
+          </Badge>
+        );
         return (
           <div
             key={seat}
@@ -75,7 +93,6 @@ export function PointsGrid({
               "relative rounded-xl border bg-surface",
               st.card,
               isDealer ? "border-accent" : "border-border",
-              highlightSeat === seat && "ring-2 ring-accent/60",
             )}
           >
             {isDealer && <div className="absolute inset-x-0 top-0 h-1 rounded-t-xl bg-accent" />}
@@ -83,24 +100,31 @@ export function PointsGrid({
               <Avatar name={names[seat]!} src={seats[seat]?.avatar ?? null} size={st.avatar} />
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 <span className={cn("truncate font-medium", st.name)}>{names[seat]}</span>
-                <Badge tone="outline" size={st.badge} className="shrink-0">
-                  {WIND_LABELS[seatWind(seat, dealer)]}
-                </Badge>
+                {phone && mySeat === seat && (
+                  <Badge tone="neutral" size="sm" className="shrink-0">
+                    我
+                  </Badge>
+                )}
+                {!phone && wind}
               </div>
-              {isDealer && (
-                <Badge tone="accent" size={st.badge} aria-label="庄家" className="shrink-0">
-                  <Crown className="h-3 w-3" />
-                  {size !== "phone" && "庄家"}
-                </Badge>
-              )}
+              {!phone && crown}
             </div>
             <div className="mt-2 flex items-end justify-between gap-2">
               <span className={cn("font-semibold tabular leading-none", st.points)}>
                 <span data-testid={`points-${seat}`}>{formatPoints(game.points[seat]!)}</span>
               </span>
-              <Badge tone={tone} size={st.badge}>
-                第 {ranks[seat]} 名
-              </Badge>
+              {phone ? (
+                // 手机卡片窄：风位、庄冠挪到分数行，让第一行完整放下昵称
+                <span className="flex flex-col items-end gap-1">
+                  <span className="flex items-center gap-1">
+                    {wind}
+                    {crown}
+                  </span>
+                  {rank}
+                </span>
+              ) : (
+                rank
+              )}
             </div>
           </div>
         );

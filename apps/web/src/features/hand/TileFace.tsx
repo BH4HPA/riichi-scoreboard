@@ -30,6 +30,7 @@ export function TileFace({
   mark = false,
   onClick,
   className,
+  buttonClassName,
 }: {
   tile: Tile;
   size?: TileSize;
@@ -40,6 +41,8 @@ export function TileFace({
   mark?: boolean;
   onClick?: (() => void) | undefined;
   className?: string;
+  /** 可点时按钮本身的额外样式（如键盘把点击区撑满格子，牌图居中） */
+  buttonClassName?: string;
 }) {
   const { w, h } = TILE_PX[size];
   const label = back ? "牌背" : tileLabel(tile);
@@ -93,7 +96,10 @@ export function TileFace({
       type="button"
       onClick={onClick}
       // inline-flex：按钮不再生成行盒，图片底边与不可点击的牌（span）严格同基线
-      className="inline-flex rounded-[3px] transition-transform active:scale-95"
+      className={cn(
+        "inline-flex rounded-[3px] transition-transform active:scale-95",
+        buttonClassName,
+      )}
       aria-label={label}
       aria-pressed={selected}
       disabled={dim}
