@@ -136,6 +136,7 @@ export function IndicatorRow({
   onTileClick,
   keepEmpty = false,
   onAdd,
+  className,
 }: {
   label: string;
   tiles: readonly Tile[];
@@ -145,12 +146,14 @@ export function IndicatorRow({
   onTileClick?: ((loc: TileLoc) => void) | undefined;
   keepEmpty?: boolean;
   onAdd?: (() => void) | undefined;
+  /** 覆盖标签颜色等（深色取景底栏上灰字看不清） */
+  className?: string | undefined;
 }) {
   if (tiles.length === 0 && !keepEmpty) return null;
   // 没给 area 就是纯展示：不匹配记号也不可点，免得里宝拿表宝的下标去比对
   const loc = (i: number): TileLoc | null => (area ? { area, i } : null);
   return (
-    <div className="flex items-center gap-1.5 text-[11px] text-muted">
+    <div className={cn("flex items-center gap-1.5 text-[11px] text-muted", className)}>
       <span>{label}</span>
       <div className="flex items-end gap-px">
         {tiles.map((t, i) => {

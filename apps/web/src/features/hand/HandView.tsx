@@ -19,6 +19,7 @@ export function HandView({
   scroll = false,
   keepEmptyDora = false,
   onAddDora,
+  indicatorClassName,
   className,
 }: {
   /** 只要牌，不要旗标：结算草稿与取景框的实时结果都能直接传进来 */
@@ -35,6 +36,8 @@ export function HandView({
   /** 确认态：一张宝牌指示牌都没认出来时也要留个空位，否则缺口看不见 */
   keepEmptyDora?: boolean;
   onAddDora?: (() => void) | undefined;
+  /** 指示牌行的样式（深色底上把标签调亮） */
+  indicatorClassName?: string;
   className?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -84,6 +87,7 @@ export function HandView({
           onTileClick={onTileClick}
           keepEmpty={keepEmptyDora}
           onAdd={onAddDora}
+          className={indicatorClassName}
         />
         {showUra && (
           <IndicatorRow
@@ -92,6 +96,7 @@ export function HandView({
             area="ura"
             marks={marks}
             onTileClick={onTileClick}
+            className={indicatorClassName}
           />
         )}
       </div>

@@ -76,8 +76,8 @@ async function shoot(p: Page, dialog: Locator): Promise<void> {
 }
 
 /**
- * 注意：Chromium 只能防回归；iOS WebKit「元素尺寸对、视频层画小」的症状这里测不到，以真机为准。
- * 取景期间逐帧量，直到取景页关闭：取景区域高度不变；视频一旦显示（不透明）就铺满区域；
+ * 预览画在 canvas 上（绕开 iOS 视频图层开流后尺寸画错的问题），这里核对画布真画出了画面且铺满。
+ * 取景期间逐帧量，直到取景页关闭：取景区域高度不变；预览画布画出了画面且铺满区域；
  * 实时识别行出现过且没被裁掉。
  */
 function sampleViewfinder(p: Page) {
@@ -89,6 +89,7 @@ function sampleViewfinder(p: Page) {
         live: boolean;
         clipped: boolean;
         uncovered: boolean;
+        shown: boolean;
       }>((resolve) => {
         let min = Infinity;
         let max = 0;
@@ -99,20 +100,34 @@ function sampleViewfinder(p: Page) {
         let seen = false;
         const tick = () => {
           const area = document.querySelector('[data-testid="camera-area"]');
-          const video = document.querySelector('[data-testid="camera-video"]');
-          if (area && video) {
+          const canvas = document.querySelector<HTMLCanvasElement>(
+            '[data-testid="camera-preview"]',
+          );
+          if (area && canvas) {
             seen = true;
             const a = area.getBoundingClientRect();
             min = Math.min(min, a.height);
             max = Math.max(max, a.height);
-            if (getComputedStyle(video).opacity !== "0") {
-              shown = true;
-              const v = video.getBoundingClientRect();
+            if (canvas.dataset.painted === "true" && canvas.width > 8 && canvas.height > 8) {
+              // 画布元素永远铺满，要看的是像素：中心与四角附近都画上了东西（假摄像头的测试图不是纯黑）
+              const ctx = canvas.getContext("2d")!;
+              const lit = (x: number, y: number) => {
+                const [r, g, b] = ctx.getImageData(x, y, 1, 1).data;
+                return r! + g! + b! > 0;
+              };
+              const w = canvas.width;
+              const h = canvas.height;
+              // 中心没画（停流瞬间画布已清空、状态还没同步）就不看四角，免得误判
+              const center = lit(w >> 1, h >> 1);
+              shown ||= center;
               uncovered ||=
-                v.left > a.left + 1 ||
-                v.top > a.top + 1 ||
-                v.right < a.right - 1 ||
-                v.bottom < a.bottom - 1;
+                center &&
+                ![
+                  [4, 4],
+                  [w - 5, 4],
+                  [4, h - 5],
+                  [w - 5, h - 5],
+                ].every(([x, y]) => lit(x!, y!));
             }
             const slot = document.querySelector('[data-testid="camera-live"]');
             live ||= Boolean(slot?.querySelector("img"));
@@ -201,13 +216,19 @@ test("模型加载失败 → 取景页给出错误，牌面不变", async ({ bro
   await expect(sheet).toBeVisible();
   // 模型下载被拦掉时才会走到这里：说明本地的 wasm 运行时已加载成功
   await expect(sheet.getByText(/fetch/i)).toBeVisible({ timeout: 20_000 });
-  // 看「怎么摆」时停流：视频断开，关掉说明再接上
+  // 模型没就绪：快门不出现
+  await expect(sheet.getByTestId("camera-shutter")).toHaveCount(0);
+  // 看「怎么摆」时停流：视频断开、预览画布复位；关掉说明再接上，新流画出画面才算在出画面
   const video = sheet.getByTestId("camera-video");
+  const preview = sheet.getByTestId("camera-preview");
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.srcObject !== null)).toBe(true);
+  await expect(preview).toHaveAttribute("data-painted", "true");
   await sheet.getByRole("button", { name: "怎么摆" }).click();
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.srcObject === null)).toBe(true);
+  await expect(preview).not.toHaveAttribute("data-painted");
   await sheet.getByRole("button", { name: "知道了" }).click();
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.srcObject !== null)).toBe(true);
+  await expect(preview).toHaveAttribute("data-painted", "true");
   // 模型用不了：给出回键盘录入的出口
   await sheet.getByRole("button", { name: "返回键盘录入" }).click();
   await expect(sheet).toHaveCount(0);
@@ -217,7 +238,7 @@ test("模型加载失败 → 取景页给出错误，牌面不变", async ({ bro
   await expect(dialog.getByTestId("recognize-button")).toBeEnabled();
 });
 
-test("相机不可用 → 取景页仍能打开：说明原因、快门禁用、给相册入口与摆牌示意", async ({
+test("相机不可用 → 取景页仍能打开：说明原因、不出快门、给相册入口与摆牌示意", async ({
   browser,
 }) => {
   const { phone: p, dialog } = await openRonHandTab(browser, async (page) => {
@@ -230,12 +251,12 @@ test("相机不可用 → 取景页仍能打开：说明原因、快门禁用、
   await dialog.getByTestId("recognize-button").click();
   const sheet = p.getByTestId("camera-sheet");
   await expect(sheet.getByText(/当前环境无法使用相机/)).toBeVisible();
-  await expect(sheet.getByTestId("camera-shutter")).toBeDisabled();
+  // 快门不能点就不出现
+  await expect(sheet.getByTestId("camera-shutter")).toHaveCount(0);
   // 画面铺满整屏、底栏浮在上面：取景带只在底栏以上，带的下沿不压到底栏
   const bandBox = (await sheet.getByTestId("band-body").boundingBox())!;
   const panelBox = (await sheet.getByTestId("camera-panel").boundingBox())!;
   expect(bandBox.y + bandBox.height).toBeLessThanOrEqual(panelBox.y + 1);
-  await expect(sheet.getByText("对不齐？直接按快门")).toHaveCount(0);
   await expect(sheet.getByLabel("从相册选一张")).toBeVisible();
   await expect(sheet.getByText("定格的照片会上传，用于改进识别")).toBeVisible();
   await sheet.getByRole("button", { name: "怎么摆" }).click();

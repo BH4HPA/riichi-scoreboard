@@ -2,8 +2,6 @@ import type { Meld, RecognitionWarning, RecognizedHand } from "@riichi/core";
 
 /** 连续多少帧认出同一副牌才定格（用户拍板 3；<300 ms/帧下约 1.2 秒） */
 export const STABLE_FRAMES = 3;
-/** 这么久还没自动定格就把快门按钮点亮，给一条明说的退路 */
-export const HINT_AFTER_MS = 5000;
 
 export interface CaptureState {
   /** 上一帧的牌面指纹；null = 还没有可用的一帧 */
