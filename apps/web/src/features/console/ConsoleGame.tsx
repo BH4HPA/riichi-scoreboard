@@ -4,14 +4,15 @@ import type { GameView, RoomView, UiState } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Dialog, DialogContent } from "@/ui/dialog";
 import { ConnectionBadge } from "@/ui/notice";
-import { DissolveButton } from "./DissolveButton";
 import { RoomQrDialog } from "./RoomQr";
 import { RoundHeader } from "@/features/scoreboard/RoundHeader";
 import { PointsGrid } from "@/features/scoreboard/PointsGrid";
 import { DiffMatrix } from "@/features/scoreboard/DiffMatrix";
 import { HistoryTable } from "@/features/history/HistoryTable";
 import { FinalPanel } from "@/features/final/FinalPanel";
-import { ControlPanel } from "@/features/settlement/ControlPanel";
+import { ControlButtons } from "@/features/settlement/controls/ControlButtons";
+import { ControlHost } from "@/features/settlement/controls/ControlHost";
+import { useControlDialogs } from "@/features/settlement/controls/useControlDialogs";
 import { MirrorOverlay } from "@/features/mirror/MirrorOverlay";
 import { SiteFooter } from "@/features/site/SiteFooter";
 
@@ -32,6 +33,7 @@ export function ConsoleGame({
   const [panelOpen, setPanelOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
+  const controls = useControlDialogs();
   return (
     <div className={wide ? "flex h-dvh flex-col gap-4 p-6" : "flex min-h-dvh flex-col gap-3 p-4"}>
       <header className="flex flex-wrap items-center gap-3">
@@ -118,14 +120,22 @@ export function ConsoleGame({
           description="也可以用手机远程操作。"
           className="sm:max-w-2xl"
         >
-          <ControlPanel
+          <ControlButtons
             game={game}
+            rules={room.rules}
+            size="lg"
+            dissolvable
+            onOpen={controls.open}
+          />
+          <ControlHost
+            dialog={controls.dialog}
+            onClose={controls.close}
+            game={game.present}
             names={names}
             rules={room.rules}
             mirror={false}
             mySeat={null}
-            size="lg"
-            roomActions={<DissolveButton code={room.code} size="lg" variant="danger" />}
+            dissolveCode={room.code}
           />
         </DialogContent>
       </Dialog>

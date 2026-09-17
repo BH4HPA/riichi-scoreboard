@@ -139,7 +139,7 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   output is constant the gate always fires on the third frame — the "frames disagree, reset" branch is
   covered by `camera/autoCapture.test.ts` instead.
 - Riichi music: `RoomView.music` (`{track, seat, at}`) is memory-only room state like `online`; a client
-  sends `{type:"music", track: id | null}` (the section lives in the shared `ControlPanel`, so the console
+  sends `{type:"music", track: id | null}` (the section lives in the shared `settlement/controls/ControlButtons`, so the console
   can press it for local players with `seat: null`), the TV plays the track from the static bucket
   (`features/music/url.ts`) and shows a float badge; the name is derived from the seat snapshot. The
   server clears it after any command in `STOPS_MUSIC` (settlement, adjust, redo, endGame/newGame/toLobby/
