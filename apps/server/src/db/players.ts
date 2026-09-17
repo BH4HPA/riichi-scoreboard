@@ -17,6 +17,9 @@ export interface PlayerRow {
   last_seen: number;
 }
 
+/** 注册时没给昵称的设备玩家名（主控台通常就停在这个名字） */
+export const DEFAULT_PLAYER_NAME = "玩家";
+
 export function toPlayerRef(row: PlayerRow): PlayerRef {
   return { id: row.id, name: row.name, avatar: row.avatar, kind: row.kind };
 }

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { MAX_PRESETS_PER_PLAYER, type PresetsRepo } from "../../db/presets";
-import { toPlayerRef, type PlayersRepo } from "../../db/players";
+import { DEFAULT_PLAYER_NAME, toPlayerRef, type PlayersRepo } from "../../db/players";
 import type { ResultsRepo } from "../../db/results";
 import { validateRules, RulesError, type RoomRules } from "@riichi/core";
 import { requirePlayer, type AuthEnv } from "../../auth/deviceToken";
@@ -32,7 +32,7 @@ export function meRoutes(deps: Deps): Hono {
   /** 首次访问：签发设备 token。 */
   app.post("/register", jsonLimit, async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { name?: unknown };
-    const name = cleanName(body.name) ?? "玩家";
+    const name = cleanName(body.name) ?? DEFAULT_PLAYER_NAME;
     const row = deps.players.create(name, Date.now());
     return c.json({ token: row.token, player: toPlayerRef(row) }, 201);
   });

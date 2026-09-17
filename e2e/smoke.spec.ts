@@ -125,6 +125,9 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await tv.getByRole("button", { name: "操作" }).click();
   await tv.getByRole("button", { name: "撤销" }).click();
   await expect(tv.getByTestId("points-0")).toHaveText("25,000");
+  // 全桌都看到谁撤了哪一笔
+  await expect(phones[3]!.getByText("主控台 撤销了：东1局0本场 东家自摸")).toBeVisible();
+  await expect(tv.getByText("主控台 撤销了：东1局0本场 东家自摸")).toBeVisible();
   await expect(phones[3]!.getByTestId("points-0")).toHaveText("25,000");
   // 主控台没有座位：选人控件不标相对方位
   await tv.getByRole("button", { name: "自摸", exact: true }).click();

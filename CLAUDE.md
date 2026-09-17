@@ -43,7 +43,8 @@ Yarn workspaces monorepo:
   swallow a tap); they are then validated (`validateCommand`), enriched by actor
   (`registry.enrich`: seat identity, local-player ownership, engine evaluation), reduced, appended to
   `room_events`, and the resulting `present` state is broadcast. Undo/redo stacks live in memory and are
-  rebuilt by replay. Transient UI intents (mirroring a phone's dialog on the TV) live in memory only.
+  rebuilt by replay; an accepted undo/redo is followed by a `reverted` message to the whole room (who, and
+  which entry per core `describeRevert`) that every client shows as a notice. Transient UI intents (mirroring a phone's dialog on the TV) live in memory only.
   SQLite schema is versioned (`db/index.ts` `MIGRATIONS`, applied by `user_version`). User files go through
   `storage/ObjectStore`: local disk (served at `/api/objects/*`) or Tencent COS (`QCLOUD_*` env, `riichi/`
   prefix, see `.env.template`). Serves the built web app with SPA fallback.

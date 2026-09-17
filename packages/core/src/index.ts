@@ -16,6 +16,7 @@ export * from "./reducer/reduce";
 export * from "./reducer/validateCommand";
 export * from "./format/round";
 export * from "./format/describe";
+export * from "./format/describeRevert";
 export * from "./format/rules";
 export * from "./hand/options";
 export * from "./reference/notation";
