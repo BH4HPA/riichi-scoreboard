@@ -45,6 +45,7 @@ export function ControlPanel({
   const finished = present.status === "finished";
   const openOf = (key: DialogKey) => (open: boolean) => setDialog(open ? key : null);
   const shared = { game: present, names, rules, mirror };
+  const seated = { ...shared, mySeat };
   // 点任意结算键即让电视停掉立直音乐，弹窗取消也不恢复
   const openSettlement = (key: DialogKey) => {
     if (musicPlaying) socket.music(null);
@@ -152,26 +153,11 @@ export function ControlPanel({
         </section>
       )}
 
-      <TsumoDialog
-        open={dialog === "tsumo"}
-        onOpenChange={openOf("tsumo")}
-        defaultSeat={mySeat}
-        {...shared}
-      />
-      <RonDialog
-        open={dialog === "ron"}
-        onOpenChange={openOf("ron")}
-        defaultSeat={mySeat}
-        {...shared}
-      />
-      <DrawDialog open={dialog === "draw"} onOpenChange={openOf("draw")} {...shared} />
-      <AbortiveDialog open={dialog === "abortive"} onOpenChange={openOf("abortive")} {...shared} />
-      <ChomboDialog
-        open={dialog === "chombo"}
-        onOpenChange={openOf("chombo")}
-        defaultSeat={mySeat}
-        {...shared}
-      />
+      <TsumoDialog open={dialog === "tsumo"} onOpenChange={openOf("tsumo")} {...seated} />
+      <RonDialog open={dialog === "ron"} onOpenChange={openOf("ron")} {...seated} />
+      <DrawDialog open={dialog === "draw"} onOpenChange={openOf("draw")} {...seated} />
+      <AbortiveDialog open={dialog === "abortive"} onOpenChange={openOf("abortive")} {...seated} />
+      <ChomboDialog open={dialog === "chombo"} onOpenChange={openOf("chombo")} {...seated} />
       <AdjustDialog open={dialog === "adjust"} onOpenChange={openOf("adjust")} {...shared} />
       <ConfirmDialog
         open={dialog === "end"}

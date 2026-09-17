@@ -31,7 +31,7 @@ export interface WinDialogProps {
   names: string[];
   rules: RoomRules;
   mirror: boolean;
-  defaultSeat: Seat | null;
+  mySeat: Seat | null;
 }
 
 interface FormProps {
@@ -39,7 +39,7 @@ interface FormProps {
   names: string[];
   rules: RoomRules;
   mirror: boolean;
-  defaultSeat: Seat | null;
+  mySeat: Seat | null;
   onDone: () => void;
 }
 
@@ -95,9 +95,9 @@ export function TsumoDialog(props: WinDialogProps) {
 }
 
 /** 每次打开重新挂载：默认和牌者为操作者自己，草稿不跨次残留。 */
-function TsumoForm({ game, names, rules, mirror, defaultSeat, onDone }: FormProps) {
+function TsumoForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
   const send = useCommand();
-  const [winner, setWinner] = useState<Seat>(defaultSeat ?? 0);
+  const [winner, setWinner] = useState<Seat>(mySeat ?? 0);
   const [draft, setDraft] = useState<ValueDraft>(() => createValueDraft(true, readValueMode()));
   const [riichi, setRiichi] = useState(NO_FLAGS);
   const [pao, setPao] = useState<Seat | null>(null);
@@ -204,10 +204,10 @@ interface RonWinDraftState {
   pao: Seat | null;
 }
 
-function RonForm({ game, names, rules, mirror, defaultSeat, onDone }: FormProps) {
+function RonForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
   const send = useCommand();
   const maxWins = { atamahane: 1, double: 2, triple: 3 }[rules.win.multiRon];
-  const me = defaultSeat ?? 0;
+  const me = mySeat ?? 0;
   const [loser, setLoser] = useState<Seat>(SEATS.find((s) => s !== me) ?? 1);
   const [wins, setWins] = useState<RonWinDraftState[]>(() => [
     { winner: me, draft: createValueDraft(false, readValueMode()), pao: null },
