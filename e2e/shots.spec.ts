@@ -209,6 +209,17 @@ test("截图：取景框、确认态与标注页", async ({ browser }) => {
   await lab.screenshot({ path: `${OUT}/phone-label-lightbox.png` });
   await labelCtx.close();
 
+  // 摆牌示意：不装假模型，取景页不会自动定格，能从容打开「怎么摆」
+  const guideCtx = await newContext(browser, { viewport: { width: 400, height: 860 } });
+  const guide = await guideCtx.newPage();
+  await guide.route("**/riichi/models/*.onnx", (route) => route.abort());
+  await guide.goto("/label");
+  await guide.getByRole("button", { name: /开始拍/ }).click();
+  await guide.getByRole("button", { name: "怎么摆" }).click();
+  await guide.getByText("怎么摆，识别最准").waitFor();
+  await guide.screenshot({ path: `${OUT}/phone-layout-guide.png` });
+  await guideCtx.close();
+
   // 房间里的结算确认态：识别通过时键盘收起，只剩一排牌
   const tvCtx = await newContext(browser, { viewport: { width: 1600, height: 900 } });
   const tv = await tvCtx.newPage();

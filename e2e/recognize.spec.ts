@@ -130,9 +130,36 @@ test("模型加载失败 → 取景页给出错误，牌面不变", async ({ bro
   await expect(sheet).toBeVisible();
   // 模型下载被拦掉时才会走到这里：说明本地的 wasm 运行时已加载成功
   await expect(sheet.getByText(/fetch/i)).toBeVisible({ timeout: 20_000 });
+  // 模型用不了：给出回键盘录入的出口
+  await sheet.getByRole("button", { name: "返回键盘录入" }).click();
+  await expect(sheet).toHaveCount(0);
+  await dialog.getByTestId("recognize-button").click();
   await sheet.getByRole("button", { name: "关闭取景" }).click();
   await expect(dialog.getByTestId("hand-area").getByRole("button")).toHaveCount(0);
   await expect(dialog.getByTestId("recognize-button")).toBeEnabled();
+});
+
+test("相机不可用 → 取景页仍能打开：说明原因、快门禁用、给相册入口与摆牌示意", async ({
+  browser,
+}) => {
+  const { phone: p, dialog } = await openRonHandTab(browser, async (page) => {
+    await withDetector()(page);
+    await page.addInitScript(() =>
+      Object.defineProperty(navigator, "mediaDevices", { value: undefined, configurable: true }),
+    );
+  });
+
+  await dialog.getByTestId("recognize-button").click();
+  const sheet = p.getByTestId("camera-sheet");
+  await expect(sheet.getByText(/当前环境无法使用相机/)).toBeVisible();
+  await expect(sheet.getByTestId("camera-shutter")).toBeDisabled();
+  await expect(sheet.getByText("对不齐？直接按快门")).toHaveCount(0);
+  await expect(sheet.getByLabel("从相册选一张")).toBeVisible();
+  await expect(sheet.getByText("定格的照片会上传，用于改进识别")).toBeVisible();
+  await sheet.getByRole("button", { name: "怎么摆" }).click();
+  await expect(sheet.getByText("手牌连成一排", { exact: false })).toBeVisible();
+  await sheet.getByRole("button", { name: "知道了" }).click();
+  await sheet.getByRole("button", { name: "关闭取景" }).click();
 });
 
 test("确认态：点牌替换、改和张、改牌展开全键盘后不再自动收回", async ({ browser }) => {

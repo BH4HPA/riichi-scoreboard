@@ -4,7 +4,6 @@ import { RECOGNITION_MANIFEST, type RoomRules } from "@riichi/core";
 import { useSession } from "@/api/session";
 import type { ValueDraft } from "@/features/settlement/valueDraft";
 import { Button } from "@/ui/button";
-import { canUseCamera } from "@/lib/device";
 import { useRoomStore } from "@/ws/store";
 import { applyRecognized } from "./applyRecognized";
 import { CameraSheet, type Capture } from "./camera/CameraSheet";
@@ -54,7 +53,6 @@ export function CameraButton({
 
   const rec = draft.recognition;
   const blocking = rec?.warnings.filter((w) => w.severity === "blocking") ?? [];
-  const usable = canUseCamera();
 
   return (
     <div className="space-y-2" data-testid="recognize">
@@ -62,11 +60,10 @@ export function CameraButton({
         variant="outline"
         className="w-full"
         onClick={() => setOpen(true)}
-        disabled={!usable}
         data-testid="recognize-button"
       >
         <Camera className="mr-1 h-4 w-4" />
-        {!usable ? "拍照识别需要 HTTPS" : rec ? "重新拍照" : "拍照识别"}
+        {rec ? "重新拍照" : "拍照识别"}
       </Button>
       {/* 只报用户此刻能动手的：结果自洽时模型的内务（丢了几个低置信框之类）对用户零价值 */}
       {blocking.length > 0 && (
