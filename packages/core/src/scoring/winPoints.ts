@@ -39,8 +39,9 @@ const DEALER: Seat = 0;
  */
 export function winPoints(value: HandValue, situation: WinSituation, rules: RoomRules): WinPoints {
   const base = calcBasePoints(value, rules);
-  const label =
-    value.yakuman > 0 ? yakumanLabel(value.yakuman) : TIER_LABELS[scoreTier(value, rules)];
+  // 倍数与 calcBasePoints 同一口径：不叠加时两倍役满也只按役满算、只叫役满
+  const yakuman = rules.scoring.yakumanStacking ? value.yakuman : Math.min(value.yakuman, 1);
+  const label = yakuman > 0 ? yakumanLabel(yakuman) : TIER_LABELS[scoreTier(value, rules)];
   const winner: Seat = situation.dealer ? DEALER : 1;
   const common = { winner, dealer: DEALER, base, honba: situation.honba, kyotaku: 0, riichi: [] };
 
