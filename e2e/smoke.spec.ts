@@ -116,7 +116,13 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await expect(tv.getByText("正在录入自摸结算")).toHaveCount(0);
 
   // 番符表镜像
+  // 默认只在手机上看，打开「投到电视」才投屏
   await phones[1]!.getByRole("button", { name: "番符表" }).click();
+  await expect(
+    phones[1]!.getByRole("dialog").getByRole("tab", { name: "役满", exact: true }),
+  ).toBeVisible();
+  await expect(tv.getByText("正在查看番符表")).toHaveCount(0);
+  await phones[1]!.getByRole("switch", { name: "投到电视" }).click();
   await expect(tv.getByText("正在查看番符表")).toBeVisible();
   await phones[1]!.getByRole("button", { name: "关闭" }).first().click();
   await expect(tv.getByText("正在查看番符表")).toHaveCount(0);
