@@ -100,3 +100,6 @@ export interface RecognitionPatch {
   /** 用户最终提交结算的手牌（训练数据的真值） */
   corrected?: HandInput;
 }
+
+/** 识别照片上传的字节上限（服务端校验与手机端编码兜底共用） */
+export const RECOGNITION_PHOTO_MAX_BYTES = 2 * 1024 * 1024;

@@ -4,8 +4,6 @@ import { newContext } from "./helpers";
 
 /** 假检测器（ml/scripts/e2e_detector.py）：恒定输出下面这副手牌的检测框，链路其余部分都是真的 */
 const DETECTOR = path.join(import.meta.dirname, "fixtures/detector.onnx");
-/** 相册入口用的任意一张图：假检测器不看内容 */
-const PHOTO = path.join(import.meta.dirname, "../docs/screenshots/tv-game.png");
 
 /** 123m 4筒 赤5筒 6筒 789s 789m 22p，和张 9m：平和 + 赤宝牌 = 2 番 30 符 */
 const CLOSED = [1, 2, 3, 13, 36, 15, 25, 26, 27, 7, 8, 11, 11, 9];
@@ -77,12 +75,13 @@ async function shoot(p: Page, dialog: Locator): Promise<void> {
   await expect(p.getByTestId("camera-sheet")).toHaveCount(0, { timeout: 30_000 });
 }
 
-test("取景 → 自动定格 → 填入牌面并自动算番 → 检测框与结算后的真值都回填", async ({ browser }) => {
-  const patches: Record<string, unknown>[] = [];
-  const { phone: p, dialog } = await openRonHandTab(browser, withDetector(patches));
-
-  // 取景期间逐帧量：取景区域高度不变（识别结果出现/消失时底栏不伸缩）；视频一旦显示就铺满区域
-  const heights = p.evaluate(
+/**
+ * 注意：Chromium 只能防回归；iOS WebKit「元素尺寸对、视频层画小」的症状这里测不到，以真机为准。
+ * 取景期间逐帧量，直到取景页关闭：取景区域高度不变；视频一旦显示（不透明）就铺满区域；
+ * 实时识别行出现过且没被裁掉。
+ */
+function sampleViewfinder(p: Page) {
+  return p.evaluate(
     () =>
       new Promise<{
         min: number;
@@ -96,6 +95,7 @@ test("取景 → 自动定格 → 填入牌面并自动算番 → 检测框与�
         let live = false;
         let clipped = false;
         let uncovered = false;
+        let shown = false;
         let seen = false;
         const tick = () => {
           const area = document.querySelector('[data-testid="camera-area"]');
@@ -105,7 +105,8 @@ test("取景 → 自动定格 → 填入牌面并自动算番 → 检测框与�
             const a = area.getBoundingClientRect();
             min = Math.min(min, a.height);
             max = Math.max(max, a.height);
-            if (getComputedStyle(video).visibility === "visible") {
+            if (getComputedStyle(video).opacity !== "0") {
+              shown = true;
               const v = video.getBoundingClientRect();
               uncovered ||=
                 v.left > a.left + 1 ||
@@ -117,18 +118,26 @@ test("取景 → 自动定格 → 填入牌面并自动算番 → 检测框与�
             live ||= Boolean(slot?.querySelector("img"));
             clipped ||= slot !== null && slot.scrollHeight > slot.clientHeight + 1;
           } else if (seen) {
-            return resolve({ min, max, live, clipped, uncovered });
+            return resolve({ min, max, live, clipped, uncovered, shown });
           }
           requestAnimationFrame(tick);
         };
         tick();
       }),
   );
+}
+
+test("取景 → 自动定格 → 填入牌面并自动算番 → 检测框与结算后的真值都回填", async ({ browser }) => {
+  const patches: Record<string, unknown>[] = [];
+  const { phone: p, dialog } = await openRonHandTab(browser, withDetector(patches));
+
+  const heights = sampleViewfinder(p);
   await shoot(p, dialog);
   const measured = await heights;
   expect(measured.live).toBe(true);
   expect(measured.max - measured.min).toBeLessThan(1);
   expect(measured.clipped).toBe(false);
+  expect(measured.shown).toBe(true);
   expect(measured.uncovered).toBe(false);
   await expect(dialog.getByTestId("recognize-button")).toHaveText("重新拍照");
 
@@ -164,8 +173,20 @@ test("连拍两张：第二次打开取景框仍能识别（模型字节被转�
   await shoot(p, dialog);
   await expect(dialog.getByTestId("hand-confirm")).toBeVisible();
 
-  // 第二次：Worker 重建，用的是同一份缓存的模型字节
+  // 第二次：Worker 重建，用的是同一份缓存的模型字节；画面照样铺满（iOS 上曾经只有第一次铺满）
+  const second = sampleViewfinder(p);
   await shoot(p, dialog);
+  const again = await second;
+  // 取景带只在底栏以上：带的下沿不压到浮在画面上的底栏
+  await dialog.getByTestId("recognize-button").click();
+  const band = p.getByTestId("band-body");
+  const panel = p.getByTestId("camera-panel");
+  const bandBox = await band.boundingBox();
+  const panelBox = await panel.boundingBox();
+  if (bandBox && panelBox) expect(bandBox.y + bandBox.height).toBeLessThanOrEqual(panelBox.y + 1);
+  await expect(p.getByTestId("camera-sheet")).toHaveCount(0, { timeout: 30_000 });
+  expect(again.shown).toBe(true);
+  expect(again.uncovered).toBe(false);
   await expect(dialog.getByTestId("hand-confirm")).toBeVisible();
   await expect(dialog.getByTestId("recognize-button")).toHaveText("重新拍照");
 });
@@ -210,6 +231,10 @@ test("相机不可用 → 取景页仍能打开：说明原因、快门禁用、
   const sheet = p.getByTestId("camera-sheet");
   await expect(sheet.getByText(/当前环境无法使用相机/)).toBeVisible();
   await expect(sheet.getByTestId("camera-shutter")).toBeDisabled();
+  // 画面铺满整屏、底栏浮在上面：取景带只在底栏以上，带的下沿不压到底栏
+  const bandBox = (await sheet.getByTestId("band-body").boundingBox())!;
+  const panelBox = (await sheet.getByTestId("camera-panel").boundingBox())!;
+  expect(bandBox.y + bandBox.height).toBeLessThanOrEqual(panelBox.y + 1);
   await expect(sheet.getByText("对不齐？直接按快门")).toHaveCount(0);
   await expect(sheet.getByLabel("从相册选一张")).toBeVisible();
   await expect(sheet.getByText("定格的照片会上传，用于改进识别")).toBeVisible();
@@ -218,18 +243,57 @@ test("相机不可用 → 取景页仍能打开：说明原因、快门禁用、
   await sheet.getByRole("button", { name: "知道了" }).click();
 
   // 相册选一张：取景带可以拖着移动，「用这块识别」后定格回填牌面
-  await sheet.getByTestId("label-album").setInputFiles(PHOTO);
+  // 用一张 4032×3024 的噪点大图（JPEG 编码后远超 2 MB）：送识别前必须缩小，否则留存上传 413
+  const big = await p.evaluate(() => {
+    const c = document.createElement("canvas");
+    c.width = 4032;
+    c.height = 3024;
+    const ctx = c.getContext("2d")!;
+    const img = ctx.createImageData(c.width, c.height);
+    for (let i = 0; i < img.data.length; i++) img.data[i] = (Math.random() * 255) | 0;
+    ctx.putImageData(img, 0, 0);
+    return c.toDataURL("image/jpeg", 0.95).split(",")[1]!;
+  });
+  const uploaded = p.waitForResponse(
+    (r) => r.url().includes("/api/recognitions?") && r.request().method() === "POST",
+  );
+  await sheet.getByTestId("label-album").setInputFiles({
+    name: "big.jpg",
+    mimeType: "image/jpeg",
+    buffer: Buffer.from(big, "base64"),
+  });
   const picker = p.getByTestId("still-picker");
   const body = picker.getByTestId("band-body");
   const before = (await body.boundingBox())!;
   await p.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
   await p.mouse.down();
-  await p.mouse.move(before.x + before.width / 2, before.y + before.height / 2 + 80, { steps: 5 });
+  await p.mouse.move(before.x + before.width / 2, before.y + before.height / 2 + 1000, {
+    steps: 8,
+  });
   await p.mouse.up();
+  // 拖到底：被夹在画面内
   expect((await body.boundingBox())!.y).toBeGreaterThan(before.y + 40);
+  // 把手往下拉到底后手指不动：带高不能自己一路涨（曾经每次移动都用被夹住的中线反推，越算越大）
+  const handle = picker.getByRole("slider", { name: "取景带高度" });
+  const h = (await handle.boundingBox())!;
+  await p.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(h.x + h.width / 2, h.y + h.height / 2 + 12, { steps: 4 });
+  const grown = Number(await handle.getAttribute("aria-valuenow"));
+  expect(grown).toBeLessThan(70);
+  // 指尖原地微微抖动（真机手指不可能绝对静止）
+  for (let i = 0; i < 6; i++) {
+    await p.mouse.move(h.x + h.width / 2, h.y + h.height / 2 + 12 + (i % 2));
+  }
+  expect(Math.abs(Number(await handle.getAttribute("aria-valuenow")) - grown)).toBeLessThanOrEqual(
+    1,
+  );
+  await p.mouse.up();
   await picker.getByRole("button", { name: "用这块识别" }).click();
   await expect(sheet).toHaveCount(0, { timeout: 30_000 });
   await expect(dialog.getByTestId("hand-confirm")).toBeVisible();
+  expect((await uploaded).status()).toBe(201);
+  await expect(p.getByText("照片留存失败，不影响结算")).toHaveCount(0);
 });
 
 test("确认态：点牌替换、改和张、改牌展开全键盘后不再自动收回", async ({ browser }) => {

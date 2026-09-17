@@ -65,7 +65,8 @@ export function StillPicker({
         <img
           src={url}
           alt=""
-          className="absolute inset-0 h-full w-full max-w-none object-contain"
+          // 不接事件：带外长按不弹 iOS 的图片菜单
+          className="pointer-events-none absolute inset-0 h-full w-full max-w-none object-contain select-none"
         />
         <BandOverlay
           band={band}

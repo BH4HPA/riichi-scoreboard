@@ -6,6 +6,7 @@ import {
   boxStyle,
   clampBand,
   clampCenter,
+  fitLongEdge,
   fitBox,
   type Viewport,
 } from "./band";
@@ -135,5 +136,22 @@ describe("相册照片：完整显示、取景带可上下移动", () => {
     const r = bandRect(wide, 0.7)!;
     expect(r.y).toBe(0);
     expect(Math.round(r.height)).toBe(1080);
+  });
+});
+
+describe("fitLongEdge", () => {
+  it("相册原图裁出的长条按长边缩到上限，比例不变；小图不放大", () => {
+    expect(fitLongEdge(4032, 1300, 1920)).toEqual({ width: 1920, height: 619 });
+    expect(fitLongEdge(800, 300, 1920)).toEqual({ width: 800, height: 300 });
+  });
+});
+
+describe("底栏浮在画面上：取景带只在可见部分里", () => {
+  it("带按可见高度居中，映射回画面时整体上移", () => {
+    const full = bandRect(portrait, 0.5)!;
+    const visible = bandRect(portrait, 0.5, 0.5, 580)!;
+    expect(visible.y + visible.height / 2).toBeLessThan(full.y + full.height / 2);
+    // 带高 = 可见高度的一半 = 290 px，换回视频像素
+    expect(Math.round(visible.height)).toBe(Math.round(290 / (780 / 1080)));
   });
 });

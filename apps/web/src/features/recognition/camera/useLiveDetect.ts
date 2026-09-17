@@ -9,6 +9,8 @@ interface Options {
   /** 取景区域（视频按 cover 铺在里面）：取景带的比例以它为准 */
   area: HTMLElement | null;
   band: number;
+  /** 底栏浮在画面下方的高度（px）：取景带只在它以上的可见部分里 */
+  bottomInset: number;
   active: boolean;
   onFrame: (r: FrameResult) => void;
   /** 这一帧实际送去推理的区域（检测框的坐标系），标注模式据此把框画回屏幕 */
@@ -25,16 +27,19 @@ export function useLiveDetect({
   videoRef,
   area,
   band,
+  bottomInset,
   active,
   onFrame,
   onCrop,
 }: Options): void {
   const bandRef = useRef(band);
+  const insetRef = useRef(bottomInset);
   const onFrameRef = useRef(onFrame);
   const onCropRef = useRef(onCrop);
   // 走 ref：拖动取景带、换回调都不该重启整个循环（重启会丢掉正在推理的那一帧）
   useEffect(() => {
     bandRef.current = band;
+    insetRef.current = bottomInset;
     onFrameRef.current = onFrame;
     onCropRef.current = onCrop;
   });
@@ -62,7 +67,7 @@ export function useLiveDetect({
         displayWidth: area.clientWidth,
         displayHeight: area.clientHeight,
       };
-      const rect = bandRect(view, bandRef.current);
+      const rect = bandRect(view, bandRef.current, 0.5, area.clientHeight - insetRef.current);
       if (!rect) return;
       inFlight = true;
       onCropRef.current?.(rect);

@@ -5,7 +5,8 @@ import { requirePlayer, type AuthEnv } from "../../auth/deviceToken";
 import type { PlayersRepo } from "../../db/players";
 import type { RecognitionsRepo } from "../../db/recognitions";
 import type { ObjectStore } from "../../storage";
-import { PHOTO_MAX_BYTES, PhotoError, savePhoto, validatePhoto } from "../photos";
+import { RECOGNITION_PHOTO_MAX_BYTES } from "@riichi/core";
+import { PhotoError, savePhoto, validatePhoto } from "../photos";
 
 interface Deps {
   players: PlayersRepo;
@@ -50,7 +51,7 @@ export class UploadLimiter {
 
 const tooLarge = (max: string) =>
   bodyLimit({
-    maxSize: max === "photo" ? PHOTO_MAX_BYTES : PATCH_MAX_BYTES,
+    maxSize: max === "photo" ? RECOGNITION_PHOTO_MAX_BYTES : PATCH_MAX_BYTES,
     onError: (c) => c.json({ error: "too_large", message: "请求体过大" }, 413),
   });
 

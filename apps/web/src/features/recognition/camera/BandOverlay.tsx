@@ -32,10 +32,20 @@ export function BandOverlay({
     const rect = boxRef.current?.getBoundingClientRect();
     return rect && rect.height > 0 ? (clientY - rect.top) / rect.height : null;
   };
+  /** 按下把手时引导框的上沿：可移动的带（相册照片）拖把手时固定上沿，只改下沿 */
+  const topRef = useRef(0);
   const resize = (clientY: number) => {
     const y = fraction(clientY);
-    // 把手在下沿：半高 = 指尖到中线的距离
-    if (y !== null) onBandChange(clampBand((Math.abs(y - mid) * 2) / GUIDE_RATIO));
+    if (y === null) return;
+    if (!onCenterChange) {
+      // 固定居中的带（实时取景）：半高 = 指尖到中线的距离
+      onBandChange(clampBand((Math.abs(y - mid) * 2) / GUIDE_RATIO));
+      return;
+    }
+    // 不能用渲染时的中线反推：带贴底时中线被夹住，每次移动都会把带高越算越大
+    const next = clampBand((y - topRef.current) / GUIDE_RATIO);
+    onBandChange(next);
+    onCenterChange(clampCenter(topRef.current + (next * GUIDE_RATIO) / 2, next));
   };
 
   return (
@@ -76,9 +86,11 @@ export function BandOverlay({
         // touch-none 必不可少：不声明的话浏览器会把纵向拖拽当成页面滚动手势接管，
         // 派发 pointercancel，setPointerCapture 也拦不住，拖到一半就掉线。
         // z-10 压在检测框之上：标注模式下带沿附近的框会抢走把手的触摸。
-        className="pointer-events-auto absolute inset-x-0 z-10 flex h-8 touch-none items-center justify-center"
+        // 只在中间一小段可拖：整宽的话会盖住两侧的其它控件
+        className="pointer-events-auto absolute left-1/2 z-10 flex h-8 w-24 -translate-x-1/2 touch-none items-center justify-center"
         style={{ bottom: `calc(${bottom} - 1rem)` }}
         onPointerDown={(e) => {
+          topRef.current = mid - guide / 2;
           e.currentTarget.setPointerCapture(e.pointerId);
           resize(e.clientY);
         }}

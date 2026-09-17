@@ -50,14 +50,21 @@ export function fitBox(view: Viewport): { scale: number; left: number; top: numb
 /**
  * 取景带 → 原始像素的矩形，用于 `createImageBitmap(src, sx, sy, sw, sh)`。
  * 先按 fitBox 求缩放与居中偏移，再把带的上下沿、区域的左右沿换算回原始像素并夹到画面内；
- * `center` 是带中线的位置（实时取景固定居中，相册照片可以拖）。尺寸退化时返回 null。
+ * `center` 是带中线的位置（实时取景固定居中，相册照片可以拖）。
+ * `visibleHeight`：画面铺满整屏、底栏浮在下方时，带只在底栏以上的可见部分里取（从顶部起算）。
+ * 尺寸退化时返回 null。
  */
-export function bandRect(view: Viewport, fraction: number, center = 0.5): Rect | null {
+export function bandRect(
+  view: Viewport,
+  fraction: number,
+  center = 0.5,
+  visibleHeight = view.displayHeight,
+): Rect | null {
   const box = fitBox(view);
-  if (!box) return null;
-  const { videoWidth: vw, videoHeight: vh, displayWidth: dw, displayHeight: dh } = view;
-  const bandH = dh * clampBand(fraction);
-  const bandTop = dh * clampCenter(center, fraction) - bandH / 2;
+  if (!box || visibleHeight <= 0) return null;
+  const { videoWidth: vw, videoHeight: vh, displayWidth: dw } = view;
+  const bandH = visibleHeight * clampBand(fraction);
+  const bandTop = visibleHeight * clampCenter(center, fraction) - bandH / 2;
   const toX = (px: number) => Math.min(vw, Math.max(0, (px - box.left) / box.scale));
   const toY = (px: number) => Math.min(vh, Math.max(0, (px - box.top) / box.scale));
   const x = toX(0);
@@ -84,5 +91,21 @@ export function boxStyle(
     top: pct(y1, crop.height),
     width: pct(x2 - x1, crop.width),
     height: pct(y2 - y1, crop.height),
+  };
+}
+
+/** 相册静帧送识别前的长边上限：与实时取景请求的分辨率一致（useCameraStream 的 1920） */
+export const STILL_MAX_EDGE = 1920;
+
+/** 按长边等比缩小到不超过 max（不放大），取整且至少 1 像素 */
+export function fitLongEdge(
+  width: number,
+  height: number,
+  max: number,
+): { width: number; height: number } {
+  const scale = Math.min(1, max / Math.max(width, height));
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
   };
 }
