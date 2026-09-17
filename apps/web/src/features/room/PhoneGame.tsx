@@ -117,7 +117,7 @@ export function PhoneGame() {
         className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
         aria-label="功能"
       >
-        <div className="mx-auto flex max-w-md items-center gap-2 pt-1.5 pl-4 pr-2 text-[11px] text-muted">
+        <div className="mx-auto flex max-w-md items-center gap-2 pt-1.5 pl-4 pr-3 text-[11px] text-muted">
           <span>
             房间 <span className="font-semibold tabular text-fg">{room.code}</span>
           </span>
