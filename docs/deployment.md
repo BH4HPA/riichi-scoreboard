@@ -12,7 +12,7 @@ docker compose up -d --build   # 单容器，:8787，数据卷 /data（SQLite + 
 
 - 构建前端前设置 `VITE_API_BASE_URL`；
 - 服务端设置 `CORS_ORIGINS`；
-- 把静态站点的 404 回退到 `index.html`（`/console`、`/r/:code` 都是前端路由）。
+- 把静态站点的 404 回退到 `index.html`（`/console`、`/r/:code`、`/calc` 都是前端路由）。
 
 ## 线上（GitHub Actions → 腾讯云）
 
