@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { canUseCamera } from "@/lib/device";
 
 /** 请求的分辨率：取景带裁完还要 letterbox 到 640，源越清楚每张牌剩的像素越多 */
 const CONSTRAINTS: MediaStreamConstraints = {
@@ -40,8 +41,11 @@ export function useCameraStream(
     onLostRef.current = onLost;
   });
 
+  // 非安全上下文或浏览器没有相机 API：navigator.mediaDevices 可能根本不存在，不能去调
+  const supported = canUseCamera();
+
   useEffect(() => {
-    if (!active) return;
+    if (!active || !supported) return;
     const video = videoRef.current;
     let stream: MediaStream | null = null;
     let cancelled = false;
@@ -76,7 +80,11 @@ export function useCameraStream(
       stream?.getTracks().forEach((t) => t.stop());
       if (video) video.srcObject = null;
     };
-  }, [active]);
+  }, [active, supported]);
 
-  return { videoRef, error, ready };
+  return {
+    videoRef,
+    error: supported ? error : "当前环境无法使用相机（需要 HTTPS），可以从相册选一张",
+    ready,
+  };
 }

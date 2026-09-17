@@ -10,7 +10,6 @@ import {
 } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { HandView } from "@/features/hand/HandView";
-import { canUseCamera } from "@/lib/device";
 import { closeDetector, openDetector, type Detector } from "../worker/client";
 import type { FrameResult } from "../worker/protocol";
 import { BAND_DEFAULT, type Rect } from "./band";
@@ -18,6 +17,7 @@ import { BandOverlay } from "./BandOverlay";
 import { DetectionOverlay } from "./DetectionOverlay";
 import { StillPicker } from "./StillPicker";
 import { EMPTY_CAPTURE, feedFrame, HINT_AFTER_MS, STABLE_FRAMES } from "./autoCapture";
+import { LayoutGuide } from "./LayoutGuide";
 import { useCameraStream } from "./useCameraStream";
 import { useLiveDetect } from "./useLiveDetect";
 
@@ -66,6 +66,7 @@ export function CameraSheet({
   const [flash, setFlash] = useState(false);
   const [cropRect, setCropRect] = useState<Rect | null>(null);
   const [picked, setPicked] = useState<Detection | null>(null);
+  const [guide, setGuide] = useState(false);
   const onCloseRef = useRef(onClose);
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -207,7 +208,8 @@ export function CameraSheet({
     ...(mode === "label" ? { onCrop: setCropRect } : {}),
   });
 
-  const secure = canUseCamera();
+  /** 相机用不了（权限、无设备、占用、非 HTTPS）：快门没有意义，给相册入口 */
+  const camBroken = camError !== null;
   const downloading = !detector && !error && progress < 1;
   const overdue = now - openedAt > HINT_AFTER_MS && !paused;
   const hint =
@@ -274,6 +276,7 @@ export function CameraSheet({
             aria-hidden
           />
         )}
+        {guide && <LayoutGuide onClose={() => setGuide(false)} />}
         {picked && (
           <button
             type="button"
@@ -286,10 +289,17 @@ export function CameraSheet({
       </div>
 
       <div className="space-y-2 bg-black/90 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 text-white">
-        {!secure && (
-          <p className="text-sm text-neg">当前不是安全上下文（需要 HTTPS），相机无法打开。</p>
+        {camError && <p className="text-sm text-neg">{camError}</p>}
+        {error && (
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-neg">{error}</p>
+            {mode === "room" && (
+              <Button variant="outline" size="sm" className="shrink-0 text-fg" onClick={onClose}>
+                返回键盘录入
+              </Button>
+            )}
+          </div>
         )}
-        {(error ?? camError) && <p className="text-sm text-neg">{error ?? camError}</p>}
         {downloading && (
           <div>
             <p className="text-xs">
@@ -309,12 +319,15 @@ export function CameraSheet({
           </div>
         )}
         <div className="flex items-center justify-between gap-3">
-          <span className="text-xs text-white/70">
-            {overdue ? "对不齐？直接按快门" : "对准后会自动定格"}
+          <span className="flex items-center gap-3 text-xs text-white/70">
+            {!camBroken && (overdue ? "对不齐？直接按快门" : "对准后会自动定格")}
+            <button type="button" className="underline" onClick={() => setGuide(true)}>
+              怎么摆
+            </button>
           </span>
           <div className="flex items-center gap-2">
-            {/* 相册只在标注模式给：房间里就地拍一张的成本已经接近零 */}
-            {mode === "label" && (
+            {/* 相册：标注模式常驻；房间里就地拍一张成本接近零，只在相机用不了时才给 */}
+            {(mode === "label" || camBroken) && (
               <label
                 className="inline-flex h-8 cursor-pointer items-center rounded-lg border border-white/40 px-2.5 text-sm"
                 aria-label="从相册选一张"
@@ -337,13 +350,16 @@ export function CameraSheet({
               variant={overdue ? "accent" : "outline"}
               size="sm"
               onClick={() => void capture()}
-              disabled={!detector}
+              disabled={!detector || !ready || camBroken}
               data-testid="camera-shutter"
             >
               快门
             </Button>
           </div>
         </div>
+        {mode === "room" && (
+          <p className="text-[11px] text-white/50">定格的照片会上传，用于改进识别</p>
+        )}
       </div>
 
       {file && (
