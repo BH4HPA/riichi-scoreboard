@@ -4,7 +4,6 @@ import { Link } from "react-router";
 import { RECOGNITION_MANIFEST } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Notice } from "@/ui/notice";
-import { canUseCamera } from "@/lib/device";
 import { CameraSheet } from "@/features/recognition/camera/CameraSheet";
 import { CalcContextCard, type CalcContext } from "@/features/calc/context/CalcContextCard";
 import { useEvaluation } from "@/features/calc/evaluate/useEvaluation";
@@ -59,10 +58,9 @@ export function Calc() {
       />
 
       {shot.phase === "idle" &&
+        // 相机用不了（无权限、非 HTTPS）不在这里拦：取景页自己说明原因、禁用快门并给相册入口
         (!RECOGNITION_MANIFEST.model ? (
           <p className="text-sm text-muted">识别模型还没有发布，暂时不能拍照识别。</p>
-        ) : !canUseCamera() ? (
-          <p className="text-sm text-neg">相机需要 HTTPS 才能打开，请用正式地址访问本页。</p>
         ) : (
           <Button variant="accent" size="lg" onClick={shot.shoot}>
             <Camera className="h-5 w-5" />
