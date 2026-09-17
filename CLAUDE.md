@@ -50,7 +50,9 @@ Yarn workspaces monorepo:
   prefix, see `.env.template`). Serves the built web app with SPA fallback.
 - `apps/web` — Vite + React 19 + Tailwind v4 + radix primitives. Routes: `/` landing (device routing:
   desktop → `/console`, tablet chooses, phone gets QR scan + six-cell code input), `/console` (TV: two
-  columns ≥ 1280px, otherwise single column with history drawer + QR dialog), `/r/:code` (phone).
+  columns ≥ 1280px with a draggable split — `features/console/split`, default scores 0.6, clamped by
+  per-column minimum widths, remembered in `riichi.console.split` — otherwise single column with history
+  drawer + QR dialog), `/r/:code` (phone).
   Phone settlement dialogs mirror to the TV as a full-screen modal (`features/mirror/SettlementMirror`),
   carrying the hand only once the engine has evaluated it. Looking up the 番符表/rules on a phone stays on the phone
   unless its 「投到电视」 switch (`features/mirror/CastSwitch`, reset whenever the sheet closes) is on. Site credits (copyright, ICP record) live in

@@ -7,7 +7,7 @@ const ROOM_KEY = "riichi.console.room";
 
 /**
  * 主控台的房间：优先复用本机上次的房间码；不存在（404）或已解散（410）则新建。
- * `newRoom` 供「新房间」按钮与解散后的自动重建使用。
+ * `newRoom` 供解散后的自动重建使用（「新房间」已并入「解散房间」）。
  */
 export function useConsoleRoom() {
   const ensure = useSession((s) => s.ensure);

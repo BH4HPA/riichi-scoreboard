@@ -44,7 +44,6 @@ export function Console() {
           <ConsoleLobby
             room={room}
             wide={wide}
-            onNewRoom={newRoom}
             extraActions={
               <DissolveButton code={room.code} size="lg" variant="ghost" className="text-neg" />
             }

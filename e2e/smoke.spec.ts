@@ -115,6 +115,14 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await expect(tv.getByText("东1局1本场")).toBeVisible();
   await expect(tv.getByText("正在录入自摸结算")).toHaveCount(0);
 
+  // 宽屏比分/历史分隔可调（默认 3:2）：键盘微调
+  const separator = tv.getByRole("separator", { name: /拖动调整/ });
+  const before = Number(await separator.getAttribute("aria-valuenow"));
+  expect(before).toBe(60);
+  await separator.focus();
+  await tv.keyboard.press("ArrowRight");
+  await expect(separator).toHaveAttribute("aria-valuenow", String(before + 2));
+
   // 番符表镜像
   // 默认只在手机上看，打开「投到电视」才投屏
   await phones[1]!.getByRole("button", { name: "番符表" }).click();
@@ -279,6 +287,10 @@ test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手�
   const tv = await tvCtx.newPage();
   await tv.goto("/console"); // 新的浏览器上下文没有保存的房间码，会自动新建房间
   const code = (await tv.getByTestId("room-code").textContent())?.trim() ?? "";
+
+  // 开局键旁说明还差什么；「新房间」已并入「解散房间」
+  await expect(tv.getByText("还差 4 人入座")).toBeVisible();
+  await expect(tv.getByRole("button", { name: "新房间" })).toHaveCount(0);
 
   // 东家：新建并入座；南家：再建一个
   for (const [seat, name] of [
