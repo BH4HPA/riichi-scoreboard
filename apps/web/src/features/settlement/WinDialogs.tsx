@@ -10,7 +10,7 @@ import {
   type SettlementWinView,
 } from "@riichi/core";
 import { Button } from "@/ui/button";
-import { Label, Select } from "@/ui/controls";
+import { Label } from "@/ui/controls";
 import { Dialog, DialogContent, DialogFooter } from "@/ui/dialog";
 import { useCommand } from "@/ws/useRoom";
 import { useSession } from "@/api/session";
@@ -19,9 +19,9 @@ import { ValuePicker } from "./ValuePicker";
 import { createValueDraft, draftToClientValue, draftValue, type ValueDraft } from "./valueDraft";
 import { readValueMode } from "./valueModePref";
 import { PreviewGrid } from "./PreviewGrid";
-import { NO_FLAGS, incomeBreakdown, seatOptions, seatsOf } from "./format";
+import { NO_FLAGS, incomeBreakdown, seatsOf } from "./format";
 import { previewRon, previewTsumo } from "./preview";
-import { SeatFlags, SeatSelect } from "./SeatFlags";
+import { PaoPicker, SeatFlags, SeatSelect } from "./SeatFlags";
 import { useMirror } from "./useMirror";
 
 export interface WinDialogProps {
@@ -41,31 +41,6 @@ interface FormProps {
   mirror: boolean;
   mySeat: Seat | null;
   onDone: () => void;
-}
-
-/** 包牌者：仅规则开启且当前价值为役满时可选。 */
-function PaoPicker({
-  names,
-  winner,
-  value,
-  onChange,
-}: {
-  names: string[];
-  winner: Seat;
-  value: Seat | null;
-  onChange: (v: Seat | null) => void;
-}) {
-  return (
-    <div>
-      <Label>包牌（责任払い）</Label>
-      <Select
-        value={value === null ? "none" : String(value)}
-        onValueChange={(v) => onChange(v === "none" ? null : (Number(v) as Seat))}
-        options={[{ value: "none", label: "无" }, ...seatOptions(names, [winner])]}
-        className="mt-1"
-      />
-    </div>
-  );
 }
 
 /** 镜像用的和牌者视图：牌面模式且已算出结果时才带手牌（半手牌会被服务端拒绝）。 */
@@ -145,10 +120,24 @@ function TsumoForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
   return (
     <>
       <div className="space-y-3">
-        <SeatSelect label="自摸者" names={names} value={winner} onChange={setWinner} />
-        <SeatFlags label="立直情况" names={names} value={riichi} onChange={setRiichi} />
+        <SeatSelect
+          label="自摸者"
+          names={names}
+          mySeat={mySeat}
+          value={winner}
+          onChange={setWinner}
+        />
+        <SeatFlags
+          label="立直情况"
+          names={names}
+          mySeat={mySeat}
+          value={riichi}
+          onChange={setRiichi}
+        />
         <ValuePicker draft={draft} onChange={setDraft} rules={rules} seat={winner} />
-        {paoAllowed && <PaoPicker names={names} winner={winner} value={pao} onChange={setPao} />}
+        {paoAllowed && (
+          <PaoPicker names={names} mySeat={mySeat} winner={winner} value={pao} onChange={setPao} />
+        )}
         <div>
           <Label>结算预览</Label>
           {preview ? (
@@ -285,13 +274,26 @@ function RonForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
   return (
     <>
       <div className="space-y-3">
-        <SeatSelect label="放铳者" names={names} value={loser} onChange={setLoser} />
-        <SeatFlags label="立直情况" names={names} value={riichi} onChange={setRiichi} />
+        <SeatSelect
+          label="放铳者"
+          names={names}
+          mySeat={mySeat}
+          value={loser}
+          onChange={setLoser}
+        />
+        <SeatFlags
+          label="立直情况"
+          names={names}
+          mySeat={mySeat}
+          value={riichi}
+          onChange={setRiichi}
+        />
         {wins.map((w, i) => (
           <div key={i} className="rounded-lg border border-border p-2.5">
             <div className="flex items-end gap-2">
               <div className="flex-1">
                 <SeatSelect
+                  mySeat={mySeat}
                   label={`荣和者${wins.length > 1 ? ` ${i + 1}` : ""}`}
                   names={names}
                   value={w.winner}
@@ -321,6 +323,7 @@ function RonForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
               <div className="mt-2">
                 <PaoPicker
                   names={names}
+                  mySeat={mySeat}
                   winner={w.winner}
                   value={w.pao}
                   onChange={(pao) => setWin(i, { pao })}
