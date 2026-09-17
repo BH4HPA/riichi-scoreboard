@@ -8,6 +8,7 @@ export * from "./rules/presets";
 export * from "./rules/validate";
 export * from "./scoring/basePoints";
 export * from "./scoring/payments";
+export * from "./scoring/winPoints";
 export * from "./final/settle";
 export * from "./progress/advance";
 export * from "./reducer/undoable";
