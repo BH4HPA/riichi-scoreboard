@@ -14,6 +14,7 @@ import { PresetsRepo } from "./db/presets";
 import { RecognitionsRepo } from "./db/recognitions";
 import { ResultsRepo } from "./db/results";
 import { RoomsRepo } from "./db/rooms";
+import { evaluateRoutes } from "./http/routes/evaluate";
 import { localRoutes } from "./http/routes/locals";
 import { meRoutes } from "./http/routes/me";
 import { recognitionRoutes } from "./http/routes/recognitions";
@@ -112,6 +113,7 @@ export function createApp({
   app.route("/api/me/locals", localRoutes({ players, results, registry, store }));
   app.route("/api/me", meRoutes({ players, presets, results, registry, store }));
   app.route("/api/rooms", roomRoutes({ registry, players }));
+  app.route("/api/evaluate", evaluateRoutes({ players }));
   app.route("/api/recognitions", recognitionRoutes({ players, recognitions, store, modelId }));
   if (local) mountLocalObjects(app, local);
   app.notFound((c) => c.json({ error: "not_found", message: "接口不存在" }, 404));
