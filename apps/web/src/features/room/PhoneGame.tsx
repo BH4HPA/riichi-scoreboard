@@ -165,10 +165,13 @@ export function PhoneGame() {
           <ProfileEditor />
           <h3 className="mb-2 mt-4 text-sm font-medium">战绩</h3>
           <StatsPanel />
-          {/* 对局中离开只是暂离：座位保留，回首页点「返回房间」或重新扫码即可回来 */}
-          <Button asChild variant="outline" size="sm" className="mt-4 w-full">
-            <Link to="/">暂离房间</Link>
-          </Button>
+          {/* 对局中离开只是暂离：座位保留，回首页点「返回房间」或重新扫码即可回来。
+              外面包一层：对话框给最后一个子元素加底部内边距，直接落在按钮上会把文字顶偏 */}
+          <div className="mt-4">
+            <Button asChild variant="outline" className="w-full">
+              <Link to="/">暂离房间</Link>
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

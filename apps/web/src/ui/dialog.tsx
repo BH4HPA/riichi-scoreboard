@@ -54,8 +54,9 @@ export function DialogContent({
             <X className="h-4 w-4" />
           </DialogPrimitive.Close>
         </div>
-        {/* 下内边距放在最后一个子元素上：有底栏时底栏自带内边距，sticky 才能贴到滚动区底边 */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-3 [&>*:last-child]:pb-3">
+        {/* 下内边距放在最后一个子元素上（sticky 底栏才能贴到滚动区底边），并且不小于 iPhone 底部安全区。
+            这条选择器比子元素自己的 pb-* 优先级高，所以底栏的安全区留白也统一在这里给 */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-3 [&>*:last-child]:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {children}
         </div>
       </DialogPrimitive.Content>
@@ -71,7 +72,7 @@ export function DialogFooter({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "sticky bottom-0 -mx-4 mt-4 flex flex-row justify-end gap-2 border-t border-border bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]",
+        "sticky bottom-0 -mx-4 mt-4 flex flex-row justify-end gap-2 border-t border-border bg-surface px-4 pt-3",
         className,
       )}
       {...props}
