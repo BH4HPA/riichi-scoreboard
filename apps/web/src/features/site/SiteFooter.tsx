@@ -8,10 +8,13 @@ const link = "underline-offset-2 hover:underline";
 /** 版权 + 备案号，一行两段（放不下折成两行）；对齐方式由调用方给。 */
 export function SiteFooter({ className }: { className?: string }) {
   return (
-    <footer className={cn("flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted", className)}>
+    <footer
+      className={cn("flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted", className)}
+    >
       <a href={AUTHOR.url} {...external} className={link}>
-        {/* PingFang 的 © 字形又小又偏上（Mac 上的 Chrome 按字体栈会用到它），单独交给系统西文字体 */}
-        <span className="font-[system-ui]">©</span> {AUTHOR.name} {AUTHOR.since}-
+        {/* PingFang 的 © 字形又小又偏上（Mac 上的 Chrome 按字体栈会用到它），单独交给系统西文字体；
+            leading-none：换了字体的行高不同，会把这一段的行盒撑高，和备案号错开 */}
+        <span className="font-[system-ui] leading-none">©</span> {AUTHOR.name} {AUTHOR.since}-
         {new Date().getFullYear()}
       </a>
       <a href={ICP.url} {...external} className={link}>
