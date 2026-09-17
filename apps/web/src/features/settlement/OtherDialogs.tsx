@@ -39,11 +39,22 @@ interface FormProps {
   onDone: () => void;
 }
 
+/** 结算类对话框额外带操作者座位：默认选人与相对方位标注都以它为视角；主控台为 null。 */
+type Seated = { mySeat: Seat | null };
+
 function description(game: GameState, names: string[]): string {
   return `${roundLabel(game.kyoku, game.honba)}，庄家：${names[dealerOf(game.kyoku)]}`;
 }
 
-export function DrawDialog({ open, onOpenChange, game, names, rules, mirror }: DialogProps) {
+export function DrawDialog({
+  open,
+  onOpenChange,
+  game,
+  names,
+  rules,
+  mirror,
+  mySeat,
+}: DialogProps & Seated) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent title="流局结算" description={description(game, names)}>
@@ -52,6 +63,7 @@ export function DrawDialog({ open, onOpenChange, game, names, rules, mirror }: D
           names={names}
           rules={rules}
           mirror={mirror}
+          mySeat={mySeat}
           onDone={() => onOpenChange(false)}
         />
       </DialogContent>
@@ -59,7 +71,7 @@ export function DrawDialog({ open, onOpenChange, game, names, rules, mirror }: D
   );
 }
 
-function DrawForm({ game, names, rules, mirror, onDone }: FormProps) {
+function DrawForm({ game, names, rules, mirror, onDone }: FormProps & Seated) {
   const send = useCommand();
   const [tenpai, setTenpai] = useState(NO_FLAGS);
   const [riichi, setRiichi] = useState(NO_FLAGS);
@@ -140,7 +152,15 @@ const ABORTIVE_OPTIONS: Array<{ value: AbortiveReason; label: string }> = [
   { value: "sanchahou", label: "三家和了" },
 ];
 
-export function AbortiveDialog({ open, onOpenChange, game, names, rules, mirror }: DialogProps) {
+export function AbortiveDialog({
+  open,
+  onOpenChange,
+  game,
+  names,
+  rules,
+  mirror,
+  mySeat,
+}: DialogProps & Seated) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -152,6 +172,7 @@ export function AbortiveDialog({ open, onOpenChange, game, names, rules, mirror 
           names={names}
           rules={rules}
           mirror={mirror}
+          mySeat={mySeat}
           onDone={() => onOpenChange(false)}
         />
       </DialogContent>
@@ -159,7 +180,7 @@ export function AbortiveDialog({ open, onOpenChange, game, names, rules, mirror 
   );
 }
 
-function AbortiveForm({ names, mirror, onDone }: FormProps) {
+function AbortiveForm({ names, mirror, onDone }: FormProps & Seated) {
   const send = useCommand();
   const [reason, setReason] = useState<AbortiveReason>("kyuushu");
   const [riichi, setRiichi] = useState(NO_FLAGS);
@@ -222,8 +243,8 @@ export function ChomboDialog({
   names,
   rules,
   mirror,
-  defaultSeat,
-}: DialogProps & { defaultSeat: Seat | null }) {
+  mySeat,
+}: DialogProps & Seated) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -235,7 +256,7 @@ export function ChomboDialog({
           names={names}
           rules={rules}
           mirror={mirror}
-          defaultSeat={defaultSeat}
+          mySeat={mySeat}
           onDone={() => onOpenChange(false)}
         />
       </DialogContent>
@@ -243,14 +264,9 @@ export function ChomboDialog({
   );
 }
 
-function ChomboForm({
-  names,
-  mirror,
-  defaultSeat,
-  onDone,
-}: FormProps & { defaultSeat: Seat | null }) {
+function ChomboForm({ names, mirror, mySeat, onDone }: FormProps & Seated) {
   const send = useCommand();
-  const [offender, setOffender] = useState<Seat>(defaultSeat ?? 0);
+  const [offender, setOffender] = useState<Seat>(mySeat ?? 0);
   const [busy, setBusy] = useState(false);
   useMirror(
     true,
