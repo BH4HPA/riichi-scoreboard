@@ -62,9 +62,6 @@ export function FlagChips({
           </Chip>
         );
       })}
-      {riichiAuto && hand.riichi && (
-        <span className="text-[11px] text-muted">照片里有里宝，已替你勾上立直</span>
-      )}
     </div>
   );
 }
