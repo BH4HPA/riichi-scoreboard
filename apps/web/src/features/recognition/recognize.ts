@@ -2,7 +2,11 @@ import type { RecognitionResult, RecognitionSource } from "@riichi/core";
 import type { ValueDraft } from "@/features/settlement/valueDraft";
 import { createRecognition, patchRecognition } from "./api";
 
-/** 每次识别的上传 Promise，按运行 key 记着：结算确认时若 id 还没回来就等它，真值不丢。 */
+/**
+ * 每次识别的上传 Promise，按运行 key 记着：确认时若 id 还没回来就等它，真值不丢。
+ * 确认后不删：同一张可能再确认一次（算点数页「返回修改」后），那时草稿里的 id 可能仍是 null。
+ * 只在上传失败时删；一条就是一个已决的 Promise，页面生命周期内攒不出量。
+ */
 const uploads = new Map<string, Promise<string>>();
 
 /**
@@ -56,8 +60,5 @@ export function confirmRecognized(draft: ValueDraft, token: string | null): Prom
   if (!id) return Promise.resolve();
   return id
     .then((i) => patchRecognition(i, { corrected: draft.hand }, token))
-    .catch(() => undefined)
-    .finally(() => {
-      uploads.delete(rec.key);
-    });
+    .catch(() => undefined);
 }
