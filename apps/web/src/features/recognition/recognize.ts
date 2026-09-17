@@ -17,7 +17,7 @@ export function uploadRecognition(
   token: string,
   source: RecognitionSource,
   onId?: (id: string) => void,
-  /** 上传失败要能被看见：否则记录 id 永远为 null，算点数页会一直提示「照片还在上传」 */
+  /** 上传失败要能被看见：否则记录 id 永远为 null，界面上就永远等不到它 */
   onFail?: (message: string) => void,
 ): void {
   const upload = createRecognition(blob, token, source).then((created) => {
@@ -45,14 +45,19 @@ export function uploadRecognition(
     .catch(() => undefined);
 }
 
-/** 结算命令被接受后：把用户最终提交的手牌回填为真值（上传还没回来就等它）。 */
-export function confirmRecognized(draft: ValueDraft, token: string | null): void {
+/**
+ * 用户确认之后（房间里是结算命令被接受，算点数页是「识别正确」）：把最终手牌回填为真值（上传还没回来就等它）。
+ * 返回的 Promise 只会 resolve：同一张照片可能被确认多次，调用方据此串行，免得旧的回填后到把新的盖掉。
+ */
+export function confirmRecognized(draft: ValueDraft, token: string | null): Promise<void> {
   const rec = draft.recognition;
-  if (draft.mode !== "hand" || !rec || !token) return;
+  if (draft.mode !== "hand" || !rec || !token) return Promise.resolve();
   const id = rec.id ? Promise.resolve(rec.id) : uploads.get(rec.key);
-  if (!id) return;
-  void id
+  if (!id) return Promise.resolve();
+  return id
     .then((i) => patchRecognition(i, { corrected: draft.hand }, token))
     .catch(() => undefined)
-    .finally(() => uploads.delete(rec.key));
+    .finally(() => {
+      uploads.delete(rec.key);
+    });
 }

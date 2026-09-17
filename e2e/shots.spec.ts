@@ -187,27 +187,36 @@ test("截图：取景框、确认态与算点数页", async ({ browser }) => {
     await page.route("**/api/recognitions/*", (route) => route.fulfill({ status: 204 }));
   };
 
-  // 算点数页：取景框（带检测框与牌图标签）→ 定格后的确认态
-  const labelCtx = await newContext(browser, { viewport: { width: 400, height: 860 } });
-  const lab = await labelCtx.newPage();
-  await withDetector(lab);
-  await lab.goto("/calc");
-  await lab.screenshot({ path: `${OUT}/phone-label-entry.png` });
-  await lab.getByRole("button", { name: /开始拍/ }).click();
-  const sheet = lab.getByTestId("camera-sheet");
+  // 算点数页：入口（场况卡）→ 规则弹窗 → 取景框（带检测框与牌图标签）→ 核对 → 结果
+  const calcCtx = await newContext(browser, { viewport: { width: 400, height: 860 } });
+  const calc = await calcCtx.newPage();
+  await withDetector(calc);
+  await calc.goto("/calc");
+  await calc.screenshot({ path: `${OUT}/phone-calc-entry.png` });
+  await calc.getByRole("button", { name: "M-League" }).click();
+  await calc.getByRole("dialog").waitFor();
+  await calc.waitForTimeout(200);
+  await calc.screenshot({ path: `${OUT}/phone-calc-rules.png` });
+  await calc.getByRole("button", { name: "取消" }).click();
+  await calc.getByRole("button", { name: /开始拍/ }).click();
+  const sheet = calc.getByTestId("camera-sheet");
   await sheet.waitFor();
-  // 抢在自动定格之前拍一张取景中的样子；来不及就只留确认态
-  await lab.waitForTimeout(120);
+  // 抢在自动定格之前拍一张取景中的样子；来不及就只留核对态
+  await calc.waitForTimeout(120);
   if ((await sheet.count()) > 0)
-    await lab.screenshot({ path: `${OUT}/phone-label-viewfinder.png` });
-  await lab.getByTestId("hand-confirm").waitFor({ timeout: 30_000 });
-  await lab.getByTestId("annotated-shot").waitFor({ timeout: 15_000 });
-  await lab.screenshot({ path: `${OUT}/phone-label-confirm.png` });
-  await lab.getByTestId("annotated-shot").click();
-  await lab.getByTestId("annotated-lightbox").waitFor();
-  await lab.waitForTimeout(200);
-  await lab.screenshot({ path: `${OUT}/phone-label-lightbox.png` });
-  await labelCtx.close();
+    await calc.screenshot({ path: `${OUT}/phone-calc-viewfinder.png` });
+  await calc.getByTestId("hand-confirm").waitFor({ timeout: 30_000 });
+  await calc.getByTestId("annotated-shot").waitFor({ timeout: 15_000 });
+  await calc.screenshot({ path: `${OUT}/phone-calc-review.png`, fullPage: true });
+  await calc.getByTestId("annotated-shot").click();
+  await calc.getByTestId("annotated-lightbox").waitFor();
+  await calc.waitForTimeout(200);
+  await calc.screenshot({ path: `${OUT}/phone-calc-lightbox.png` });
+  await calc.getByTestId("annotated-lightbox").getByRole("button", { name: "关闭" }).click();
+  await calc.getByTestId("calc-confirm").click();
+  await calc.getByTestId("calc-points").waitFor();
+  await calc.screenshot({ path: `${OUT}/phone-calc-result.png`, fullPage: true });
+  await calcCtx.close();
 
   // 摆牌示意：不装假模型，取景页不会自动定格，能从容打开「怎么摆」
   const guideCtx = await newContext(browser, { viewport: { width: 400, height: 860 } });
