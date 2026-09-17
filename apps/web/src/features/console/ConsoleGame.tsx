@@ -5,6 +5,8 @@ import { Button } from "@/ui/button";
 import { Dialog, DialogContent } from "@/ui/dialog";
 import { ConnectionBadge } from "@/ui/notice";
 import { RoomQrDialog } from "./RoomQr";
+import { SplitHandle } from "./split/SplitHandle";
+import { useSplit } from "./split/useSplit";
 import { RoundHeader } from "@/features/scoreboard/RoundHeader";
 import { PointsGrid } from "@/features/scoreboard/PointsGrid";
 import { DiffMatrix } from "@/features/scoreboard/DiffMatrix";
@@ -16,7 +18,7 @@ import { useControlDialogs } from "@/features/settlement/controls/useControlDial
 import { MirrorOverlay } from "@/features/mirror/MirrorOverlay";
 import { SiteFooter } from "@/features/site/SiteFooter";
 
-/** 主控台对局页：宽屏双栏（左记分右历史），窄屏（Pad）单栏 + 历史抽屉；两者都有二维码弹窗。 */
+/** 主控台对局页：宽屏双栏（左记分右历史，中间可拖动），窄屏（Pad）单栏 + 历史抽屉；两者都有二维码弹窗。 */
 export function ConsoleGame({
   room,
   game,
@@ -34,6 +36,7 @@ export function ConsoleGame({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const controls = useControlDialogs();
+  const { attach, ratio, ratioAt, set: setRatio } = useSplit();
   return (
     <div className={wide ? "flex h-dvh flex-col gap-4 p-6" : "flex min-h-dvh flex-col gap-3 p-4"}>
       <header className="flex flex-wrap items-center gap-3">
@@ -58,7 +61,9 @@ export function ConsoleGame({
       </header>
 
       <main
-        className={wide ? "grid min-h-0 flex-1 grid-cols-[2fr_3fr] gap-4" : "flex flex-col gap-3"}
+        ref={attach}
+        className={wide ? "grid min-h-0 flex-1" : "flex flex-col gap-3"}
+        style={wide ? { gridTemplateColumns: `${ratio}fr 16px ${1 - ratio}fr` } : undefined}
       >
         <div className={wide ? "flex min-h-0 flex-col gap-2" : "contents"}>
           <div className={wide ? "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto" : "contents"}>
@@ -93,6 +98,7 @@ export function ConsoleGame({
           </div>
           {wide && <SiteFooter className="shrink-0" />}
         </div>
+        {wide && <SplitHandle ratio={ratio} ratioAt={ratioAt} onChange={setRatio} />}
         {wide && (
           <div className="min-h-0 overflow-y-auto rounded-xl border border-border bg-surface p-3">
             <HistoryTable history={game.present.history} tv />

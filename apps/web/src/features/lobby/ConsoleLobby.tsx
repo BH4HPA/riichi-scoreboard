@@ -12,6 +12,7 @@ import { RulesEditor } from "@/features/rules/RulesEditor";
 import { SiteBrand, SiteFooter } from "@/features/site/SiteFooter";
 import { LocalPlayerDialog } from "./LocalPlayerDialog";
 import { SeatCards } from "./SeatCards";
+import { startBlocker } from "./startBlocker";
 import { useCountdown } from "./useCountdown";
 
 /**
@@ -21,12 +22,10 @@ import { useCountdown } from "./useCountdown";
 export function ConsoleLobby({
   room,
   wide,
-  onNewRoom,
   extraActions,
 }: {
   room: RoomView;
   wide: boolean;
-  onNewRoom: () => void;
   /** 放在底部操作栏右侧的额外按钮（如解散房间） */
   extraActions?: ReactNode;
 }) {
@@ -44,6 +43,7 @@ export function ConsoleLobby({
   }
   const full = room.seats.every((s) => s !== null);
   const allReady = full && room.ready.every(Boolean);
+  const blocker = startBlocker(room);
   const countdown = useCountdown(useRoomStore((s) => s.autoStartDeadline));
   const openLocals = (seat: Seat | null) => {
     setLocalSeat(seat);
@@ -103,6 +103,7 @@ export function ConsoleLobby({
       >
         强制开局
       </Button>
+      {blocker && <span className="text-sm whitespace-nowrap text-muted">{blocker}</span>}
       {/* 窄屏页脚并进按钮行，宽屏的在左栏 */}
       {wide ? null : <SiteFooter className="flex-1 justify-center" />}
       <span className={cn("flex items-center gap-2", wide && "ml-auto")}>
@@ -113,9 +114,6 @@ export function ConsoleLobby({
           </Button>
         )}
         {extraActions}
-        <Button size="lg" variant="ghost" onClick={onNewRoom}>
-          新房间
-        </Button>
       </span>
     </div>
   );

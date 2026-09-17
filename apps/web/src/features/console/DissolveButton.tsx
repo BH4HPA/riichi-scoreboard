@@ -20,7 +20,7 @@ export function DissolveDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={`解散房间 ${code}？`}
-      description="所有手机会被断开，进行中的对局不再记录战绩；主控台会自动创建新房间。"
+      description="已加入的玩家会看到房间已解散，进行中的对局不再记录战绩；本机随即开一个新房间。"
       confirmText="解散"
       danger
       onConfirm={() => send({ type: "dissolve" })}
