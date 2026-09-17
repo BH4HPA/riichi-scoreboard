@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, Navigate, useSearchParams } from "react-router";
 import { Monitor, Smartphone } from "lucide-react";
+import { RECOGNITION_MANIFEST } from "@riichi/core";
 import { deviceKind } from "@/lib/device";
 import { Button } from "@/ui/button";
 import { JoinPanel } from "@/features/join/JoinPanel";
@@ -55,20 +56,24 @@ export function Landing() {
             返回选择
           </button>
         )}
-        {kind === "phone" && (
-          <p className="text-xs text-muted">
-            想在这台设备上开主控台？
-            <Link to="/console" className="underline">
-              点这里
-            </Link>
-          </p>
-        )}
-        {/* 低频的开发者向功能，压在小字一档：手机端 showJoin 恒为 true，放进上面的三元就看不见了 */}
-        <p className="text-xs text-muted">
-          <Link to="/calc" className="underline">
-            给模型标牌 →
-          </Link>
-        </p>
+        {/* 次要入口压在小字一档，成组放、与上方面板拉开：手机端 showJoin 恒为 true，放进上面的三元就看不见了 */}
+        <div className="mt-4 space-y-2 text-xs text-muted">
+          {RECOGNITION_MANIFEST.model && (
+            <p>
+              <Link to="/calc" className="underline">
+                拍照算点数 →
+              </Link>
+            </p>
+          )}
+          {kind === "phone" && (
+            <p>
+              想在这台设备上开主控台？
+              <Link to="/console" className="underline">
+                点这里
+              </Link>
+            </p>
+          )}
+        </div>
       </div>
       <SiteFooter className="shrink-0 justify-center" />
     </main>

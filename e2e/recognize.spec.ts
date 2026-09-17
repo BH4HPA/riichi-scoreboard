@@ -371,7 +371,7 @@ test("算点数页：设场况 → 拍 → 重新拍 → 识别正确出番符�
   });
 
   await p.goto("/?stay=1");
-  await p.getByRole("link", { name: /给模型标牌/ }).click();
+  await p.getByRole("link", { name: /拍照算点数/ }).click();
   await expect(p.getByRole("heading", { name: "拍照算点数" })).toBeVisible();
   await expect(p).toHaveURL(/\/calc$/);
 
