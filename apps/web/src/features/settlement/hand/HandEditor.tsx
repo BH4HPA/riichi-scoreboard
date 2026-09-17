@@ -30,10 +30,10 @@ export function HandEditor({
   evaluating: boolean;
   evalError: string | null;
   camera: React.ReactNode;
-  /** 算点数页不算番：不显示番符与役种那一块，免得永远停在「计算中…」 */
+  /** 算点数页核对阶段不算番：不显示番符与役种那一块，免得永远停在「计算中…」 */
   showValue?: boolean;
-  /** 和牌者是否庄家：决定第一巡自摸叫天和还是地和；不在房间里（算点数页）为 null */
-  isDealer: boolean | null;
+  /** 和牌者是否庄家：决定第一巡自摸叫天和还是地和 */
+  isDealer: boolean;
 }) {
   const [picking, setPicking] = useState<TileLoc | null>(null);
 
