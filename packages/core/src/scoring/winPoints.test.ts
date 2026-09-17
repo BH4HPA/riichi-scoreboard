@@ -58,8 +58,8 @@ describe("winPoints", () => {
       total: 64000,
     });
     expect(
-      winPoints(v, { ...ron, dealer: false }, withScoring({ yakumanStacking: false })).total,
-    ).toBe(32000);
+      winPoints(v, { ...ron, dealer: false }, withScoring({ yakumanStacking: false })),
+    ).toMatchObject({ label: "役满", total: 32000 });
   });
 
   it("本场：亲 2 本场自摸每家 +200，子荣和 +600", () => {
