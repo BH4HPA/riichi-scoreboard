@@ -84,12 +84,16 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   expect(Math.abs(footerBox.y + footerBox.height - (dialogBox.y + dialogBox.height))).toBeLessThan(
     1,
   );
+  // 南家、西家按过立直：自摸表单自动勾上
+  await expect(dialog.getByRole("checkbox", { name: /^南家/ })).toBeChecked();
+  await expect(dialog.getByRole("checkbox", { name: /^西家/ })).toBeChecked();
+  await expect(dialog.getByRole("checkbox", { name: /^东家/ })).not.toBeChecked();
   // 番符不给默认值：只选番时仍不能确认
   await dialog.getByRole("button", { name: "3", exact: true }).click();
   await expect(dialog.getByRole("button", { name: "确认自摸" })).toBeDisabled();
   await expect(dialog.getByTestId("settlement-summary")).toHaveText("还需选择：符");
   await dialog.getByRole("button", { name: "30", exact: true }).click();
-  await expect(dialog.getByTestId("settlement-summary")).toHaveText("东家 自摸 · 收入 +6,000");
+  await expect(dialog.getByTestId("settlement-summary")).toHaveText("东家 自摸 · 收入 +8,000");
   await expect(tv.getByText("正在录入自摸结算")).toBeVisible();
   // 关掉再开：草稿还在
   await dialog.getByRole("button", { name: "取消" }).click();
@@ -104,9 +108,10 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await expect(phones[3]!.getByRole("dialog")).toHaveCount(0);
   await expect(phones[3]!.getByText("局面已变化，结算已关闭")).toBeVisible();
   await expect(phones[0]!.getByText("局面已变化，结算已关闭")).toHaveCount(0);
-  await expect(tv.getByTestId("points-0")).toHaveText("31,000");
-  await expect(tv.getByTestId("points-1")).toHaveText("23,000");
-  await expect(phones[2]!.getByTestId("points-0")).toHaveText("31,000");
+  // 2000 all + 南西两根立直棒
+  await expect(tv.getByTestId("points-0")).toHaveText("33,000");
+  await expect(tv.getByTestId("points-1")).toHaveText("22,000");
+  await expect(phones[2]!.getByTestId("points-0")).toHaveText("33,000");
   await expect(tv.getByText("东1局1本场")).toBeVisible();
   await expect(tv.getByText("正在录入自摸结算")).toHaveCount(0);
 
@@ -127,6 +132,9 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await expect(tv.getByRole("dialog")).toHaveCount(1);
   const tvTsumo = tv.getByRole("dialog").filter({ hasText: "自摸结算" });
   await expect(tvTsumo.getByText("立直情况")).toBeVisible();
+  // 撤销了结算：本局立直声明随局面快照回来，表单照样预勾
+  await expect(tvTsumo.getByRole("checkbox", { name: "南家", exact: true })).toBeChecked();
+  await expect(tvTsumo.getByRole("checkbox", { name: "西家", exact: true })).toBeChecked();
   await expect(tvTsumo).not.toContainText(/上家|对家|下家|自己/);
   // 第一巡自摸按和牌者庄闲命名：东 1 局庄家东家 → 天和，换成南家 → 地和
   // 主控台代记没有默认和牌者：未选时不能确认，底栏提示缺项
@@ -150,6 +158,12 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   // 西家视角：北家是下家，立直情况在番符/牌面之上
   await expect(ron.getByRole("combobox").first()).toHaveText("北家下家");
   const riichiRows = ron.getByText("立直情况").locator("..").getByRole("checkbox");
+  // 预勾的立直手动取消：之后不会被勾回
+  await expect(riichiRows.nth(1)).toBeChecked();
+  await riichiRows.nth(1).click();
+  await riichiRows.nth(2).click();
+  await expect(riichiRows.nth(1)).not.toBeChecked();
+  await expect(riichiRows.nth(2)).not.toBeChecked();
   expect((await riichiRows.first().boundingBox())!.y).toBeLessThan(
     (await ron.getByRole("tab", { name: "牌面" }).boundingBox())!.y,
   );
@@ -237,6 +251,16 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   const historyTable = tv.getByRole("listitem").filter({ hasText: "西家 荣和 北家" });
   await expect(historyTable.getByRole("img", { name: "赤5筒" })).toBeVisible();
   await expect(historyTable.getByText("平和 1 番")).toBeVisible();
+
+  // 立直 → 流局：流局表单同样预勾，立直棒进场供
+  await phones[3]!.getByRole("button", { name: "立直", exact: true }).click();
+  await phones[0]!.getByRole("button", { name: "流局", exact: true }).click();
+  const draw = phones[0]!.getByRole("dialog");
+  const drawRiichi = draw.getByText("立直情况").locator("..").getByRole("checkbox");
+  await expect(drawRiichi.nth(3)).toBeChecked();
+  await expect(drawRiichi.nth(0)).not.toBeChecked();
+  await draw.getByRole("button", { name: "确认流局" }).click();
+  await expect(tv.getByTestId("points-3")).toHaveText("22,000");
 
   await tvCtx.close();
 });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   dealerOf,
   formatDiff,
@@ -26,11 +26,12 @@ import {
 import { readValueMode } from "./valueModePref";
 import { draftForWinner, draftWithRiichi, effectiveRiichi, storeRiichiClick } from "./riichiSync";
 import { PreviewGrid } from "./PreviewGrid";
-import { NO_FLAGS, incomeBreakdown, seatsOf } from "./format";
+import { incomeBreakdown, seatsOf } from "./format";
 import { previewRon, previewTsumo } from "./preview";
 import { PaoPicker, SeatFlags, SeatSelect } from "./SeatFlags";
 import { useMirror } from "./useMirror";
 import { useDraft } from "./drafts/useDraft";
+import { seedRiichi } from "./riichiSeed";
 import { missingText, ronSummary, tsumoSummary } from "./footerSummary";
 
 export interface WinDialogProps {
@@ -106,6 +107,8 @@ interface TsumoFormState {
   winner: Seat | null;
   draft: ValueDraft;
   riichi: boolean[];
+  /** 已并入过的本局立直声明（见 riichiSeed） */
+  seededRiichi: boolean[];
   pao: Seat | null;
 }
 
@@ -116,13 +119,28 @@ function TsumoForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
     "tsumo",
     () => ({
       winner: mySeat,
-      draft: createValueDraft(true, readValueMode()),
-      riichi: NO_FLAGS,
+      draft: draftWithRiichi(
+        createValueDraft(true, readValueMode()),
+        mySeat !== null && game.riichi[mySeat]!,
+      ),
+      riichi: [...game.riichi],
+      seededRiichi: [...game.riichi],
       pao: null,
     }),
     onDone,
   );
   const { winner, draft, riichi, pao } = form.state;
+  // 弹窗开着时有人按了立直：新声明并进勾选（用户取消过的不勾回）
+  useEffect(() => {
+    form.update((st) => {
+      const seed = seedRiichi({ riichi: st.riichi, seeded: st.seededRiichi }, game.riichi);
+      if (seed.riichi === st.riichi) return st;
+      const draft =
+        st.winner === null ? st.draft : draftWithRiichi(st.draft, seed.riichi[st.winner]!);
+      return { ...st, riichi: seed.riichi, seededRiichi: seed.seeded, draft };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 只在声明变化时并入
+  }, [game.riichi]);
   const setDraft = (fn: (d: ValueDraft) => ValueDraft) =>
     form.update((st) => ({ ...st, draft: fn(st.draft) }));
   const [busy, setBusy] = useState(false);
@@ -284,6 +302,8 @@ interface RonFormState {
   loser: Seat | null;
   wins: RonWinDraftState[];
   riichi: boolean[];
+  /** 已并入过的本局立直声明（见 riichiSeed） */
+  seededRiichi: boolean[];
 }
 
 function RonForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
@@ -293,12 +313,38 @@ function RonForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
     "ron",
     () => ({
       loser: null,
-      wins: [{ winner: mySeat, draft: createValueDraft(false, readValueMode()), pao: null }],
-      riichi: NO_FLAGS,
+      wins: [
+        {
+          winner: mySeat,
+          draft: draftWithRiichi(
+            createValueDraft(false, readValueMode()),
+            mySeat !== null && game.riichi[mySeat]!,
+          ),
+          pao: null,
+        },
+      ],
+      riichi: [...game.riichi],
+      seededRiichi: [...game.riichi],
     }),
     onDone,
   );
   const { loser, wins, riichi } = form.state;
+  // 弹窗开着时有人按了立直：新声明并进勾选（用户取消过的不勾回）
+  useEffect(() => {
+    form.update((st) => {
+      const seed = seedRiichi({ riichi: st.riichi, seeded: st.seededRiichi }, game.riichi);
+      if (seed.riichi === st.riichi) return st;
+      return {
+        ...st,
+        riichi: seed.riichi,
+        seededRiichi: seed.seeded,
+        wins: st.wins.map((w) =>
+          w.winner === null ? w : { ...w, draft: draftWithRiichi(w.draft, seed.riichi[w.winner]!) },
+        ),
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 只在声明变化时并入
+  }, [game.riichi]);
   const setWins = (fn: (ws: RonWinDraftState[]) => RonWinDraftState[]) =>
     form.update((st) => ({ ...st, wins: fn(st.wins) }));
   const [busy, setBusy] = useState(false);
