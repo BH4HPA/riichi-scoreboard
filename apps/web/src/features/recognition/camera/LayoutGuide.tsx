@@ -60,7 +60,7 @@ export function LayoutGuide({ onClose }: { onClose: () => void }) {
           </p>
         </div>
       </div>
-      <p className="text-xs text-white/60">整副牌放进框里，对准后会自动定格；牌河挪到框外。</p>
+      <p className="text-xs text-white/60">整副牌放进框里，对准后会自动拍下；牌河挪到框外。</p>
       <button
         type="button"
         onClick={onClose}

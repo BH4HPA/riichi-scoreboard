@@ -45,7 +45,7 @@ export function AnnotatedShot({ photo, detections }: { photo: Blob; detections: 
         aria-label="放大查看带标注的照片"
         data-testid="annotated-shot"
       >
-        <img src={url} alt="带检测框的定格帧" className="block max-h-40 w-full object-contain" />
+        <img src={url} alt="带检测框的照片" className="block max-h-40 w-full object-contain" />
       </button>
 
       {open &&
@@ -58,7 +58,7 @@ export function AnnotatedShot({ photo, detections }: { photo: Blob; detections: 
             data-testid="annotated-lightbox"
           >
             <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-2">
-              <img src={url} alt="带检测框的定格帧" className="max-h-full max-w-full" />
+              <img src={url} alt="带检测框的照片" className="max-h-full max-w-full" />
             </div>
             <div className="flex items-center justify-between gap-3 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
               <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
