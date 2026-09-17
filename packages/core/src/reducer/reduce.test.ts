@@ -317,3 +317,73 @@ describe("reduceRoom / 整局回放", () => {
     expect(fresh.gameNo).toBe(2);
   });
 });
+
+describe("reduceRoom / 立直声明", () => {
+  let seq = 100;
+  const apply = (room: RoomState, command: Command): RoomState =>
+    reduceRoom(room, { seq: seq++, at: 0, actor: { playerId: null, clientId: "t" }, command });
+
+  it("声明只置位本局状态：幂等、不扣点、不入撤销栈", () => {
+    const room = startedRoom();
+    const declared = apply(room, { type: "declareRiichi", seat: 1 });
+    expect(declared.game!.present.riichi).toEqual([false, true, false, false]);
+    expect(declared.game!.present.points).toEqual(room.game!.present.points);
+    expect(declared.game!.past).toHaveLength(0);
+    expect(apply(declared, { type: "declareRiichi", seat: 1 })).toBe(declared);
+  });
+
+  it("点数不足 1000 且规则不允许时拒绝", () => {
+    const room = startedRoom();
+    const strict = { ...room.rules.progress, riichiBelow1000: false };
+    const poor = {
+      ...room,
+      rules: { ...room.rules, progress: strict },
+      game: {
+        ...room.game!,
+        present: { ...room.game!.present, points: [500, 25000, 25000, 49500] },
+      },
+    };
+    expect(() => apply(poor, { type: "declareRiichi", seat: 0 })).toThrow(/不足 1000/);
+    const lenient = {
+      ...poor,
+      rules: { ...poor.rules, progress: { ...poor.rules.progress, riichiBelow1000: true } },
+    };
+    expect(apply(lenient, { type: "declareRiichi", seat: 0 }).game!.present.riichi[0]).toBe(true);
+  });
+
+  it("结算后清空；撤销结算后声明随快照回来；重做再次清空", () => {
+    let room = apply(startedRoom(), { type: "declareRiichi", seat: 2 });
+    room = apply(room, { type: "tsumo", winner: 0, value: manual(3, 30), riichi: [2] });
+    expect(room.game!.present.riichi).toEqual([false, false, false, false]);
+    room = apply(room, { type: "undo" });
+    expect(room.game!.present.riichi).toEqual([false, false, true, false]);
+    room = apply(room, { type: "redo" });
+    expect(room.game!.present.riichi).toEqual([false, false, false, false]);
+  });
+
+  it("流局与途中流局同样清空；调整场况只在局数或本场变化时清", () => {
+    const declared = apply(startedRoom(), { type: "declareRiichi", seat: 0 });
+    const drawn = apply(declared, {
+      type: "draw",
+      tenpai: [true, false, false, false],
+      riichi: [0],
+      nagashi: [],
+    });
+    expect(drawn.game!.present.riichi).toEqual([false, false, false, false]);
+    const withAbortive = {
+      ...declared,
+      rules: { ...declared.rules, progress: { ...declared.rules.progress, abortiveDraws: true } },
+    };
+    const aborted = apply(withAbortive, { type: "abortive", reason: "kyuushu", riichi: [0] });
+    expect(aborted.game!.present.riichi).toEqual([false, false, false, false]);
+    const same = apply(declared, { type: "adjust", kyoku: 0, honba: 0 });
+    expect(same.game!.present.riichi).toEqual([true, false, false, false]);
+    const moved = apply(declared, { type: "adjust", kyoku: 1, honba: 0 });
+    expect(moved.game!.present.riichi).toEqual([false, false, false, false]);
+  });
+
+  it("终局后不能声明", () => {
+    const finished = apply(startedRoom(), { type: "endGame" });
+    expect(() => apply(finished, { type: "declareRiichi", seat: 0 })).toThrow(/已结束/);
+  });
+});

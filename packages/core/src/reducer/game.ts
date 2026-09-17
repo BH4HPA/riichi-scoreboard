@@ -37,6 +37,7 @@ export function createGame(rules: RoomRules, players: PlayerRef[], startedAt: nu
     kyotaku: 0,
     honba: 0,
     kyoku: 0,
+    riichi: SEATS.map(() => false),
     history: [],
     tobi: null,
     startedAt,
@@ -83,10 +84,15 @@ function assertPao(
   return pao;
 }
 
+/** 该座位此刻能否立直（点数规则）；结算校验、立直声明与手机立直键共用。 */
+export function canRiichi(game: GameState, rules: RoomRules, seat: Seat): boolean {
+  return rules.progress.riichiBelow1000 || game.points[seat]! >= 1000;
+}
+
 function assertRiichi(game: GameState, riichi: readonly Seat[], rules: RoomRules): void {
   for (const seat of riichi) {
     assertSeat(seat, "立直座位");
-    if (!rules.progress.riichiBelow1000 && game.points[seat]! < 1000) {
+    if (!canRiichi(game, rules, seat)) {
       throw new DomainError("riichi_points", "点数不足 1000 不能立直");
     }
   }
@@ -183,7 +189,30 @@ function makeWinRecord(
   };
 }
 
+/** 声明立直：幂等（已声明原样返回同一对象）；对局结束或点数不足时拒绝。 */
+export function declareRiichi(game: GameState, seat: Seat, rules: RoomRules): GameState {
+  assertSeat(seat, "立直座位");
+  if (game.status === "finished") throw new DomainError("finished", "对局已结束");
+  if (!canRiichi(game, rules, seat)) {
+    throw new DomainError("riichi_points", "点数不足 1000 不能立直");
+  }
+  if (game.riichi[seat]) return game;
+  return { ...game, riichi: game.riichi.map((r, s) => r || s === seat) };
+}
+
+/**
+ * 命令结算后的立直声明：换局即作废。调整场况只在局数或本场变化时清（改点数之类不影响本局声明）。
+ */
+function riichiAfter(prev: GameState, next: GameState, cmd: GameCommand): GameState {
+  if (cmd.type === "adjust" && next.kyoku === prev.kyoku && next.honba === prev.honba) return next;
+  return { ...next, riichi: SEATS.map(() => false) };
+}
+
 export function applyGameCommand(game: GameState, cmd: GameCommand, ctx: GameContext): GameState {
+  return riichiAfter(game, settleCommand(game, cmd, ctx), cmd);
+}
+
+function settleCommand(game: GameState, cmd: GameCommand, ctx: GameContext): GameState {
   const { rules } = ctx;
   const dealer = dealerOf(game.kyoku);
   if (game.status === "finished" && cmd.type !== "adjust") {
@@ -372,6 +401,7 @@ export function applyGameCommand(game: GameState, cmd: GameCommand, ctx: GameCon
     case "undo":
     case "redo":
     case "newGame":
+    case "declareRiichi":
       throw new DomainError("not_here", `${cmd.type} 由房间层处理`);
 
     default:

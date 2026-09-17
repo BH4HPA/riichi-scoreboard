@@ -42,6 +42,8 @@ export type GameCommand<V = WinValue> =
   | { type: "abortive"; reason: AbortiveReason; riichi: Seat[] }
   | { type: "chombo"; offender: Seat }
   | { type: "adjust"; kyoku: number; honba: number }
+  /** 声明立直：只记本局状态供结算预勾，不扣点、不入撤销栈 */
+  | { type: "declareRiichi"; seat: Seat }
   | { type: "undo" }
   | { type: "redo" }
   | { type: "endGame" }
@@ -64,6 +66,7 @@ export const GAME_COMMAND_TYPES: ReadonlySet<string> = new Set([
   "abortive",
   "chombo",
   "adjust",
+  "declareRiichi",
   "undo",
   "redo",
   "endGame",

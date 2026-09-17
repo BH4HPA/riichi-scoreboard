@@ -149,3 +149,9 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   start/dissolve); settlement buttons also send `track: null` on click while playing. Catalog =
   `packages/core/src/music/manifest.json` (lowercase uuid object names; upload with `ci/upload-music.sh`).
   Phone keeps `riichi.music.prefs` in localStorage (last pick, per-track use counts drive the order).
+- Riichi declaration: a seated phone's 「▶ 立直」 also commits `declareRiichi` (own seat only, stale-tolerant,
+  idempotent, rejected by `canRiichi` when points < 1000 and the rule forbids it — the button is disabled
+  then). It sets `GameState.riichi[seat]` by replacing `present` without touching the undo stack; every
+  settlement clears it (`adjust` only when kyoku/honba change), so undoing a settlement brings the
+  declaration back with the snapshot. Settlement forms pre-check declared seats; points only move with the
+  settlement's own `riichi` list. The console presses for local players with no seat, so it only plays music.

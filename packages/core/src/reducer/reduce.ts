@@ -4,7 +4,7 @@ import { isGameCommand, type LobbyCommand } from "../types/commands";
 import type { RoomEvent } from "../types/events";
 import type { RoomRules } from "../types/rules";
 import { isLocalPlayer, seatNames, type PlayerRef, type RoomState } from "../types/state";
-import { applyGameCommand, createGame } from "./game";
+import { applyGameCommand, createGame, declareRiichi } from "./game";
 import { createUndoable, push, redo, undo } from "./undoable";
 import { assertSeat } from "./validateCommand";
 
@@ -128,6 +128,11 @@ export function reduceRoom(room: RoomState, event: RoomEvent): RoomState {
 
   if (!room.game) throw new DomainError("no_game", "尚未开局");
 
+  if (cmd.type === "declareRiichi") {
+    // 替换 present、不动撤销栈：撤销撤的是结算，声明跟着局面快照走
+    const present = declareRiichi(room.game.present, cmd.seat, room.rules);
+    return present === room.game.present ? room : { ...room, game: { ...room.game, present } };
+  }
   if (cmd.type === "undo") {
     const game = undo(room.game);
     if (!game) throw new DomainError("nothing_to_undo", "暂无可撤销的结算");

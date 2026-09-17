@@ -66,7 +66,13 @@ export function PhoneGame() {
         </div>
       )}
       <div className="rounded-xl border border-border bg-surface p-3">
-        <ControlButtons game={game} rules={room.rules} size="sm" onOpen={controls.open} />
+        <ControlButtons
+          game={game}
+          rules={room.rules}
+          mySeat={mySeat}
+          size="sm"
+          onOpen={controls.open}
+        />
       </div>
       <ControlHost
         dialog={controls.dialog}
