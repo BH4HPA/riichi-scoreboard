@@ -122,6 +122,9 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   keyboard open, `info` is only shown in label mode. `layoutHand` also returns `provenance` (which
   detection each tile came from, plus `usedDetections`) — the UI degrades it into "which tiles to
   double-check" at the `applyRecognized` boundary, and the reflow pipeline uses it to relabel boxes.
+  The settlement's 拍照识别 button is enabled whenever a model is published: an unusable camera (no
+  permission/device, busy, or no `mediaDevices` outside a secure context) is explained inside `CameraSheet`,
+  which then disables the shutter and offers the album; a detector load failure offers 「返回键盘录入」.
   Settlement shows `HandConfirm` (read-only strip + flag chips + tap-to-replace) when the result is
   self-consistent, `TileKeyboard` otherwise (`settlement/hand/HandEditor.tsx`). Inference runs only on the
   phone (a server engine was considered and dropped: phone WASM is fast enough); WebGPU is deliberately
