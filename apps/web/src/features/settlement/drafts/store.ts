@@ -44,7 +44,9 @@ export function updateDraft<S>(
   const entry = useDraftStore.getState().entries[key];
   if (!entry || entry.generation !== generation) return;
   const current = (entry.state as S | null) ?? init();
-  putEntry(key, { ...entry, state: update(current) });
+  const next = update(current);
+  // 没有实际变化就不落盘：用户没动过的草稿保持「未动过」
+  if (next !== current) putEntry(key, { ...entry, state: next });
 }
 
 /** 离开房间：丢掉这个房间的全部草稿。 */

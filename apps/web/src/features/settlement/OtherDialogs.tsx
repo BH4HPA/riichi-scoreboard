@@ -21,6 +21,7 @@ import { NO_FLAGS, drawKyotakuText, seatsOf } from "./format";
 import { previewDraw } from "./preview";
 import { SeatFlags, SeatSelect } from "./SeatFlags";
 import { useMirror } from "./useMirror";
+import { useSeededRiichi } from "./riichiSeed";
 
 export interface DialogProps {
   open: boolean;
@@ -74,7 +75,7 @@ export function DrawDialog({
 function DrawForm({ game, names, rules, mirror, mySeat, onDone }: FormProps & Seated) {
   const send = useCommand();
   const [tenpai, setTenpai] = useState(NO_FLAGS);
-  const [riichi, setRiichi] = useState(NO_FLAGS);
+  const [riichi, setRiichi] = useSeededRiichi(game.riichi);
   const [nagashi, setNagashi] = useState(NO_FLAGS);
   const [busy, setBusy] = useState(false);
   const preview = previewDraw(game, rules, tenpai, seatsOf(riichi), seatsOf(nagashi));
@@ -198,10 +199,10 @@ export function AbortiveDialog({
   );
 }
 
-function AbortiveForm({ names, mirror, mySeat, onDone }: FormProps & Seated) {
+function AbortiveForm({ game, names, mirror, mySeat, onDone }: FormProps & Seated) {
   const send = useCommand();
   const [reason, setReason] = useState<AbortiveReason>("kyuushu");
-  const [riichi, setRiichi] = useState(NO_FLAGS);
+  const [riichi, setRiichi] = useSeededRiichi(game.riichi);
   const [busy, setBusy] = useState(false);
   const deltas = riichi.map((r) => (r ? -1000 : 0));
   useMirror(
