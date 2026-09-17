@@ -178,7 +178,13 @@ export function validateCommand(input: unknown): ClientCommand {
     case "chombo":
       return { type: "chombo", offender: seat(input.offender, "错和者") };
     case "declareRiichi":
-      return { type: "declareRiichi", seat: seat(input.seat, "立直座位") };
+      return {
+        type: "declareRiichi",
+        seat: seat(input.seat, "立直座位"),
+        kyoku: int(input.kyoku, "局数", 0, 99),
+        honba: int(input.honba, "本场数", 0, 999),
+        entries: int(input.entries, "历史条数", 0, 100_000),
+      };
     case "adjust":
       return {
         type: "adjust",

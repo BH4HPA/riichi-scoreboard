@@ -42,8 +42,11 @@ export type GameCommand<V = WinValue> =
   | { type: "abortive"; reason: AbortiveReason; riichi: Seat[] }
   | { type: "chombo"; offender: Seat }
   | { type: "adjust"; kyoku: number; honba: number }
-  /** 声明立直：只记本局状态供结算预勾，不扣点、不入撤销栈 */
-  | { type: "declareRiichi"; seat: Seat }
+  /**
+   * 声明立直：只记本局状态供结算预勾，不扣点、不入撤销栈。
+   * 带上按下时看到的局面（局、本场、历史条数）：不看 baseSeq，但局面对不上就拒绝，不会落到别的局上。
+   */
+  | { type: "declareRiichi"; seat: Seat; kyoku: number; honba: number; entries: number }
   | { type: "undo" }
   | { type: "redo" }
   | { type: "endGame" }

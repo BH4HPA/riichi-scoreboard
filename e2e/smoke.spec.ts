@@ -328,6 +328,24 @@ test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手�
   await expect(phones[0]!.getByTestId("seat-0")).toContainText("本地甲");
   await tv.getByTestId("seat-1").getByRole("button", { name: "本地乙 离座" }).click();
   await expect(tv.getByTestId("seat-1")).toContainText("等待加入");
+  // 空着一个座位（不会自动开局）：两部手机都准备，手机 2 改规则 → 两人准备都被清；
+  // 手机 1 收到提示，改规则的手机 2 自己不提示；本地玩家保持已准备
+  await phones[0]!.getByRole("button", { name: "准备", exact: true }).click();
+  await phones[1]!.getByRole("button", { name: "准备", exact: true }).click();
+  await expect(phones[1]!.getByRole("button", { name: "取消准备" })).toBeVisible();
+  await phones[1]!.getByRole("button", { name: "修改规则" }).click();
+  const rulesDlg = phones[1]!.getByRole("dialog");
+  await rulesDlg
+    .getByText("切上满贯", { exact: true })
+    .locator("xpath=../..")
+    .getByRole("switch")
+    .click();
+  await rulesDlg.getByRole("button", { name: "应用规则" }).click();
+  await expect(phones[0]!.getByText("规则已修改，请重新准备")).toBeVisible();
+  await expect(phones[0]!.getByRole("button", { name: "准备", exact: true })).toBeVisible();
+  await expect(phones[1]!.getByRole("button", { name: "准备", exact: true })).toBeVisible();
+  await expect(phones[1]!.getByText("规则已修改，请重新准备")).toHaveCount(0);
+  await expect(tv.getByTestId("seat-0")).toContainText("已准备");
   // 从已有列表再次入座
   await tv.getByTestId("seat-1").getByRole("button", { name: "添加本地玩家" }).click();
   await tv
@@ -341,21 +359,6 @@ test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手�
   // 两部手机准备 → 倒计时开始（本地玩家入座即准备）→ 主控台在倒计时内手动开局
   await phones[0]!.getByRole("button", { name: "准备", exact: true }).click();
   await expect(tv.getByRole("button", { name: /开局 ·/ })).toHaveCount(0);
-  // 手机 2 改规则 → 手机 1 的准备被清并提示；本地玩家保持已准备；改的人自己不提示
-  await expect(phones[0]!.getByRole("button", { name: "取消准备" })).toBeVisible();
-  await phones[1]!.getByRole("button", { name: "修改规则" }).click();
-  const rulesDlg = phones[1]!.getByRole("dialog");
-  await rulesDlg
-    .getByText("切上满贯", { exact: true })
-    .locator("xpath=../..")
-    .getByRole("switch")
-    .click();
-  await rulesDlg.getByRole("button", { name: "应用规则" }).click();
-  await expect(phones[0]!.getByText("规则已修改，请重新准备")).toBeVisible();
-  await expect(phones[0]!.getByRole("button", { name: "准备", exact: true })).toBeVisible();
-  await expect(tv.getByTestId("seat-0")).toContainText("已准备");
-  await expect(phones[1]!.getByText("规则已修改，请重新准备")).toHaveCount(0);
-  await phones[0]!.getByRole("button", { name: "准备", exact: true }).click();
   await phones[1]!.getByRole("button", { name: "准备", exact: true }).click();
   await tv.getByRole("button", { name: /开局 ·/ }).click();
   await expect(tv.getByTestId("points-0")).toHaveText("25,000");

@@ -31,7 +31,7 @@ import { previewRon, previewTsumo } from "./preview";
 import { PaoPicker, SeatFlags, SeatSelect } from "./SeatFlags";
 import { useMirror } from "./useMirror";
 import { useDraft } from "./drafts/useDraft";
-import { seedRiichi } from "./riichiSeed";
+import { seedRiichi, winnerDraftAfterSeed } from "./riichiSeed";
 import { missingText, ronSummary, tsumoSummary } from "./footerSummary";
 
 export interface WinDialogProps {
@@ -64,7 +64,6 @@ function mirrorWin(winner: Seat, draft: ValueDraft, valueText: string | null): S
   };
 }
 
-/** 草稿动过才出现：清空当前录入，回到默认值。 */
 /** 底栏按钮上方独占一行：填齐了是「谁和了谁 · 收入」，没填齐是还缺什么。 */
 function FooterSummary({ text, ready }: { text: string; ready: boolean }) {
   return (
@@ -77,6 +76,7 @@ function FooterSummary({ text, ready }: { text: string; ready: boolean }) {
   );
 }
 
+/** 草稿动过才出现：清空当前录入，回到默认值。 */
 function ResetDraft({ onReset }: { onReset: () => void }) {
   return (
     <div className="-mb-2 flex justify-end">
@@ -135,12 +135,11 @@ function TsumoForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
     form.update((st) => {
       const seed = seedRiichi({ riichi: st.riichi, seeded: st.seededRiichi }, game.riichi);
       if (seed.riichi === st.riichi) return st;
-      const draft =
-        st.winner === null ? st.draft : draftWithRiichi(st.draft, seed.riichi[st.winner]!);
+      const draft = winnerDraftAfterSeed(st.draft, st.winner, st.riichi, seed.riichi);
       return { ...st, riichi: seed.riichi, seededRiichi: seed.seeded, draft };
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 只在声明变化时并入
-  }, [game.riichi]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 只在声明变化时并入（数组每次广播换引用，按内容比）
+  }, [game.riichi.join()]);
   const setDraft = (fn: (d: ValueDraft) => ValueDraft) =>
     form.update((st) => ({ ...st, draft: fn(st.draft) }));
   const [busy, setBusy] = useState(false);
@@ -338,13 +337,14 @@ function RonForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
         ...st,
         riichi: seed.riichi,
         seededRiichi: seed.seeded,
-        wins: st.wins.map((w) =>
-          w.winner === null ? w : { ...w, draft: draftWithRiichi(w.draft, seed.riichi[w.winner]!) },
-        ),
+        wins: st.wins.map((w) => ({
+          ...w,
+          draft: winnerDraftAfterSeed(w.draft, w.winner, st.riichi, seed.riichi),
+        })),
       };
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 只在声明变化时并入
-  }, [game.riichi]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 只在声明变化时并入（数组每次广播换引用，按内容比）
+  }, [game.riichi.join()]);
   const setWins = (fn: (ws: RonWinDraftState[]) => RonWinDraftState[]) =>
     form.update((st) => ({ ...st, wins: fn(st.wins) }));
   const [busy, setBusy] = useState(false);

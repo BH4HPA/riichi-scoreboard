@@ -45,9 +45,18 @@ export function RiichiSection({
   };
   const blocked =
     game.status === "finished" || (mySeat !== null && !canRiichi(game, rules, mySeat));
+  // 记分优先：在座的声明立直不依赖选曲；没选到曲目只是不放音乐
   const riichi = () => {
+    if (mySeat !== null && !game.riichi[mySeat]) {
+      void send({
+        type: "declareRiichi",
+        seat: mySeat,
+        kyoku: game.kyoku,
+        honba: game.honba,
+        entries: game.history.length,
+      });
+    }
     if (!value) return;
-    if (mySeat !== null && !game.riichi[mySeat]) void send({ type: "declareRiichi", seat: mySeat });
     if (!socket.music(value)) return notify("error", "连接已断开");
     update((p) => withPick(p, value));
   };
@@ -58,7 +67,12 @@ export function RiichiSection({
       <h3 className="mb-1.5 text-xs font-medium text-muted">对局中</h3>
       <div className="flex items-center gap-1.5">
         <TrackPicker tracks={ordered} value={value} onChange={select} size={size} />
-        <Button size={size} variant="accent" disabled={blocked || !value} onClick={riichi}>
+        <Button
+          size={size}
+          variant="accent"
+          disabled={blocked || (mySeat === null && !value)}
+          onClick={riichi}
+        >
           <Play className="h-4 w-4" fill="currentColor" /> 立直
         </Button>
       </div>
