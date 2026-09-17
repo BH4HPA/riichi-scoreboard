@@ -3,9 +3,10 @@
  * 分诊比例走 stderr（不污染数据流）。对齐逻辑在 `src/recognition/align.ts`，本文件只做装配。
  *
  * 判据：`corrected IS NOT NULL`。房间来的记录只有在结算命令被接受之后才回填 corrected
- * （`confirmRecognized` 只在 WinDialogs 的成功分支里调），而牌桌上其他三个人不会允许错误的
+ * （房间里 `confirmRecognized` 只在 WinDialogs 的成功分支里调），而牌桌上其他三个人不会允许错误的
  * 牌局录进系统——「触发了结算」本身就是一次人力校验，不看用户改没改过。
- * 标注模式（`source=label`）的 corrected 是用户显式提交的真值。
+ * `source=label`（已下线的标注页）是开发者显式提交的真值；`source=calc`（拍照算点数页）在玩家点
+ * 「识别正确」时回填，没有牌桌把关，玩家可能对不影响点数的错牌照点不误。
  *
  * **在本机跑，不在容器里跑**：运行镜像只装了打包后的 server，没有脚本、没有源码、
  * 也没有 `@riichi/core`（align 对它是值导入）。先把库拷出来：
@@ -43,7 +44,7 @@ interface Row {
 const db = new DatabaseSync(dbFile, { readOnly: true });
 const rows = db
   .prepare(
-    // source 必须一直带着：标注模式与房间结算是两个可信度不同的群体
+    // source 必须一直带着：房间结算、标注页、算点数页是可信度不同的群体
     "SELECT id, photo_key, model_id, source, detections, recognized, corrected, created_at" +
       " FROM recognitions WHERE corrected IS NOT NULL AND detections IS NOT NULL ORDER BY created_at",
   )

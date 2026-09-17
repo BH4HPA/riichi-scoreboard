@@ -5,7 +5,7 @@ const stroke = (width: number) => Math.max(2, Math.round(width / 400));
 const fontSize = (width: number) => Math.max(11, Math.round(width / 48));
 
 /**
- * 把检测框烧进照片，供标注时下载存档。
+ * 把检测框烧进照片，供算点数页回看与下载存档。
  *
  * 屏幕上的叠加层用牌图当标签（小屏上文字会糊成一团，见 `camera/DetectionOverlay`），
  * 这里反过来用文字 + 置信度：下载下来是拿去放大排查的，全分辨率下文字才带得动信息。

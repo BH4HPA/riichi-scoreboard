@@ -93,7 +93,9 @@ describe("POST /api/recognitions", () => {
     expect(r.source).toBe("room");
   });
 
-  it("?source=label 记为标注模式；非法值 → 400，不落库", async () => {
+  it("?source=calc / label 原样记下；非法值 → 400，不落库", async () => {
+    const calc = (await post(JPEG, token, "calc")).json() as Promise<{ id: string }>;
+    expect(row((await calc).id)!.source).toBe("calc");
     const ok = (await post(JPEG, token, "label")).json() as Promise<{ id: string }>;
     expect(row((await ok).id)!.source).toBe("label");
     const before = ctx.db.prepare("SELECT COUNT(*) AS n FROM recognitions").get();
