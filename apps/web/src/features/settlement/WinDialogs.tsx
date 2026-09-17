@@ -18,7 +18,7 @@ import { confirmRecognized } from "@/features/recognition/recognize";
 import { ValuePicker } from "./ValuePicker";
 import { createValueDraft, draftToClientValue, draftValue, type ValueDraft } from "./valueDraft";
 import { readValueMode } from "./valueModePref";
-import { draftWithRiichi, effectiveRiichi } from "./riichiSync";
+import { draftForWinner, draftWithRiichi, effectiveRiichi, storeRiichiClick } from "./riichiSync";
 import { PreviewGrid } from "./PreviewGrid";
 import { NO_FLAGS, incomeBreakdown, seatsOf } from "./format";
 import { previewRon, previewTsumo } from "./preview";
@@ -81,14 +81,12 @@ function TsumoForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
 
   const flags = effectiveRiichi(riichi, [{ winner, draft }]);
   const changeRiichi = (next: boolean[]) => {
-    setRiichi(next);
+    setRiichi(storeRiichiClick(riichi, flags, next));
     setDraft((d) => draftWithRiichi(d, next[winner]!));
   };
-  /** 换和牌者：先把当前显示的勾选落定，手牌再跟随新和牌者那一格 */
   const changeWinner = (next: Seat) => {
-    setRiichi(flags);
     setWinner(next);
-    setDraft((d) => draftWithRiichi(d, flags[next]!));
+    setDraft((d) => draftForWinner(d, riichi, winner, next));
   };
 
   const value = draftValue(draft);
@@ -282,34 +280,22 @@ function RonForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
   const setWin = (i: number, patch: Partial<RonWinDraftState>) =>
     setWins(wins.map((w, k) => (k === i ? { ...w, ...patch } : w)));
   const changeRiichi = (next: boolean[]) => {
-    setRiichi(next);
+    setRiichi(storeRiichiClick(riichi, flags, next));
     setWins((ws) => ws.map((w) => ({ ...w, draft: draftWithRiichi(w.draft, next[w.winner]!) })));
   };
-  /** 换人、增删荣和者前先把当前显示的勾选落定，手牌再跟随各自和牌者那一格 */
-  const changeWinner = (i: number, winner: Seat) => {
-    setRiichi(flags);
+  const changeWinner = (i: number, winner: Seat) =>
     setWins((ws) =>
       ws.map((w, k) =>
-        k === i ? { ...w, winner, draft: draftWithRiichi(w.draft, flags[winner]!) } : w,
+        k === i ? { ...w, winner, draft: draftForWinner(w.draft, riichi, w.winner, winner) } : w,
       ),
     );
-  };
-  const removeWin = (i: number) => {
-    setRiichi(flags);
-    setWins(wins.filter((_, k) => k !== i));
-  };
-  const addWin = () => {
-    const winner = SEATS.find((s) => s !== loser && !wins.some((w) => w.winner === s)) ?? 0;
-    setRiichi(flags);
-    setWins([
-      ...wins,
-      {
-        winner,
-        draft: draftWithRiichi(createValueDraft(false, readValueMode()), flags[winner]!),
-        pao: null,
-      },
-    ]);
-  };
+  const removeWin = (i: number) => setWins((ws) => ws.filter((_, k) => k !== i));
+  const addWin = () =>
+    setWins((ws) => {
+      const winner = SEATS.find((s) => s !== loser && !ws.some((w) => w.winner === s)) ?? 0;
+      const draft = draftWithRiichi(createValueDraft(false, readValueMode()), riichi[winner]!);
+      return [...ws, { winner, draft, pao: null }];
+    });
   /** 评估结果异步回来时用函数式更新，避免覆盖期间的改动 */
   const updateDraft = (i: number, update: (d: ValueDraft) => ValueDraft) =>
     setWins((ws) => ws.map((w, k) => (k === i ? { ...w, draft: update(w.draft) } : w)));
