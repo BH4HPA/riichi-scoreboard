@@ -26,8 +26,8 @@ export function FlagChips({
   hand: HandInput;
   rules: RoomRules;
   riichiAuto: boolean;
-  /** 和牌者是否庄家；不在房间里（算点数页）为 null */
-  isDealer: boolean | null;
+  /** 和牌者是否庄家 */
+  isDealer: boolean;
   onChange: (next: HandInput) => void;
 }) {
   const flags: Flag[] = [

@@ -73,15 +73,15 @@ export function TileKeyboard({
   hand: HandInput;
   onChange: (next: HandInput) => void;
   rules: RoomRules;
-  /** 和牌者是否庄家：决定第一巡自摸叫天和还是地和；不在房间里（算点数页）为 null */
-  isDealer: boolean | null;
+  /** 和牌者是否庄家：决定第一巡自摸叫天和还是地和 */
+  isDealer: boolean;
   /** 由 ValuePicker 在手牌录满后自动评估 */
   evaluated: EvaluatedHand | null;
   evaluating: boolean;
   evalError: string | null;
   /** 识别没把握的位置，给对应的牌打记号 */
   uncertain?: readonly TileLoc[];
-  /** 算点数页不算番，不显示番符与役种 */
+  /** 算点数页核对阶段不算番，不显示番符与役种 */
   showValue?: boolean;
 }) {
   const marked = (loc: TileLoc) => hasLoc(uncertain, loc);
