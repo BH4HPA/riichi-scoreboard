@@ -155,14 +155,15 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await expect(ron.getByText("2 番 30 符")).toBeVisible();
   await expect(ron.getByText("赤宝牌 1 番")).toBeVisible();
   // 立直情况勾上和牌者自己 → 手牌立直旗标跟着亮、番数 +1；手牌里取消 → 立直情况跟着取消
-  // 电视在重算期间按住上一份牌面，不闪：逐帧采样，牌面一帧都不能消失
+  // 电视在重算期间按住上一份牌面与结算文字，不闪：逐帧采样，一帧都不能消失
   const tvGaps = tv.evaluate(
     () =>
       new Promise<number>((resolve) => {
         let gaps = 0;
         const end = performance.now() + 1200;
         const tick = () => {
-          if (!document.querySelector('[role="img"][aria-label="赤5筒"]')) gaps++;
+          const tiles = document.querySelector('[role="img"][aria-label="赤5筒"]');
+          if (!tiles || !document.body.innerText.includes("收入 +")) gaps++;
           if (performance.now() < end) requestAnimationFrame(tick);
           else resolve(gaps);
         };

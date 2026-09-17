@@ -18,6 +18,9 @@ type SettlementIntent = Extract<UiIntent, { kind: "settlement" }>;
 
 /** 手机改牌后引擎重算约 300 ms；留足余量，超过仍为空才算真的清掉 */
 const HOLD_MS = 1000;
+/** 按住的旧值：调暗加轻微高斯模糊，一眼看出是「上一份、正在重算」 */
+const STALE = "opacity-50 blur-[2px]";
+const STALE_TRANSITION = "transition-[opacity,filter] duration-200";
 
 /** 电视全屏模态：实时镜像手机端的结算录入（和牌者、牌面、番符役种、四家增减）。 */
 export function SettlementMirror({
@@ -31,6 +34,7 @@ export function SettlementMirror({
 }) {
   const who = state.seat !== null ? names[state.seat] : state.name;
   const deltas = useHeld(intent.deltas, HOLD_MS);
+  const summary = useHeld(intent.summary, HOLD_MS);
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-bg/90 p-8 backdrop-blur-sm">
       <div className="w-full max-w-5xl rounded-2xl border border-accent/40 bg-surface p-8 shadow-2xl">
@@ -53,13 +57,22 @@ export function SettlementMirror({
           <WinBlock key={w.winner} win={w} names={names} />
         ))}
 
-        <div className={cn("mt-6 transition-opacity", deltas.stale && "opacity-50")}>
+        <div className="mt-6">
           {deltas.value ? (
-            <PreviewGrid deltas={deltas.value} names={names} size="lg" />
+            <PreviewGrid
+              deltas={deltas.value}
+              names={names}
+              size="lg"
+              className={cn(STALE_TRANSITION, deltas.stale && STALE)}
+            />
           ) : (
             <p className="text-xl text-muted">填写中…</p>
           )}
-          {intent.summary && <p className="mt-4 text-xl">{intent.summary}</p>}
+          {summary.value && (
+            <p className={cn("mt-4 text-xl", STALE_TRANSITION, summary.stale && STALE)}>
+              {summary.value}
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -77,8 +90,9 @@ function WinBlock({ win, names }: { win: SettlementWinView; names: string[] }) {
         <span className="text-2xl font-semibold">{names[win.winner]}</span>
         <span
           className={cn(
-            "text-4xl font-semibold tabular text-accent transition-opacity",
-            evaluated.stale && "opacity-50",
+            "text-4xl font-semibold tabular text-accent",
+            STALE_TRANSITION,
+            evaluated.stale && STALE,
           )}
         >
           {e
@@ -89,7 +103,7 @@ function WinBlock({ win, names }: { win: SettlementWinView; names: string[] }) {
         </span>
       </div>
       {hand.value && (
-        <div className={cn("space-y-3 transition-opacity", hand.stale && "opacity-50")}>
+        <div className={cn("space-y-3", STALE_TRANSITION, hand.stale && STALE)}>
           <HandStrip
             closed={hand.value.closed}
             melds={hand.value.melds}
@@ -107,8 +121,9 @@ function WinBlock({ win, names }: { win: SettlementWinView; names: string[] }) {
           yaku={e.yaku}
           yakuman={e.yakuman}
           className={cn(
-            "text-base transition-opacity [&>span]:px-2.5 [&>span]:py-1",
-            evaluated.stale && "opacity-50",
+            "text-base [&>span]:px-2.5 [&>span]:py-1",
+            STALE_TRANSITION,
+            evaluated.stale && STALE,
           )}
         />
       )}
