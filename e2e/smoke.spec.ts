@@ -113,6 +113,9 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await expect(tv.getByTestId("points-1")).toHaveText("22,000");
   await expect(phones[2]!.getByTestId("points-0")).toHaveText("33,000");
   await expect(tv.getByText("东1局1本场")).toBeVisible();
+  // 手机入座者默认看「我与三家」的点差
+  await expect(phones[1]!.getByText("我的点差")).toBeVisible();
+  await expect(phones[1]!.getByText("落后 11,000")).toBeVisible();
   await expect(tv.getByText("正在录入自摸结算")).toHaveCount(0);
 
   // 宽屏比分/历史分隔可调（默认 3:2）：键盘微调
@@ -214,7 +217,10 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
     "2筒",
     "9萬",
   ]) {
-    await keyboard.getByRole("button", { name: t, exact: true }).click();
+    // 点牌键的角：点击区是整个格子（至少 44px 高），不只是牌图
+    const key = keyboard.getByRole("button", { name: t, exact: true });
+    expect((await key.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await key.click({ position: { x: 1, y: 1 } });
   }
   await expect(ron.getByText("2 番 30 符")).toBeVisible();
   await expect(ron.getByText("赤宝牌 1 番")).toBeVisible();

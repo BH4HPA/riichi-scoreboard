@@ -46,8 +46,9 @@ export function DialogContent({
               <DialogPrimitive.Description className="sr-only">{title}</DialogPrimitive.Description>
             )}
           </div>
+          {/* 图标 16px 不变，负外边距把点击区撑到约 40px */}
           <DialogPrimitive.Close
-            className="rounded-md p-1 text-muted hover:bg-surface-2 hover:text-fg"
+            className="-m-3 rounded-md p-3 text-muted hover:bg-surface-2 hover:text-fg"
             aria-label="关闭"
           >
             <X className="h-4 w-4" />
@@ -70,7 +71,7 @@ export function DialogFooter({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "sticky bottom-0 -mx-4 mt-4 flex flex-row justify-end gap-2 border-t border-border bg-surface px-4 py-3",
+        "sticky bottom-0 -mx-4 mt-4 flex flex-row justify-end gap-2 border-t border-border bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]",
         className,
       )}
       {...props}

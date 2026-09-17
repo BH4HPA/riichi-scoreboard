@@ -56,6 +56,9 @@ function akaAvailable(hand: HandInput, tile: Tile, rules: RoomRules): boolean {
   return inSuit < akaLimit(suit, rules.hand.akaCount);
 }
 
+/** 键盘牌键的点击区：撑满格子、至少 44px 高 */
+const KEY_HIT = "min-h-11 w-full items-center justify-center";
+
 export function TileKeyboard({
   hand,
   onChange,
@@ -259,9 +262,17 @@ export function TileKeyboard({
           ))}
       </div>
 
-      <div className="grid grid-cols-9 justify-items-center gap-1" data-testid="tile-keyboard">
+      {/* 点击区是整个格子（约 36×44），牌图保持原尺寸居中：单手录入不用对准 26px 宽的牌 */}
+      <div className="grid grid-cols-9 gap-1" data-testid="tile-keyboard">
         {ALL_TILES.map((t) => (
-          <TileFace key={t} tile={t} size="sm" dim={disabledOnKeyboard(t)} onClick={() => tap(t)} />
+          <TileFace
+            key={t}
+            tile={t}
+            size="sm"
+            dim={disabledOnKeyboard(t)}
+            onClick={() => tap(t)}
+            buttonClassName={KEY_HIT}
+          />
         ))}
         {akaEnabled && (
           <>
@@ -273,6 +284,7 @@ export function TileKeyboard({
                 size="sm"
                 dim={disabledOnKeyboard(t)}
                 onClick={() => tap(t)}
+                buttonClassName={KEY_HIT}
               />
             ))}
           </>

@@ -92,7 +92,7 @@ export function ControlButtons({
             调整场况
           </Button>
           {!finished ? (
-            <Button size={size} variant="positive" onClick={() => onOpen("end")}>
+            <Button size={size} variant="outline" onClick={() => onOpen("end")}>
               <Check className="h-4 w-4" /> 终局结算
             </Button>
           ) : (
@@ -100,7 +100,12 @@ export function ControlButtons({
               返回大厅
             </Button>
           )}
-          <Button size={size} variant="danger" onClick={() => onOpen("newGame")}>
+          <Button
+            size={size}
+            variant="outline"
+            className="text-neg"
+            onClick={() => onOpen("newGame")}
+          >
             <RefreshCcw className="h-4 w-4" /> 重开一局
           </Button>
         </div>
