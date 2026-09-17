@@ -21,7 +21,11 @@ export interface RonWin<V> {
  * - 规则、开局、结算、撤销、终局、解散：任何连接者都可发起。
  */
 export type LobbyCommand =
-  | { type: "setRules"; rules: RoomRules }
+  /**
+   * `resetReady` 只由服务端补全：规则确有变化时清掉设备玩家的准备（「已准备」不能沿用到新规则）。
+   * 旧事件没有这个字段，回放语义不变。
+   */
+  | { type: "setRules"; rules: RoomRules; resetReady?: true }
   | { type: "sit"; seat: Seat; player: PlayerRef; ready?: boolean }
   | { type: "leave"; seat: Seat }
   | { type: "setReady"; seat: Seat; ready: boolean }
@@ -45,9 +49,10 @@ export type GameCommand<V = WinValue> =
 
 export type Command = LobbyCommand | GameCommand;
 
-/** 客户端可提交的命令形态：牌面未评估；入座不带玩家对象；本地玩家只带 id。 */
+/** 客户端可提交的命令形态：牌面未评估；入座不带玩家对象；本地玩家只带 id；改规则不带准备重置标记。 */
 export type ClientCommand =
-  | Exclude<LobbyCommand, { type: "sit" } | { type: "syncProfile" }>
+  | Exclude<LobbyCommand, { type: "sit" } | { type: "syncProfile" } | { type: "setRules" }>
+  | { type: "setRules"; rules: RoomRules }
   | { type: "sit"; seat: Seat }
   | { type: "sitLocal"; seat: Seat; playerId: string }
   | GameCommand<ClientWinValue>;

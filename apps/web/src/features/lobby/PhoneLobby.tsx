@@ -12,6 +12,7 @@ import { useMirror } from "@/features/settlement/useMirror";
 import { SiteFooter } from "@/features/site/SiteFooter";
 import { SeatCards } from "./SeatCards";
 import { useCountdown } from "./useCountdown";
+import { useRulesChangedNotice } from "./useRulesChangedNotice";
 
 export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | null }) {
   const send = useCommand();
@@ -22,6 +23,7 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
   const ready = mySeat !== null && room.ready[mySeat] === true;
   const full = room.seats.every((s) => s !== null);
   const countdown = useCountdown(useRoomStore((s) => s.autoStartDeadline));
+  const ownRulesChange = useRulesChangedNotice(room.rules, ready);
   // 退出房间：已入座先离座（等 ack），无论成败都回首页；失败的座位由离线回收兜底
   const exit = async () => {
     if (mySeat !== null) await send({ type: "leave", seat: mySeat });
@@ -110,7 +112,8 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
             <Button
               variant="accent"
               onClick={async () => {
-                if (await send({ type: "setRules", rules: draft })) setRulesOpen(false);
+                if (await ownRulesChange(() => send({ type: "setRules", rules: draft })))
+                  setRulesOpen(false);
               }}
             >
               应用规则

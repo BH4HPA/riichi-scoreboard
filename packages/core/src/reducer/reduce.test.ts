@@ -91,6 +91,28 @@ describe("reduceRoom / lobby", () => {
     expect(lobby.phase).toBe("lobby");
     expect(lobby.ready).toEqual([false, false, false, true]);
   });
+  it("改规则带 resetReady：清设备玩家准备，本地玩家保持", () => {
+    const local: PlayerRef = { id: "l", name: "本地", avatar: null, kind: "local" };
+    const cmds = lobbyCommands().slice(0, 8);
+    cmds[3] = { type: "sit", seat: 3, player: local, ready: true };
+    const room = replay(createRoom("X", MLEAGUE_RULES), events(cmds));
+    expect(room.ready).toEqual([true, true, true, true]);
+    const rules = { ...MLEAGUE_RULES, scoring: { ...MLEAGUE_RULES.scoring, kiriageMangan: false } };
+    const next = reduceRoom(room, {
+      seq: 9,
+      at: 0,
+      actor: { playerId: null, clientId: "t" },
+      command: { type: "setRules", rules, resetReady: true },
+    });
+    expect(next.rules.scoring.kiriageMangan).toBe(false);
+    expect(next.ready).toEqual([false, false, false, true]);
+  });
+  it("旧事件（改规则无 resetReady）回放语义不变：准备后改规则仍可开局", () => {
+    const cmds = lobbyCommands();
+    cmds.splice(8, 0, { type: "setRules", rules: MLEAGUE_RULES });
+    const room = replay(createRoom("X", MLEAGUE_RULES), events(cmds));
+    expect(room.phase).toBe("playing");
+  });
   it("同一玩家换座会离开原座位", () => {
     const room = replay(
       createRoom("X", MLEAGUE_RULES),

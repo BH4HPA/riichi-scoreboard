@@ -33,7 +33,11 @@ function applyLobbyCommand(room: RoomState, cmd: LobbyCommand): RoomState {
   switch (cmd.type) {
     case "setRules": {
       requireLobby(room, "修改规则");
-      return { ...room, rules: validateRules(cmd.rules) };
+      const rules = validateRules(cmd.rules);
+      if (!cmd.resetReady) return { ...room, rules };
+      // 本地玩家由主控台代管、入座即准备，不让它们陷入等待
+      const ready = room.seats.map((p, i) => isLocalPlayer(p) && room.ready[i] === true);
+      return { ...room, rules, ready };
     }
     case "sit": {
       requireLobby(room, "换座");

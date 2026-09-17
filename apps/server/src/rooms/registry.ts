@@ -10,6 +10,7 @@ import {
   kyokuWind,
   reduceRoom,
   replay,
+  rulesKey,
   seatOfPlayer,
   seatsOnline,
   STOPS_MUSIC,
@@ -242,6 +243,11 @@ export class RoomRegistry {
       throw new DomainError("forbidden", `只能${what}自己的座位`);
     };
     switch (cmd.type) {
+      case "setRules": {
+        // 规则确有变化才清准备；非法规则不补标记，交 reducer 照常报错
+        const next = rulesKey(cmd.rules);
+        return next !== null && next !== rulesKey(state.rules) ? { ...cmd, resetReady: true } : cmd;
+      }
       case "sit": {
         const row = actor.playerId ? this.players.byId(actor.playerId) : null;
         if (!row) throw new DomainError("unauthorized", "需要先注册设备");
