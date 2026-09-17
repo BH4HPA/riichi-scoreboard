@@ -145,8 +145,8 @@ function TsumoForm({ game, names, rules, mirror, defaultSeat, onDone }: FormProp
     <>
       <div className="space-y-3">
         <SeatSelect label="自摸者" names={names} value={winner} onChange={setWinner} />
-        <ValuePicker draft={draft} onChange={setDraft} rules={rules} seat={winner} />
         <SeatFlags label="立直情况" names={names} value={riichi} onChange={setRiichi} />
+        <ValuePicker draft={draft} onChange={setDraft} rules={rules} seat={winner} />
         {paoAllowed && <PaoPicker names={names} winner={winner} value={pao} onChange={setPao} />}
         <div>
           <Label>结算预览</Label>
@@ -285,6 +285,7 @@ function RonForm({ game, names, rules, mirror, defaultSeat, onDone }: FormProps)
     <>
       <div className="space-y-3">
         <SeatSelect label="放铳者" names={names} value={loser} onChange={setLoser} />
+        <SeatFlags label="立直情况" names={names} value={riichi} onChange={setRiichi} />
         {wins.map((w, i) => (
           <div key={i} className="rounded-lg border border-border p-2.5">
             <div className="flex items-end gap-2">
@@ -348,7 +349,6 @@ function RonForm({ game, names, rules, mirror, defaultSeat, onDone }: FormProps)
         {!distinct && (
           <p className="text-xs text-neg">荣和者与放铳者不能是同一人，荣和者之间不能重复</p>
         )}
-        <SeatFlags label="立直情况" names={names} value={riichi} onChange={setRiichi} />
         <div>
           <Label>结算预览</Label>
           {preview ? (
