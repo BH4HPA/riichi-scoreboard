@@ -7,6 +7,7 @@ import { Button } from "@/ui/button";
 import { useRoomStore } from "@/ws/store";
 import { applyRecognized } from "./applyRecognized";
 import { CameraSheet, type Capture } from "./camera/CameraSheet";
+import { RecognitionWarnings } from "./RecognitionWarnings";
 import { uploadRecognition } from "./recognize";
 
 /**
@@ -52,7 +53,6 @@ export function CameraButton({
   };
 
   const rec = draft.recognition;
-  const blocking = rec?.warnings.filter((w) => w.severity === "blocking") ?? [];
 
   return (
     <div className="space-y-2" data-testid="recognize">
@@ -65,14 +65,7 @@ export function CameraButton({
         <Camera className="mr-1 h-4 w-4" />
         {rec ? "重新拍照" : "拍照识别"}
       </Button>
-      {/* 只报用户此刻能动手的：结果自洽时模型的内务（丢了几个低置信框之类）对用户零价值 */}
-      {blocking.length > 0 && (
-        <ul className="space-y-0.5 text-xs text-neg">
-          {blocking.map((w, i) => (
-            <li key={i}>{w.message}</li>
-          ))}
-        </ul>
-      )}
+      {rec && <RecognitionWarnings warnings={rec.warnings} />}
       {open && <CameraSheet rules={rules} onCapture={onCapture} onClose={() => setOpen(false)} />}
     </div>
   );
