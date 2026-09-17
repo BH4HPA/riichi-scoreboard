@@ -27,6 +27,8 @@ Package manager is **Yarn 4** (via corepack). Node >= 22.13 (node:sqlite); use 2
   — so a half-finished upload fails the run) and the server image to CCR + the bitego server
   over SSH (`ci/deploy-server.sh`). Rollback = re-run the workflow on an older commit. See
   `docs/deployment.md` (README is the human-facing overview; `docs/development.md` has local HTTPS setup).
+  The web job `needs` the server job: a new frontend may rely on new protocol fields, while an old
+  frontend tolerates a new server.
 
 ## Architecture
 
