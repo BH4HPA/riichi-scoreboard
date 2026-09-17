@@ -109,6 +109,7 @@ export function Label() {
             evalError={null}
             camera={null}
             showValue={false}
+            isDealer={null}
           />
           <Button variant="accent" onClick={() => void submit()} data-testid="label-submit">
             就是这手

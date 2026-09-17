@@ -1,6 +1,7 @@
 import type { HandInput, RoomRules } from "@riichi/core";
 import { Chip } from "@/ui/controls";
 import { cn } from "@/lib/utils";
+import { firstTakeLabel } from "./firstTake";
 import { withRiichi } from "./handEdits";
 
 interface Flag {
@@ -19,11 +20,14 @@ export function FlagChips({
   hand,
   rules,
   riichiAuto,
+  isDealer,
   onChange,
 }: {
   hand: HandInput;
   rules: RoomRules;
   riichiAuto: boolean;
+  /** 和牌者是否庄家；不在房间里（标注页）为 null */
+  isDealer: boolean | null;
   onChange: (next: HandInput) => void;
 }) {
   const flags: Flag[] = [
@@ -32,7 +36,7 @@ export function FlagChips({
     ...(rules.hand.ippatsu ? [{ key: "ippatsu" as const, label: "一发", needsRiichi: true }] : []),
     { key: "afterKan", label: hand.tsumo ? "岭上开花" : "抢杠" },
     { key: "lastTile", label: hand.tsumo ? "海底捞月" : "河底捞鱼" },
-    { key: "firstTake", label: hand.tsumo ? "天和 / 地和" : "人和" },
+    { key: "firstTake", label: firstTakeLabel(hand.tsumo, isDealer) },
   ];
 
   const toggle = (f: Flag) => {

@@ -145,7 +145,13 @@ function TsumoForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
           value={flags}
           onChange={changeRiichi}
         />
-        <ValuePicker draft={draft} onChange={setDraft} rules={rules} seat={winner} />
+        <ValuePicker
+          draft={draft}
+          onChange={setDraft}
+          rules={rules}
+          seat={winner}
+          dealer={dealerOf(game.kyoku)}
+        />
         {paoAllowed && (
           <PaoPicker names={names} mySeat={mySeat} winner={winner} value={pao} onChange={setPao} />
         )}
@@ -342,6 +348,7 @@ function RonForm({ game, names, rules, mirror, mySeat, onDone }: FormProps) {
                 onChange={(update) => updateDraft(i, update)}
                 rules={rules}
                 seat={w.winner}
+                dealer={dealerOf(game.kyoku)}
               />
             </div>
             {drafts[i]!.paoAllowed && (

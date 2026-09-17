@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { isAnkanBack } from "@/features/hand/meld";
 import { TileFace } from "@/features/hand/TileFace";
 import { hasLoc, type TileLoc } from "@/features/hand/tileLoc";
+import { firstTakeLabel } from "./hand/firstTake";
 import { withRiichi } from "./hand/handEdits";
 import { ValueResult } from "./hand/ValueResult";
 import { closedCapacity, isHandComplete } from "./valueDraft";
@@ -64,10 +65,13 @@ export function TileKeyboard({
   evalError,
   uncertain = [],
   showValue = true,
+  isDealer,
 }: {
   hand: HandInput;
   onChange: (next: HandInput) => void;
   rules: RoomRules;
+  /** 和牌者是否庄家：决定第一巡自摸叫天和还是地和；不在房间里（标注页）为 null */
+  isDealer: boolean | null;
   /** 由 ValuePicker 在手牌录满后自动评估 */
   evaluated: EvaluatedHand | null;
   evaluating: boolean;
@@ -355,7 +359,7 @@ export function TileKeyboard({
           {hand.tsumo ? "海底捞月" : "河底捞鱼"}
         </CheckRow>
         <CheckRow checked={hand.firstTake} onCheckedChange={(v) => update({ firstTake: v })}>
-          {hand.tsumo ? "天和 / 地和" : "人和"}
+          {firstTakeLabel(hand.tsumo, isDealer)}
         </CheckRow>
       </div>
 
