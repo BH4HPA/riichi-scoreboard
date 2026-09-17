@@ -71,7 +71,7 @@ export function DrawDialog({
   );
 }
 
-function DrawForm({ game, names, rules, mirror, onDone }: FormProps & Seated) {
+function DrawForm({ game, names, rules, mirror, mySeat, onDone }: FormProps & Seated) {
   const send = useCommand();
   const [tenpai, setTenpai] = useState(NO_FLAGS);
   const [riichi, setRiichi] = useState(NO_FLAGS);
@@ -112,10 +112,28 @@ function DrawForm({ game, names, rules, mirror, onDone }: FormProps & Seated) {
   return (
     <>
       <div className="space-y-3">
-        <SeatFlags label="听牌情况" names={names} value={tenpai} onChange={setTenpai} />
-        <SeatFlags label="立直情况" names={names} value={riichi} onChange={setRiichi} />
+        <SeatFlags
+          label="听牌情况"
+          names={names}
+          mySeat={mySeat}
+          value={tenpai}
+          onChange={setTenpai}
+        />
+        <SeatFlags
+          label="立直情况"
+          names={names}
+          mySeat={mySeat}
+          value={riichi}
+          onChange={setRiichi}
+        />
         {rules.hand.nagashiMangan && (
-          <SeatFlags label="流局满贯" names={names} value={nagashi} onChange={setNagashi} />
+          <SeatFlags
+            label="流局满贯"
+            names={names}
+            mySeat={mySeat}
+            value={nagashi}
+            onChange={setNagashi}
+          />
         )}
         <div>
           <Label>结算预览</Label>
@@ -180,7 +198,7 @@ export function AbortiveDialog({
   );
 }
 
-function AbortiveForm({ names, mirror, onDone }: FormProps & Seated) {
+function AbortiveForm({ names, mirror, mySeat, onDone }: FormProps & Seated) {
   const send = useCommand();
   const [reason, setReason] = useState<AbortiveReason>("kyuushu");
   const [riichi, setRiichi] = useState(NO_FLAGS);
@@ -220,6 +238,7 @@ function AbortiveForm({ names, mirror, onDone }: FormProps & Seated) {
         <SeatFlags
           label="已宣告立直（立直棒留在场上）"
           names={names}
+          mySeat={mySeat}
           value={riichi}
           onChange={setRiichi}
         />
@@ -289,7 +308,13 @@ function ChomboForm({ names, mirror, mySeat, onDone }: FormProps & Seated) {
   };
   return (
     <>
-      <SeatSelect label="错和者" names={names} value={offender} onChange={setOffender} />
+      <SeatSelect
+        label="错和者"
+        names={names}
+        mySeat={mySeat}
+        value={offender}
+        onChange={setOffender}
+      />
       <DialogFooter>
         <Button variant="outline" onClick={onDone}>
           取消
