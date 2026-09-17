@@ -6,6 +6,7 @@ import {
   confirmable,
   createValueDraft,
   isHandComplete,
+  withHandEdit,
   type ValueDraft,
 } from "./valueDraft";
 
@@ -73,5 +74,42 @@ describe("confirmable", () => {
     const draft = recognized();
     expect(draft.hand.doraIndicators).toEqual([]);
     expect(confirmable(draft)).toBe(true);
+  });
+});
+
+describe("withHandEdit 里宝暂存", () => {
+  const base = createValueDraft(false, "hand");
+  const riichi: ValueDraft = {
+    ...base,
+    hand: {
+      ...base.hand,
+      riichi: true,
+      doraIndicators: [TILE.M1, TILE.M2],
+      uraIndicators: [TILE.P3, TILE.P4],
+    },
+  };
+  const off = (d: ValueDraft) => withHandEdit(d, { ...d.hand, riichi: false, uraIndicators: [] });
+  const on = (d: ValueDraft) => withHandEdit(d, { ...d.hand, riichi: true });
+
+  it("取消立直暂存里宝，重新勾上还原并清空暂存", () => {
+    const cleared = off(riichi);
+    expect(cleared.hand.uraIndicators).toEqual([]);
+    expect(cleared.uraStash).toEqual([TILE.P3, TILE.P4]);
+    const restored = on(cleared);
+    expect(restored.hand.uraIndicators).toEqual([TILE.P3, TILE.P4]);
+    expect(restored.uraStash).toEqual([]);
+  });
+
+  it("还原张数不超过当前宝牌指示牌", () => {
+    const cleared = off(riichi);
+    const fewerDora = withHandEdit(cleared, { ...cleared.hand, doraIndicators: [TILE.M1] });
+    expect(on(fewerDora).hand.uraIndicators).toEqual([TILE.P3]);
+  });
+
+  it("其它编辑不碰暂存", () => {
+    const cleared = off(riichi);
+    const edited = withHandEdit(cleared, { ...cleared.hand, lastTile: true });
+    expect(edited.uraStash).toEqual([TILE.P3, TILE.P4]);
+    expect(edited.hand.lastTile).toBe(true);
   });
 });
