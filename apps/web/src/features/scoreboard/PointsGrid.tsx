@@ -89,12 +89,13 @@ export function PointsGrid({
           <div
             key={seat}
             className={cn(
-              "relative rounded-xl border bg-surface",
+              "relative overflow-hidden rounded-xl border bg-surface",
               st.card,
               isDealer ? "border-accent" : "border-border",
             )}
           >
-            {isDealer && <div className="absolute inset-x-0 top-0 h-1 rounded-t-xl bg-accent" />}
+            {/* 顶条交给卡片的圆角裁切，弧度才能和边框内沿吻合 */}
+            {isDealer && <div className="absolute inset-x-0 top-0 h-1 bg-accent" />}
             <div className="flex items-center gap-2">
               <Avatar name={names[seat]!} src={seats[seat]?.avatar ?? null} size={st.avatar} />
               <div className="flex min-w-0 flex-1 items-center gap-2">
