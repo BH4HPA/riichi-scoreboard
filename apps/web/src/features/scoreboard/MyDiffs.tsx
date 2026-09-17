@@ -1,30 +1,53 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { formatPoints, type GameState, type RoomRules, type Seat } from "@riichi/core";
+import {
+  dealerOf,
+  formatPoints,
+  seatWind,
+  WIND_LABELS,
+  type GameState,
+  type PlayerRef,
+  type RoomRules,
+  type Seat,
+} from "@riichi/core";
+import { Avatar } from "@/ui/avatar";
+import { Badge } from "@/ui/controls";
 import { cn } from "@/lib/utils";
+import { relativeSeatLabel } from "@/features/settlement/format";
 import { DiffMatrix } from "./DiffMatrix";
 import { myDiffs } from "./diffRows";
 
 /** 手机入座者的点差：先回答「我和三家差多少」，全桌矩阵按需展开。 */
 export function MyDiffs({
   game,
+  seats,
   names,
   rules,
   mySeat,
 }: {
   game: GameState;
+  seats: (PlayerRef | null)[];
   names: string[];
   rules: RoomRules;
   mySeat: Seat;
 }) {
   const [all, setAll] = useState(false);
+  const dealer = dealerOf(game.kyoku);
   return (
     <div>
       <h3 className="mb-1.5 text-xs font-medium text-muted">我的点差</h3>
       <ul className="divide-y divide-border text-sm">
         {myDiffs(game.points, mySeat).map(({ seat, diff }) => (
-          <li key={seat} className="flex items-center justify-between gap-3 py-1.5">
+          <li key={seat} className="flex items-center gap-2 py-1.5">
+            <Avatar name={names[seat]!} src={seats[seat]?.avatar ?? null} size="sm" />
             <span className="min-w-0 truncate">{names[seat]}</span>
+            <span className="shrink-0 text-xs text-muted">
+              {relativeSeatLabel(mySeat, seat as Seat)}
+            </span>
+            <Badge tone={seat === dealer ? "accent" : "outline"} size="sm" className="shrink-0">
+              {WIND_LABELS[seatWind(seat as Seat, dealer)]}
+            </Badge>
+            <span className="flex-1" />
             <span
               className={cn(
                 "shrink-0 tabular",
