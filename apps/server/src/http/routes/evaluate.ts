@@ -16,7 +16,11 @@ export function evaluateRoutes(deps: { players: PlayersRepo }): Hono<AuthEnv> {
   const app = new Hono<AuthEnv>();
   app.use("*", requirePlayer(deps.players));
 
-  app.post("/", bodyLimit({ maxSize: JSON_MAX_BYTES }), async (c) => {
+  const limit = bodyLimit({
+    maxSize: JSON_MAX_BYTES,
+    onError: (c) => c.json({ error: "too_large", message: "请求体过大" }, 413),
+  });
+  app.post("/", limit, async (c) => {
     const body: unknown = await c.req.json().catch(() => null);
     try {
       const req = validateEvaluateRequest(body);
