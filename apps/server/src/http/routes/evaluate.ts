@@ -12,7 +12,7 @@ const JSON_MAX_BYTES = 16 * 1024;
  * 房间里的评估走 WS，场况取自牌局；这里没有牌局，规则与场况都由请求自带。
  * 庄家固定坐 0 号位，自风即座位号（`seatWind(seat, 0) === seat`）。
  */
-export function evaluateRoutes(deps: { players: PlayersRepo }): Hono {
+export function evaluateRoutes(deps: { players: PlayersRepo }): Hono<AuthEnv> {
   const app = new Hono<AuthEnv>();
   app.use("*", requirePlayer(deps.players));
 
