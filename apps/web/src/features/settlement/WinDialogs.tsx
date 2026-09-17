@@ -17,6 +17,7 @@ import { useSession } from "@/api/session";
 import { confirmRecognized } from "@/features/recognition/recognize";
 import { ValuePicker } from "./ValuePicker";
 import { createValueDraft, draftToClientValue, draftValue, type ValueDraft } from "./valueDraft";
+import { readValueMode } from "./valueModePref";
 import { PreviewGrid } from "./PreviewGrid";
 import { NO_FLAGS, incomeBreakdown, seatOptions, seatsOf } from "./format";
 import { previewRon, previewTsumo } from "./preview";
@@ -97,7 +98,7 @@ export function TsumoDialog(props: WinDialogProps) {
 function TsumoForm({ game, names, rules, mirror, defaultSeat, onDone }: FormProps) {
   const send = useCommand();
   const [winner, setWinner] = useState<Seat>(defaultSeat ?? 0);
-  const [draft, setDraft] = useState<ValueDraft>(() => createValueDraft(true));
+  const [draft, setDraft] = useState<ValueDraft>(() => createValueDraft(true, readValueMode()));
   const [riichi, setRiichi] = useState(NO_FLAGS);
   const [pao, setPao] = useState<Seat | null>(null);
   const [busy, setBusy] = useState(false);
@@ -209,7 +210,7 @@ function RonForm({ game, names, rules, mirror, defaultSeat, onDone }: FormProps)
   const me = defaultSeat ?? 0;
   const [loser, setLoser] = useState<Seat>(SEATS.find((s) => s !== me) ?? 1);
   const [wins, setWins] = useState<RonWinDraftState[]>(() => [
-    { winner: me, draft: createValueDraft(false), pao: null },
+    { winner: me, draft: createValueDraft(false, readValueMode()), pao: null },
   ]);
   const [riichi, setRiichi] = useState(NO_FLAGS);
   const [busy, setBusy] = useState(false);
@@ -337,7 +338,7 @@ function RonForm({ game, names, rules, mirror, defaultSeat, onDone }: FormProps)
                 ...wins,
                 {
                   winner: SEATS.find((s) => s !== loser && !wins.some((w) => w.winner === s)) ?? 0,
-                  draft: createValueDraft(false),
+                  draft: createValueDraft(false, readValueMode()),
                   pao: null,
                 },
               ])

@@ -46,7 +46,7 @@ const result: RecognitionResult = {
 
 describe("applyRecognized", () => {
   it("切到牌面模式、替换牌、清空评估；旗标保留；认出里宝即勾选立直并提示", () => {
-    const draft = { ...createValueDraft(true), evaluated: null };
+    const draft = { ...createValueDraft(true, "manual"), evaluated: null };
     draft.hand.afterKan = true;
     const next = applyRecognized(draft, result, MLEAGUE_RULES, "k1");
     expect(next.mode).toBe("hand");
@@ -63,7 +63,7 @@ describe("applyRecognized", () => {
   });
 
   it("已勾立直时里宝照常保留，不重复提示", () => {
-    const draft = createValueDraft(false);
+    const draft = createValueDraft(false, "manual");
     draft.hand.riichi = true;
     const next = applyRecognized(draft, result, MLEAGUE_RULES, "k2");
     expect(next.hand.uraIndicators).toEqual([TILE.P8]);
@@ -75,7 +75,7 @@ describe("applyRecognized", () => {
       ...MLEAGUE_RULES,
       hand: { ...MLEAGUE_RULES.hand, akaCount: 0, kanDora: false, uraDora: false },
     };
-    const next = applyRecognized(createValueDraft(false), result, rules, "k3");
+    const next = applyRecognized(createValueDraft(false, "manual"), result, rules, "k3");
     expect(next.hand.closed).toEqual([TILE.M1, TILE.P5, TILE.M9]);
     expect(next.hand.melds[0]!.tiles[0]).toBe(TILE.S5);
     expect(next.hand.doraIndicators).toEqual([TILE.S6]);
@@ -89,7 +89,7 @@ describe("applyRecognized", () => {
   });
 
   it("没把握的位置降解成坐标；规则截掉的指示牌不留下悬空记号", () => {
-    const next = applyRecognized(createValueDraft(false), result, MLEAGUE_RULES, "k4");
+    const next = applyRecognized(createValueDraft(false, "manual"), result, MLEAGUE_RULES, "k4");
     // 置信度 0.42 的暗牌第 2 张、0.44 的副露第 1 张
     expect(next.recognition!.uncertain.map(locKey)).toEqual(["closed:1", "meld:0:0"]);
   });
@@ -98,7 +98,7 @@ describe("applyRecognized", () => {
   const sure = detections.map((d) => ({ ...d, conf: 0.9 }));
   const withAka = (r: RecognitionResult, akaCount: 0 | 3 | 4) =>
     applyRecognized(
-      createValueDraft(false),
+      createValueDraft(false, "manual"),
       { ...r, detections: sure },
       { ...MLEAGUE_RULES, hand: { ...MLEAGUE_RULES.hand, akaCount } },
       "k",
@@ -165,7 +165,7 @@ describe("applyRecognized", () => {
       ...MLEAGUE_RULES,
       hand: { ...MLEAGUE_RULES.hand, kanDora: false, uraDora: false },
     };
-    const next = applyRecognized(createValueDraft(false), shaky, rules, "k5");
+    const next = applyRecognized(createValueDraft(false, "manual"), shaky, rules, "k5");
     expect(next.hand.doraIndicators).toHaveLength(1);
     expect(
       next.recognition!.uncertain.filter((l) => l.area !== "closed" && l.area !== "meld"),
@@ -182,7 +182,7 @@ describe("applyRecognized", () => {
       [rules, "s1"],
       [MLEAGUE_RULES, "s2"],
     ] as const) {
-      const next = applyRecognized(createValueDraft(false), result, r, key);
+      const next = applyRecognized(createValueDraft(false, "manual"), result, r, key);
       const pushed = next.recognition!.warnings.filter((w) => w.code !== "count");
       expect(pushed.length).toBeGreaterThan(0);
       expect(pushed.every((w) => w.severity === "info")).toBe(true);
@@ -190,12 +190,12 @@ describe("applyRecognized", () => {
   });
 
   it("识别里宝自动勾立直时标记 riichiAuto；新一次识别把 editing 复位", () => {
-    const draft = { ...createValueDraft(true), editing: true };
+    const draft = { ...createValueDraft(true, "manual"), editing: true };
     const next = applyRecognized(draft, result, MLEAGUE_RULES, "k6");
     expect(next.riichiAuto).toBe(true);
     expect(next.editing).toBe(false);
 
-    const already = { ...createValueDraft(false) };
+    const already = { ...createValueDraft(false, "manual") };
     already.hand.riichi = true;
     expect(applyRecognized(already, result, MLEAGUE_RULES, "k7").riichiAuto).toBe(false);
   });
