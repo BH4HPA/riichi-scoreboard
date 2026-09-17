@@ -51,3 +51,14 @@ export function withWinTile(hand: HandInput, index: number): HandInput {
   const tile = hand.closed[index];
   return tile === undefined ? hand : { ...hand, winTile: tile };
 }
+
+/** 立直开关：取消时连带清掉依赖立直的两立直、一发与里宝指示牌。 */
+export function withRiichi(hand: HandInput, on: boolean): HandInput {
+  return {
+    ...hand,
+    riichi: on,
+    doubleRiichi: on ? hand.doubleRiichi : false,
+    ippatsu: on ? hand.ippatsu : false,
+    uraIndicators: on ? hand.uraIndicators : [],
+  };
+}

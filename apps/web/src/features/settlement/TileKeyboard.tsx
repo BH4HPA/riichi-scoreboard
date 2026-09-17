@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { isAnkanBack } from "@/features/hand/meld";
 import { TileFace } from "@/features/hand/TileFace";
 import { hasLoc, type TileLoc } from "@/features/hand/tileLoc";
+import { withRiichi } from "./hand/handEdits";
 import { ValueResult } from "./hand/ValueResult";
 import { closedCapacity, isHandComplete } from "./valueDraft";
 
@@ -328,17 +329,7 @@ export function TileKeyboard({
       </div>
 
       <div className="grid grid-cols-2 gap-1.5">
-        <CheckRow
-          checked={hand.riichi}
-          onCheckedChange={(v) =>
-            update({
-              riichi: v,
-              doubleRiichi: v ? hand.doubleRiichi : false,
-              ippatsu: v ? hand.ippatsu : false,
-              uraIndicators: v ? hand.uraIndicators : [],
-            })
-          }
-        >
+        <CheckRow checked={hand.riichi} onCheckedChange={(v) => onChange(withRiichi(hand, v))}>
           立直
         </CheckRow>
         <CheckRow
