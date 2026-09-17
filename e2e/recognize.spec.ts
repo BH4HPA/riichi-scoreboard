@@ -79,7 +79,38 @@ test("取景 → 自动定格 → 填入牌面并自动算番 → 检测框与�
   const patches: Record<string, unknown>[] = [];
   const { phone: p, dialog } = await openRonHandTab(browser, withDetector(patches));
 
+  // 取景期间逐帧量画面高度：实时识别结果出现/消失时底栏不伸缩，画面与取景框不跳
+  const heights = p.evaluate(
+    () =>
+      new Promise<{ min: number; max: number; live: boolean; clipped: boolean }>((resolve) => {
+        let min = Infinity;
+        let max = 0;
+        let live = false;
+        let clipped = false;
+        let seen = false;
+        const tick = () => {
+          const video = document.querySelector('[data-testid="camera-video"]');
+          if (video) {
+            seen = true;
+            const h = video.getBoundingClientRect().height;
+            min = Math.min(min, h);
+            max = Math.max(max, h);
+            const slot = document.querySelector('[data-testid="camera-live"]');
+            live ||= Boolean(slot?.querySelector("img"));
+            clipped ||= slot !== null && slot.scrollHeight > slot.clientHeight + 1;
+          } else if (seen) {
+            return resolve({ min, max, live, clipped });
+          }
+          requestAnimationFrame(tick);
+        };
+        tick();
+      }),
+  );
   await shoot(p, dialog);
+  const measured = await heights;
+  expect(measured.live).toBe(true);
+  expect(measured.max - measured.min).toBeLessThan(1);
+  expect(measured.clipped).toBe(false);
   await expect(dialog.getByTestId("recognize-button")).toHaveText("重新拍照");
 
   // 识别自洽 → 收起键盘，只剩一排牌
@@ -130,6 +161,13 @@ test("模型加载失败 → 取景页给出错误，牌面不变", async ({ bro
   await expect(sheet).toBeVisible();
   // 模型下载被拦掉时才会走到这里：说明本地的 wasm 运行时已加载成功
   await expect(sheet.getByText(/fetch/i)).toBeVisible({ timeout: 20_000 });
+  // 看「怎么摆」时停流：视频断开，关掉说明再接上
+  const video = sheet.getByTestId("camera-video");
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.srcObject !== null)).toBe(true);
+  await sheet.getByRole("button", { name: "怎么摆" }).click();
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.srcObject === null)).toBe(true);
+  await sheet.getByRole("button", { name: "知道了" }).click();
+  await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.srcObject !== null)).toBe(true);
   // 模型用不了：给出回键盘录入的出口
   await sheet.getByRole("button", { name: "返回键盘录入" }).click();
   await expect(sheet).toHaveCount(0);
