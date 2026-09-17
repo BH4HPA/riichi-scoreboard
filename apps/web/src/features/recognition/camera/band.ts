@@ -19,35 +19,51 @@ export interface Rect {
 }
 
 export interface Viewport {
-  /** 视频原始像素 */
+  /** 视频（或照片）原始像素 */
   videoWidth: number;
   videoHeight: number;
-  /** 元素在屏幕上的尺寸（`object-cover` 填满） */
+  /** 取景区域在屏幕上的尺寸 */
   displayWidth: number;
   displayHeight: number;
+  /** 画面怎么放进取景区域：实时视频铺满裁边（cover），相册照片完整显示（contain）。默认 cover */
+  fit?: "cover" | "contain";
 }
 
 export function clampBand(fraction: number): number {
   return Math.min(BAND_MAX, Math.max(BAND_MIN, fraction));
 }
 
-/**
- * 取景带 → 视频原始像素的矩形，用于 `createImageBitmap(video, sx, sy, sw, sh)`。
- * 元素是 `object-cover`：视频按长边铺满、两侧等量裁掉，所以先按 max 求缩放再去掉居中偏移。
- * 结果夹到画面内；尺寸退化（元素还没布局、视频还没解码）时返回 null。
- */
-export function bandRect(view: Viewport, fraction: number): Rect | null {
+/** 取景带中线的位置（占取景区域高度的比例）：整条带不能出界 */
+export function clampCenter(center: number, fraction: number): number {
+  const half = clampBand(fraction) / 2;
+  return Math.min(1 - half, Math.max(half, center));
+}
+
+/** 画面在取景区域里的实际摆放（像素）：cover 铺满居中裁边，contain 完整居中留边 */
+export function fitBox(view: Viewport): { scale: number; left: number; top: number } | null {
   const { videoWidth: vw, videoHeight: vh, displayWidth: dw, displayHeight: dh } = view;
   if (vw <= 0 || vh <= 0 || dw <= 0 || dh <= 0) return null;
-  const scale = Math.max(dw / vw, dh / vh);
-  const offsetX = (dw - vw * scale) / 2;
-  const offsetY = (dh - vh * scale) / 2;
+  const scale = (view.fit === "contain" ? Math.min : Math.max)(dw / vw, dh / vh);
+  return { scale, left: (dw - vw * scale) / 2, top: (dh - vh * scale) / 2 };
+}
+
+/**
+ * 取景带 → 原始像素的矩形，用于 `createImageBitmap(src, sx, sy, sw, sh)`。
+ * 先按 fitBox 求缩放与居中偏移，再把带的上下沿、区域的左右沿换算回原始像素并夹到画面内；
+ * `center` 是带中线的位置（实时取景固定居中，相册照片可以拖）。尺寸退化时返回 null。
+ */
+export function bandRect(view: Viewport, fraction: number, center = 0.5): Rect | null {
+  const box = fitBox(view);
+  if (!box) return null;
+  const { videoWidth: vw, videoHeight: vh, displayWidth: dw, displayHeight: dh } = view;
   const bandH = dh * clampBand(fraction);
-  const bandY = (dh - bandH) / 2;
-  const x = Math.max(0, (0 - offsetX) / scale);
-  const y = Math.max(0, (bandY - offsetY) / scale);
-  const width = Math.min(vw - x, dw / scale);
-  const height = Math.min(vh - y, bandH / scale);
+  const bandTop = dh * clampCenter(center, fraction) - bandH / 2;
+  const toX = (px: number) => Math.min(vw, Math.max(0, (px - box.left) / box.scale));
+  const toY = (px: number) => Math.min(vh, Math.max(0, (px - box.top) / box.scale));
+  const x = toX(0);
+  const y = toY(bandTop);
+  const width = toX(dw) - x;
+  const height = toY(bandTop + bandH) - y;
   if (width <= 0 || height <= 0) return null;
   return { x, y, width, height };
 }
