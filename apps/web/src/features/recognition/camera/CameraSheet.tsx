@@ -77,7 +77,8 @@ export function CameraSheet({
   const lastGoodRef = useRef(openedAt);
   const framesRef = useRef(new Map<number, FrameResult>());
 
-  const active = !paused && file === null && !stillBusy;
+  // 看「怎么摆」时停流、停识别：人在读说明，不该对着桌面偷偷定格
+  const active = !paused && file === null && !stillBusy && !guide;
   const lost = useCallback(() => setPaused(true), []);
   const { videoRef, error: camError, ready } = useCameraStream(active, lost);
 
@@ -230,9 +231,10 @@ export function CameraSheet({
       data-testid="camera-sheet"
     >
       <div className="relative min-h-0 flex-1 overflow-hidden">
+        {/* absolute 铺满：百分比高度在 flex 子项里 WebKit 不一定当确定值，首帧前会按视频固有尺寸缩在中间 */}
         <video
           ref={videoRef}
-          className="h-full w-full object-cover"
+          className="absolute inset-0 h-full w-full object-cover"
           muted
           playsInline
           data-testid="camera-video"
@@ -276,7 +278,14 @@ export function CameraSheet({
             aria-hidden
           />
         )}
-        {guide && <LayoutGuide onClose={() => setGuide(false)} />}
+        {guide && (
+          <LayoutGuide
+            onClose={() => {
+              lastGoodRef.current = Date.now();
+              setGuide(false);
+            }}
+          />
+        )}
         {picked && (
           <button
             type="button"
@@ -300,24 +309,34 @@ export function CameraSheet({
             )}
           </div>
         )}
-        {downloading && (
-          <div>
-            <p className="text-xs">
-              模型下载中 {Math.round(progress * 100)}%（约 25 MB，只下一次）
-            </p>
-            <div className="mt-1 h-1 w-full overflow-hidden rounded bg-white/20">
-              <div
-                className="h-full bg-accent transition-[width]"
-                style={{ width: `${Math.round(progress * 100)}%` }}
-              />
+        {/* 固定高度（一行手牌 + 一行指示牌）：模型下载进度、认出/没认出来回切换都在这一格里，
+            底栏不能伸缩，否则取景画面和框跟着跳 */}
+        <div className="h-[62px] overflow-hidden" data-testid="camera-live">
+          {downloading ? (
+            <div>
+              <p className="text-xs">
+                模型下载中 {Math.round(progress * 100)}%（约 25 MB，只下一次）
+              </p>
+              <div className="mt-1 h-1 w-full overflow-hidden rounded bg-white/20">
+                <div
+                  className="h-full bg-accent transition-[width]"
+                  style={{ width: `${Math.round(progress * 100)}%` }}
+                />
+              </div>
             </div>
-          </div>
-        )}
-        {live && (
-          <div className="overflow-x-auto">
-            <HandView hand={live.hand} size="xs" showUra={rules.hand.uraDora} className="w-max" />
-          </div>
-        )}
+          ) : (
+            live && (
+              <div className="overflow-x-auto">
+                <HandView
+                  hand={live.hand}
+                  size="xs"
+                  showUra={rules.hand.uraDora}
+                  className="w-max"
+                />
+              </div>
+            )
+          )}
+        </div>
         <div className="flex items-center justify-between gap-3">
           <span className="flex items-center gap-3 text-xs text-white/70">
             {!camBroken && (overdue ? "对不齐？直接按快门" : "对准后会自动定格")}
