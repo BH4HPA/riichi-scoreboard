@@ -2,6 +2,7 @@ import { findTrack } from "./music";
 import { DomainError } from "./progress/advance";
 import { assertSeat, validateHandShape } from "./reducer/validateCommand";
 import { YAKU_PAGES } from "./reference/yakuTable";
+import { validateRules } from "./rules/validate";
 import type { ClientCommand, Command } from "./types/commands";
 import type { RoomRules } from "./types/rules";
 import {
@@ -12,7 +13,7 @@ import {
   type PlayerRef,
   type RoomState,
 } from "./types/state";
-import type { Seat } from "./types/tiles";
+import type { Seat, Wind } from "./types/tiles";
 
 /**
  * WebSocket 保活节奏。线上经腾讯云 CDN 回源，CDN 对约 10 s 无数据的连接会静默回收且不通知两端：
@@ -128,6 +129,28 @@ export function validateMusicTrack(input: unknown): string | null {
     throw new DomainError("bad_music", "曲目不存在");
   }
   return input;
+}
+
+/** 房间外算番（`POST /api/evaluate`，拍照算点数页）：规则与场况都由请求自带。 */
+export interface EvaluateRequest {
+  hand: HandInput;
+  rules: RoomRules;
+  roundWind: Wind;
+  /** 和牌者自风：东 = 庄家 */
+  seatWind: Wind;
+}
+
+/** 牌面形状错抛 `DomainError`，规则错抛 `RulesError`。 */
+export function validateEvaluateRequest(input: unknown): EvaluateRequest {
+  if (typeof input !== "object" || input === null) {
+    throw new DomainError("bad_request", "请求无效");
+  }
+  const v = input as Record<string, unknown>;
+  const hand = validateHandShape(v.hand);
+  const rules = validateRules(v.rules);
+  assertSeat(v.roundWind, "场风");
+  assertSeat(v.seatWind, "自风");
+  return { hand, rules, roundWind: v.roundWind, seatWind: v.seatWind };
 }
 
 /** 各座位在线状态（见 RoomView.online）。 */
