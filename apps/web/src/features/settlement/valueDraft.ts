@@ -3,8 +3,9 @@ import type { DraftRecognition } from "@/features/recognition/applyRecognized";
 
 export interface ValueDraft {
   mode: "manual" | "hand";
-  han: number;
-  fu: number;
+  /** 手填番符：null = 还没选（不给默认值，没选齐不能确认） */
+  han: number | null;
+  fu: number | null;
   yakuman: number;
   hand: HandInput;
   evaluated: EvaluatedHand | null;
@@ -48,8 +49,8 @@ export function isHandComplete(hand: HandInput): boolean {
 export function createValueDraft(tsumo: boolean, mode: ValueDraft["mode"]): ValueDraft {
   return {
     mode,
-    han: 3,
-    fu: 40,
+    han: null,
+    fu: null,
     yakuman: 0,
     hand: emptyHand(tsumo),
     evaluated: null,
@@ -87,16 +88,32 @@ export function confirmable(draft: ValueDraft): boolean {
   return isHandComplete(draft.hand);
 }
 
-/** 草稿 → 可计算的番符值；牌面未评估或非和牌形时为 null。 */
+/** 手填模式的番符值；役满不看番符，否则番、符都选了才算数。 */
+function manualValue(draft: ValueDraft): HandValue | null {
+  if (draft.yakuman > 0) return { han: draft.han ?? 0, fu: draft.fu ?? 0, yakuman: draft.yakuman };
+  if (draft.han === null || draft.fu === null) return null;
+  return { han: draft.han, fu: draft.fu, yakuman: 0 };
+}
+
+/** 还没填的价值项（底栏「还需选择」用）；填齐了为空。 */
+export function missingValue(draft: ValueDraft): string[] {
+  if (draft.mode === "hand") return draftValue(draft) ? [] : ["牌面"];
+  if (draft.yakuman > 0) return [];
+  return [draft.han === null && "番", draft.fu === null && "符"].filter((x) => x !== false);
+}
+
+/** 草稿 → 可计算的番符值；手填未选齐、牌面未评估或非和牌形时为 null。 */
 export function draftValue(draft: ValueDraft): HandValue | null {
-  if (draft.mode === "manual") return { han: draft.han, fu: draft.fu, yakuman: draft.yakuman };
+  if (draft.mode === "manual") return manualValue(draft);
   const e = draft.evaluated;
   return e && e.isAgari ? { han: e.han, fu: e.fu, yakuman: e.yakuman } : null;
 }
 
+/** 只在 `draftValue` 非空（可以确认）时调用。 */
 export function draftToClientValue(draft: ValueDraft): ClientWinValue {
   if (draft.mode === "manual") {
-    return { kind: "manual", han: draft.han, fu: draft.fu, yakuman: draft.yakuman };
+    const v = manualValue(draft)!;
+    return { kind: "manual", han: v.han, fu: v.fu, yakuman: v.yakuman };
   }
   return { kind: "hand", hand: draft.hand };
 }

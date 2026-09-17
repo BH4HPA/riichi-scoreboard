@@ -63,7 +63,8 @@ export function SeatSelect({
   label: string;
   names: string[];
   mySeat: Seat | null;
-  value: Seat;
+  /** null = 还没选 */
+  value: Seat | null;
   onChange: (s: Seat) => void;
   exclude?: Seat[];
 }) {
@@ -71,7 +72,8 @@ export function SeatSelect({
     <div>
       <Label>{label}</Label>
       <Select
-        value={String(value)}
+        value={value === null ? null : String(value)}
+        placeholder="请选择"
         onValueChange={(v) => onChange(Number(v) as Seat)}
         options={seatOptions(names, mySeat, exclude)}
         className="mt-1"

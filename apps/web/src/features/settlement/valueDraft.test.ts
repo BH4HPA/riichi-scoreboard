@@ -5,7 +5,10 @@ import {
   closedCapacity,
   confirmable,
   createValueDraft,
+  draftToClientValue,
+  draftValue,
   isHandComplete,
+  missingValue,
   withHandEdit,
   type ValueDraft,
 } from "./valueDraft";
@@ -111,5 +114,29 @@ describe("withHandEdit 里宝暂存", () => {
     const edited = withHandEdit(cleared, { ...cleared.hand, lastTile: true });
     expect(edited.uraStash).toEqual([TILE.P3, TILE.P4]);
     expect(edited.hand.lastTile).toBe(true);
+  });
+});
+
+describe("手填番符：不给默认值", () => {
+  const manual = (over: Partial<ValueDraft>) => ({ ...createValueDraft(true, "manual"), ...over });
+
+  it("番、符都选了才有值；缺项逐个列出", () => {
+    expect(draftValue(manual({}))).toBeNull();
+    expect(missingValue(manual({}))).toEqual(["番", "符"]);
+    expect(draftValue(manual({ han: 3 }))).toBeNull();
+    expect(missingValue(manual({ han: 3 }))).toEqual(["符"]);
+    expect(draftValue(manual({ han: 3, fu: 30 }))).toEqual({ han: 3, fu: 30, yakuman: 0 });
+    expect(missingValue(manual({ han: 3, fu: 30 }))).toEqual([]);
+  });
+
+  it("役满不看番符", () => {
+    const d = manual({ yakuman: 1 });
+    expect(draftValue(d)).toEqual({ han: 0, fu: 0, yakuman: 1 });
+    expect(missingValue(d)).toEqual([]);
+    expect(draftToClientValue(d)).toEqual({ kind: "manual", han: 0, fu: 0, yakuman: 1 });
+  });
+
+  it("牌面模式未评估时缺「牌面」", () => {
+    expect(missingValue(createValueDraft(true, "hand"))).toEqual(["牌面"]);
   });
 });
