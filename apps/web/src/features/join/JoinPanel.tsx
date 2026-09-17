@@ -1,14 +1,17 @@
 import { useCallback, useState } from "react";
-import { useNavigate } from "react-router";
-import { ScanLine, Smartphone } from "lucide-react";
+import { Link, useNavigate } from "react-router";
+import { LogIn, ScanLine, Smartphone } from "lucide-react";
 import { api, ApiError } from "@/api/client";
 import { useSession } from "@/api/session";
 import { canUseCamera } from "@/lib/device";
 import { Button } from "@/ui/button";
 import { CodeInput } from "./CodeInput";
 import { QrScan } from "./QrScan";
+import { useLastRoom } from "./useLastRoom";
 
-/** 手机加入：扫码（需 HTTPS）或输入 6 位房间码，输满自动校验并进房。 */
+/**
+ * 手机加入：上次的房间还开着就先给「返回房间」（高亮），其次扫码（需 HTTPS）或输入 6 位房间码，输满自动校验并进房。
+ */
 export function JoinPanel() {
   const navigate = useNavigate();
   const ensure = useSession((s) => s.ensure);
@@ -17,6 +20,9 @@ export function JoinPanel() {
   const [shakeKey, setShakeKey] = useState(0);
   const [scanning, setScanning] = useState(false);
   const scannable = canUseCamera();
+  const { code: lastRoom, pending } = useLastRoom();
+  // 确认中也按「有房间」排版：返回按钮占位、扫码不高亮
+  const returning = lastRoom !== null || pending;
   const go = useCallback((c: string) => navigate(`/r/${c.toUpperCase()}`), [navigate]);
 
   const check = async (c: string) => {
@@ -43,8 +49,24 @@ export function JoinPanel() {
   }
   return (
     <div className="space-y-3">
+      {lastRoom ? (
+        <Button asChild size="lg" variant="accent" className="w-full">
+          <Link to={`/r/${lastRoom}`}>
+            <LogIn className="h-5 w-5" /> 返回房间{" "}
+            <span className="tabular tracking-widest">{lastRoom}</span>
+          </Link>
+        </Button>
+      ) : (
+        pending && <div className="h-12 rounded-lg bg-surface-2" aria-hidden />
+      )}
       {scannable ? (
-        <Button size="lg" variant="accent" className="w-full" onClick={() => setScanning(true)}>
+        <Button
+          size="lg"
+          // 有房间可回时，返回房间是主操作，扫码退为次要
+          variant={returning ? "outline" : "accent"}
+          className="w-full"
+          onClick={() => setScanning(true)}
+        >
           <ScanLine className="h-5 w-5" /> 扫描主控台二维码
         </Button>
       ) : (
