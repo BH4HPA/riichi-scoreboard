@@ -36,12 +36,15 @@ export function ValuePicker({
   onChange,
   rules,
   seat,
+  dealer,
 }: {
   draft: ValueDraft;
   /** 函数式更新：评估结果异步回来时只改仍然匹配的草稿 */
   onChange: (update: (d: ValueDraft) => ValueDraft) => void;
   rules: RoomRules;
   seat: Seat;
+  /** 本局庄家座位 */
+  dealer: Seat;
 }) {
   const socket = useSocket();
   const [evaluating, setEvaluating] = useState(false);
@@ -152,6 +155,7 @@ export function ValuePicker({
           evaluated={draft.evaluated}
           evaluating={evaluating}
           evalError={evalError}
+          isDealer={seat === dealer}
           camera={
             <Suspense fallback={null}>
               <CameraButton draft={draft} onChange={onChange} rules={rules} />

@@ -106,6 +106,12 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   const tvTsumo = tv.getByRole("dialog").filter({ hasText: "自摸结算" });
   await expect(tvTsumo.getByText("立直情况")).toBeVisible();
   await expect(tvTsumo).not.toContainText(/上家|对家|下家|自己/);
+  // 第一巡自摸按和牌者庄闲命名：东 1 局庄家东家 → 天和，换成南家 → 地和
+  await tvTsumo.getByRole("tab", { name: "牌面" }).click();
+  await expect(tvTsumo.getByRole("checkbox", { name: "天和", exact: true })).toBeVisible();
+  await tvTsumo.getByRole("combobox").first().click();
+  await tv.getByRole("option", { name: "南家" }).click();
+  await expect(tvTsumo.getByRole("checkbox", { name: "地和", exact: true })).toBeVisible();
   await tvTsumo.getByRole("button", { name: "取消" }).click();
   await tv.keyboard.press("Escape");
 

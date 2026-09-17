@@ -21,6 +21,7 @@ export function HandEditor({
   evalError,
   camera,
   showValue = true,
+  isDealer,
 }: {
   draft: ValueDraft;
   onChange: (update: (d: ValueDraft) => ValueDraft) => void;
@@ -31,6 +32,8 @@ export function HandEditor({
   camera: React.ReactNode;
   /** 标注模式不算番：不显示番符与役种那一块，免得永远停在「计算中…」 */
   showValue?: boolean;
+  /** 和牌者是否庄家：决定第一巡自摸叫天和还是地和；不在房间里（标注页）为 null */
+  isDealer: boolean | null;
 }) {
   const [picking, setPicking] = useState<TileLoc | null>(null);
 
@@ -65,6 +68,7 @@ export function HandEditor({
           evalError={evalError}
           uncertain={draft.recognition?.uncertain ?? []}
           showValue={showValue}
+          isDealer={isDealer}
         />
       </>
     );
@@ -78,6 +82,7 @@ export function HandEditor({
         rules={rules}
         uncertain={draft.recognition?.uncertain ?? []}
         riichiAuto={draft.riichiAuto}
+        isDealer={isDealer}
         evaluated={evaluated}
         evaluating={evaluating}
         evalError={evalError}
