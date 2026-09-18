@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import type { Detection, RoomRules } from "@riichi/core";
-import { useSession } from "@/api/session";
-import { applyRecognized } from "@/features/recognition/applyRecognized";
+import { applyRecognized, attachRecognitionId } from "@/features/recognition/applyRecognized";
 import type { Capture } from "@/features/recognition/camera/CameraSheet";
 import { confirmRecognized, uploadRecognition } from "@/features/recognition/recognize";
 import {
@@ -13,8 +12,6 @@ import { useRoomStore } from "@/ws/store";
 
 /** idle：还没拍；review：核对识别结果；result：已确认，看番符与点数 */
 export type CalcPhase = "idle" | "review" | "result";
-
-const UPLOAD_FAILED = "照片留存失败，不影响算点数";
 
 /**
  * 一手牌从拍到算的流程状态。照片在定格时就上传留存（与房间一致）；
@@ -32,42 +29,19 @@ export function useCalcShot(rules: RoomRules) {
     setShooting(false);
     setShot({ photo: blob, detections: result.detections });
     setPhase("review");
-    // 不用 crypto.randomUUID：它只在安全上下文可用，开发机是 HTTP
-    const key = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    const key = uploadRecognition(blob, result, "calc", {
+      onId: (id) => setDraft((d) => attachRecognitionId(d, key, id)),
+      onFail: () => useRoomStore.getState().notify("error", "照片留存失败，不影响算点数"),
+    });
     // 每张都从空草稿起：上一手的立直、一发不该带进来；荣和/自摸是场况，保留
     setDraft((d) => applyRecognized(createValueDraft(d.hand.tsumo, "hand"), result, rules, key));
-    const notifyFailed = () => useRoomStore.getState().notify("error", UPLOAD_FAILED);
-    void useSession
-      .getState()
-      .ensure()
-      .then(({ token }) =>
-        uploadRecognition(
-          key,
-          blob,
-          result,
-          token,
-          "calc",
-          (id) =>
-            setDraft((d) =>
-              d.recognition?.key === key ? { ...d, recognition: { ...d.recognition, id } } : d,
-            ),
-          notifyFailed,
-        ),
-      )
-      .catch(notifyFailed);
   };
 
   const confirm = () => {
     if (phase !== "review" || !isHandComplete(draft.hand)) return;
     setPhase("result");
     const confirmed = draft;
-    confirms.current = confirms.current.then(() =>
-      useSession
-        .getState()
-        .ensure()
-        .then(({ token }) => confirmRecognized(confirmed, token))
-        .catch(() => undefined),
-    );
+    confirms.current = confirms.current.then(() => confirmRecognized(confirmed));
   };
 
   return {

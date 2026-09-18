@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { PlayerRef, RulesPreset } from "@riichi/core";
+import { readLocal, writeLocal } from "@/lib/localStore";
 import { api, ApiError } from "./client";
 
 const TOKEN_KEY = "riichi.token";
@@ -19,21 +20,8 @@ interface SessionState {
 
 let pending: Promise<{ token: string; player: PlayerRef }> | null = null;
 
-function readToken(): string | null {
-  try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function writeToken(token: string): void {
-  try {
-    localStorage.setItem(TOKEN_KEY, token);
-  } catch {
-    /* 私密模式等场景忽略 */
-  }
-}
+const readToken = () => readLocal(TOKEN_KEY);
+const writeToken = (token: string) => writeLocal(TOKEN_KEY, token);
 
 export const useSession = create<SessionState>()((set, get) => ({
   token: readToken(),

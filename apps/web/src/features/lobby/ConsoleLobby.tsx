@@ -3,11 +3,11 @@ import { Play, Settings2, Users } from "lucide-react";
 import { presetNameOf, type RoomView, type Seat } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Badge } from "@/ui/controls";
-import { Dialog, DialogContent, DialogFooter } from "@/ui/dialog";
 import { useRoomStore } from "@/ws/store";
 import { useCommand } from "@/ws/useRoom";
 import { cn } from "@/lib/utils";
 import { RoomQr, RoomQrDialog } from "@/features/console/RoomQr";
+import { RulesDialog } from "@/features/rules/RulesDialog";
 import { RulesEditor } from "@/features/rules/RulesEditor";
 import { SiteBrand, SiteFooter } from "@/features/site/SiteFooter";
 import { LocalPlayerDialog } from "./LocalPlayerDialog";
@@ -31,7 +31,6 @@ export function ConsoleLobby({
 }) {
   const send = useCommand();
   const [rulesOpen, setRulesOpen] = useState(false);
-  const [draft, setDraft] = useState(room.rules);
   const [localSeat, setLocalSeat] = useState<Seat | null>(null);
   const [localOpen, setLocalOpen] = useState(false);
   // 窄屏首次进入大厅自动展示二维码；房间码变了再弹一次
@@ -68,14 +67,7 @@ export function ConsoleLobby({
           房间规则
           <Badge tone="outline">{presetNameOf(room.rules)}</Badge>
         </h2>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            setDraft(room.rules);
-            setRulesOpen(true);
-          }}
-        >
+        <Button variant="outline" size="sm" onClick={() => setRulesOpen(true)}>
           <Settings2 className="h-4 w-4" /> 修改规则
         </Button>
       </div>
@@ -167,28 +159,14 @@ export function ConsoleLobby({
         onSit={(seat, playerId) => send({ type: "sitLocal", seat, playerId })}
       />
 
-      <Dialog open={rulesOpen} onOpenChange={setRulesOpen}>
-        <DialogContent
-          title="房间规则"
-          description="开局前可修改；开局后锁定。"
-          className="sm:max-w-2xl"
-        >
-          <RulesEditor value={draft} onChange={setDraft} editable />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRulesOpen(false)}>
-              取消
-            </Button>
-            <Button
-              variant="accent"
-              onClick={async () => {
-                if (await send({ type: "setRules", rules: draft })) setRulesOpen(false);
-              }}
-            >
-              应用规则
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <RulesDialog
+        open={rulesOpen}
+        onOpenChange={setRulesOpen}
+        rules={room.rules}
+        description="开局前可修改；开局后锁定。"
+        className="sm:max-w-2xl"
+        onApply={(rules) => send({ type: "setRules", rules })}
+      />
     </div>
   );
 }

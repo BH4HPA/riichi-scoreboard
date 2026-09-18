@@ -28,12 +28,18 @@ export function useRoomConnection(code: string | null): RoomSocket | null {
       notice: null,
       autoStartDeadline: null,
     });
-    ensure().then(({ token }) => {
-      if (!active) return;
-      sock = new RoomSocket(code, token);
-      sock.connect();
-      setSocket(sock);
-    });
+    ensure().then(
+      ({ token }) => {
+        if (!active) return;
+        sock = new RoomSocket(code, token);
+        sock.connect();
+        setSocket(sock);
+      },
+      () => {
+        // 注册/取档案失败：没有 token 就连不上房间，明确告诉用户而不是一直「连接中」
+        if (active) useRoomStore.getState().set({ status: "closed", closedReason: "offline" });
+      },
+    );
     return () => {
       active = false;
       sock?.close();

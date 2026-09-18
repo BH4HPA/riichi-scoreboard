@@ -20,7 +20,6 @@ function winHands(entry: HistoryEntry): WinRecord[] {
   return wins.filter((w) => w.hand !== null);
 }
 
-/** 手牌 + 指示牌 + 役种。 */
 function WinHands({ entry, size }: { entry: HistoryEntry; size: TileSize }) {
   const shown = winHands(entry);
   if (shown.length === 0) return null;
@@ -123,9 +122,4 @@ export function HistoryTable({ history, tv = false }: { history: HistoryEntry[];
       ))}
     </ul>
   );
-}
-
-/** 手机端：同一组件的紧凑尺寸。 */
-export function HistoryList({ history }: { history: HistoryEntry[] }) {
-  return <HistoryTable history={history} />;
 }

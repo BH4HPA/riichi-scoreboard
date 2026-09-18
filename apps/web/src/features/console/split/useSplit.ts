@@ -1,23 +1,12 @@
 import { useEffect, useState } from "react";
+import { readLocal, writeLocal } from "@/lib/localStore";
 import { clampSplit, DEFAULT_SPLIT, HANDLE_PX } from "./clampSplit";
 
 const KEY = "riichi.console.split";
 
 function readSplit(): number {
-  try {
-    const v = Number(localStorage.getItem(KEY));
-    return v > 0 && v < 1 ? v : DEFAULT_SPLIT;
-  } catch {
-    return DEFAULT_SPLIT;
-  }
-}
-
-function writeSplit(v: number): void {
-  try {
-    localStorage.setItem(KEY, String(v));
-  } catch {
-    /* 无痕模式等写不进去：只是不记忆 */
-  }
+  const v = Number(readLocal(KEY));
+  return v > 0 && v < 1 ? v : DEFAULT_SPLIT;
 }
 
 /** 宽屏对局页比分/历史的分隔比例：本机记忆，按容器实际宽度夹在两栏最小宽度之间。 */
@@ -48,7 +37,7 @@ export function useSplit() {
     set: (next: number) => {
       const v = clampSplit(next, width);
       setRatio(v);
-      writeSplit(v);
+      writeLocal(KEY, String(v));
     },
   };
 }

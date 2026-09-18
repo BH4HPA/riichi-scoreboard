@@ -1,6 +1,6 @@
 # 牌面检测模型训练工作台
 
-拍照识别牌型的模型侧：把照片里的每张牌检测出来（YOLO11n，38 类）。检测框→手牌的布局规则（`packages/core/src/recognition/layout.ts`）、手机浏览器推理与照片留存在应用侧（`apps/web/src/features/recognition`），训练数据回流待做，这里只管数据、训练、导出、发布。
+拍照识别牌型的模型侧：把照片里的每张牌检测出来（YOLO11n，38 类）。检测框→手牌的布局规则（`packages/core/src/recognition/layout.ts`）、手机浏览器推理与照片留存在应用侧（`apps/web/src/features/recognition`），线上纠错回流见下文第 4 节；这里只管数据、训练、导出、发布。
 
 类目录的唯一真源是 `packages/core/src/recognition/manifest.json` 的 `classes`（下标 = 类 id）：`1m…9m 0m 1p…9p 0p 1s…9s 0s 1z…7z back`，`0` = 赤五，`z` 依次 东南西北白发中，`back` = 牌背。`configs/tiles.yaml` 与 `configs/label_studio.xml` 由 `scripts/gen_classes.py` 生成，CI 用 `--check` 校验它们与 manifest 一致；`configs/remap/*.json` 是手工维护的来源类名映射，入库。
 

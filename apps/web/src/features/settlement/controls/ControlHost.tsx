@@ -1,14 +1,13 @@
 import type { GameState, RoomRules, Seat } from "@riichi/core";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { useCommand } from "@/ws/useRoom";
 import { DissolveDialog } from "@/features/console/DissolveButton";
-import { TsumoDialog, RonDialog } from "../WinDialogs";
-import {
-  AbortiveDialog,
-  AdjustDialog,
-  ChomboDialog,
-  ConfirmDialog,
-  DrawDialog,
-} from "../OtherDialogs";
+import { AbortiveDialog } from "../dialogs/AbortiveDialog";
+import { AdjustDialog } from "../dialogs/AdjustDialog";
+import { ChomboDialog } from "../dialogs/ChomboDialog";
+import { DrawDialog } from "../dialogs/DrawDialog";
+import { RonDialog } from "../dialogs/RonDialog";
+import { TsumoDialog } from "../dialogs/TsumoDialog";
 import type { ControlDialog } from "./useControlDialogs";
 
 /** 操作栏的全部对话框；`dissolveCode` 只有主控台传（解散确认）。 */
@@ -38,16 +37,15 @@ export function ControlHost({
       if (!open) onClose();
     },
   });
-  const shared = { game, names, rules, mirror };
-  const seated = { ...shared, mySeat };
+  const shared = { game, names, rules, mirror, mySeat };
 
   return (
     <>
-      <TsumoDialog {...openOf("tsumo")} {...seated} />
-      <RonDialog {...openOf("ron")} {...seated} />
-      <DrawDialog {...openOf("draw")} {...seated} />
-      <AbortiveDialog {...openOf("abortive")} {...seated} />
-      <ChomboDialog {...openOf("chombo")} {...seated} />
+      <TsumoDialog {...openOf("tsumo")} {...shared} />
+      <RonDialog {...openOf("ron")} {...shared} />
+      <DrawDialog {...openOf("draw")} {...shared} />
+      <AbortiveDialog {...openOf("abortive")} {...shared} />
+      <ChomboDialog {...openOf("chombo")} {...shared} />
       <AdjustDialog {...openOf("adjust")} {...shared} />
       <ConfirmDialog
         {...openOf("end")}

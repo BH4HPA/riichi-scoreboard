@@ -2,12 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import type { RoomView } from "@riichi/core";
 import { api, ApiError } from "@/api/client";
 import { useSession } from "@/api/session";
+import { readLocal, writeLocal } from "@/lib/localStore";
 
 const ROOM_KEY = "riichi.console.room";
 
 /**
  * 主控台的房间：优先复用本机上次的房间码；不存在（404）或已解散（410）则新建。
- * `newRoom` 供解散后的自动重建使用（「新房间」已并入「解散房间」）。
+ * `newRoom` 供解散后的自动重建使用。
  */
 export function useConsoleRoom() {
   const ensure = useSession((s) => s.ensure);
@@ -21,7 +22,7 @@ export function useConsoleRoom() {
       body: {},
       token,
     });
-    localStorage.setItem(ROOM_KEY, room.code);
+    writeLocal(ROOM_KEY, room.code);
     return room.code;
   }, [ensure]);
 
@@ -30,7 +31,7 @@ export function useConsoleRoom() {
     (async () => {
       try {
         const { token } = await ensure();
-        const saved = localStorage.getItem(ROOM_KEY);
+        const saved = readLocal(ROOM_KEY);
         if (saved) {
           try {
             await api(`/api/rooms/${saved}`, { token });

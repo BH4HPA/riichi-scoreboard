@@ -10,7 +10,7 @@ export interface Detector {
   infer(bitmap: ImageBitmap): number;
   /** 取 Worker 手上最近那一帧的 JPEG；返回的 frameId 用来取同一帧的识别结果 */
   grab(): Promise<{ frameId: number; blob: Blob } | null>;
-  /** 一帧跑完；`ok=false` 表示它被背压丢掉了，调用方据此复位自己的闸门 */
+  /** 一帧跑完；r 为 null 表示它被背压丢掉了，调用方据此复位自己的闸门 */
   onResult(fn: (r: FrameResult | null) => void): () => void;
   /** ready 之后才发生的失败（会话崩了、推理抛错）；否则界面会一直显示正常 */
   onError(fn: (message: string) => void): () => void;
@@ -24,10 +24,12 @@ export interface Detector {
  * init 失败、onerror、会话创建抛错都直接销毁单例，下次打开重来。
  */
 let handle: Promise<Detector> | null = null;
-/** 上一轮 spawn 还没 resolve 就被关掉时，置位让它一 resolve 就自我了断 */
-let aborted = false;
+/** 每次 spawn 一个代次：关掉再立刻打开时，上一轮在建的会话凭它识别自己已被放弃 */
+let epoch = 0;
 
 function spawn(modelId: string, imgsz: number, onProgress?: LoadProgress): Promise<Detector> {
+  const mine = ++epoch;
+  const cancelled = () => epoch !== mine;
   // 让出单例时要比对「是不是我这一轮」。run 在闭包里被引用，所以用一个 holder 绕开 TDZ。
   const self: { promise?: Promise<Detector> } = {};
   const release = () => {
@@ -35,6 +37,7 @@ function spawn(modelId: string, imgsz: number, onProgress?: LoadProgress): Promi
   };
   const run = (async (): Promise<Detector> => {
     const { wasm, model } = await loadBytes(modelId, onProgress);
+    if (cancelled()) throw new Error("已取消");
     const worker = new Worker(new URL("./detector.worker.ts", import.meta.url), {
       type: "module",
     });
@@ -45,7 +48,7 @@ function spawn(modelId: string, imgsz: number, onProgress?: LoadProgress): Promi
     let dead: string | null = null;
 
     const ready = new Promise<void>((resolve, reject) => {
-      // 会话废了就地销毁并让出单例：ready 之后才失败时 reject 是空操作，靠 dead 挡住后续调用
+      // 会话废了就地销毁并让出单例；ready 之后由 dead 挡住后续调用
       const die = (message: string) => {
         dead = message;
         grabbing?.(null);
@@ -88,7 +91,7 @@ function spawn(modelId: string, imgsz: number, onProgress?: LoadProgress): Promi
 
     await ready;
     // 建线程期间用户已经关掉了取景页：立刻收摊，不要留下一个没人管的会话
-    if (aborted) {
+    if (cancelled()) {
       worker.terminate();
       release();
       throw new Error("已取消");
@@ -145,17 +148,16 @@ function spawn(modelId: string, imgsz: number, onProgress?: LoadProgress): Promi
 export function openDetector(onProgress?: LoadProgress): Promise<Detector> {
   const model = RECOGNITION_MANIFEST.model;
   if (!model) return Promise.reject(new Error("尚未发布识别模型"));
-  aborted = false;
   if (!handle) return (handle = spawn(model.id, model.imgsz, onProgress));
   // 线程已在建：字节可能还在下，把进度回调挂到那一轮下载上（loadBytes 会立刻重放当前进度）
   if (onProgress) void loadBytes(model.id, onProgress).catch(() => undefined);
   return handle;
 }
 
-/** 关掉识别线程（取景页卸载时调用）。连开连关时靠 aborted 保证不会堆出并行会话。 */
+/** 关掉识别线程（取景页卸载时调用）；还在建的那一轮见到代次变了会自行收摊。 */
 export function closeDetector(): void {
   const current = handle;
   handle = null;
-  aborted = true;
+  epoch += 1;
   void current?.then((d) => d.close()).catch(() => undefined);
 }

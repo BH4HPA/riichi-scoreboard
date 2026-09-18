@@ -1,6 +1,5 @@
-import { SEATS, type Seat } from "@riichi/core";
+import { relativeSeatLabel, SEATS, type Seat } from "@riichi/core";
 import { CheckRow, Label, Select } from "@/ui/controls";
-import { relativeSeatLabel } from "./format";
 
 /** 选人控件里的玩家名：在座时名字后跟灰色的相对方位。 */
 function SeatName({ names, mySeat, seat }: { names: string[]; mySeat: Seat | null; seat: Seat }) {

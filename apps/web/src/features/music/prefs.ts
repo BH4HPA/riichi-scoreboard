@@ -1,4 +1,5 @@
 import type { MusicTrack } from "@riichi/core";
+import { readLocalJson, writeLocal } from "@/lib/localStore";
 
 /** 手机本地的立直音乐偏好：上次选的曲目、各曲目被按下「立直」的次数。 */
 export interface MusicPrefs {
@@ -10,30 +11,20 @@ export const EMPTY_PREFS: MusicPrefs = { last: null, counts: {} };
 
 const KEY = "riichi.music.prefs";
 
-export function readPrefs(): MusicPrefs {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return EMPTY_PREFS;
-    const v = JSON.parse(raw) as Partial<MusicPrefs> | null;
-    if (typeof v !== "object" || v === null) return EMPTY_PREFS;
-    const counts: Record<string, number> = {};
-    const rawCounts = typeof v.counts === "object" && v.counts !== null ? v.counts : {};
-    for (const [id, n] of Object.entries(rawCounts)) {
-      if (typeof n === "number" && Number.isInteger(n) && n > 0) counts[id] = n;
-    }
-    return { last: typeof v.last === "string" ? v.last : null, counts };
-  } catch {
-    return EMPTY_PREFS;
+function parsePrefs(raw: unknown): MusicPrefs {
+  const v = raw as Partial<MusicPrefs> | null;
+  if (typeof v !== "object" || v === null) return EMPTY_PREFS;
+  const counts: Record<string, number> = {};
+  const rawCounts = typeof v.counts === "object" && v.counts !== null ? v.counts : {};
+  for (const [id, n] of Object.entries(rawCounts)) {
+    if (typeof n === "number" && Number.isInteger(n) && n > 0) counts[id] = n;
   }
+  return { last: typeof v.last === "string" ? v.last : null, counts };
 }
 
-export function writePrefs(prefs: MusicPrefs): void {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(prefs));
-  } catch {
-    /* 私密模式等场景忽略 */
-  }
-}
+export const readPrefs = (): MusicPrefs => readLocalJson(KEY, parsePrefs) ?? EMPTY_PREFS;
+
+export const writePrefs = (prefs: MusicPrefs) => writeLocal(KEY, JSON.stringify(prefs));
 
 /** 按被选用次数降序；次数相同保持曲库顺序。 */
 export function orderTracks(tracks: readonly MusicTrack[], prefs: MusicPrefs): MusicTrack[] {

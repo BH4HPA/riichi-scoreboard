@@ -215,8 +215,8 @@ export function CameraSheet({
   const runStill = useCallback(
     async (src: ImageBitmap, rect: Rect) => {
       if (!detector) return setFile(null);
-      // 先停实时循环再送帧：否则这一张有极大概率撞上正在推理的实时帧被背压丢掉，
-      // 用户点了「用这块识别」却什么也不发生
+      // 紧接着的 setFile(null) 会让相机与实时循环恢复；stillBusy 让它们继续停到静帧结果回来，
+      // 否则这一张会撞上实时帧被背压丢掉，用户点了「用这块识别」却什么也不发生
       setStillBusy(true);
       setFile(null);
       try {
@@ -250,7 +250,6 @@ export function CameraSheet({
 
   /** 相机用不了（权限、无设备、占用、非 HTTPS）：快门没有意义，给相册入口 */
   const camBroken = camError !== null;
-  /** 快门只在真能拍的时候出现：模型就绪、画面在出、相机可用 */
   const canShoot = detector !== null && ready && painted && live !== null && !camBroken;
   const downloading = !detector && !error && progress < 1;
   /** 右上角的小字进度：认出几张（副露按 3 张折算）· 连续几帧一致 */

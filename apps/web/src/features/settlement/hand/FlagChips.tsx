@@ -12,8 +12,7 @@ interface Flag {
 }
 
 /**
- * 一发、海底、抢杠、天和这些信息**照片里根本不存在**，模型永远认不出来。
- * 所以确认态收起键盘之后，这一行必须常驻、不可折叠，否则界面越干净漏勾越多。
+ * 一发、海底、抢杠、天和在照片里不存在，识别不出来：确认态收起键盘后这一行必须常驻可编辑。
  * 立直由识别里宝自动勾上时带记号，让「为什么亮着」看得见。
  */
 export function FlagChips({
@@ -26,7 +25,6 @@ export function FlagChips({
   hand: HandInput;
   rules: RoomRules;
   riichiAuto: boolean;
-  /** 和牌者是否庄家 */
   isDealer: boolean;
   onChange: (next: HandInput) => void;
 }) {

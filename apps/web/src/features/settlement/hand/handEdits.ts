@@ -1,7 +1,6 @@
 import type { HandInput, Tile } from "@riichi/core";
 import type { TileLoc } from "@/features/hand/tileLoc";
 
-/** 取出某个位置当前是哪张牌。 */
 export function tileAt(hand: HandInput, loc: TileLoc): Tile | null {
   if (loc.area === "closed") return hand.closed[loc.i] ?? null;
   if (loc.area === "meld") return hand.melds[loc.i]?.tiles[loc.j ?? 0] ?? null;
@@ -10,8 +9,8 @@ export function tileAt(hand: HandInput, loc: TileLoc): Tile | null {
 }
 
 /**
- * 把某个位置换成另一张牌。张数不变，所以其它位置的下标与「请核对」记号都不受影响
- * —— 确认态下删除才是错的默认动作（张数已经对了，删一张就不完整）。
+ * 把某个位置换成另一张牌。张数不变，所以其它位置的下标与「请核对」记号都不受影响；
+ * 确认态下张数已经对了，删一张反而不完整。
  */
 export function replaceAt(hand: HandInput, loc: TileLoc, tile: Tile): HandInput {
   switch (loc.area) {

@@ -37,7 +37,6 @@ export function ValuePicker({
   rules: RoomRules;
   /** 和牌者；还没选时为 null，牌面照常录入但不送评估 */
   seat: Seat | null;
-  /** 本局庄家座位 */
   dealer: Seat;
 }) {
   const socket = useSocket();
@@ -50,7 +49,7 @@ export function ValuePicker({
   const maxYakuman = rules.scoring.yakumanStacking ? 6 : 1;
 
   // 牌面完整即自动算番；回包只在手牌快照未变时写回（防乱序与覆盖期间改动）。
-  // onChange 走 ref：调用方可以传每次渲染新建的函数，不会触发 effect 重跑（否则荣和框会无限轮询）。
+  // onChange 走 ref，不进 effect 依赖：调用方可以传每次渲染新建的函数。
   const onChangeRef = useRef(onChange);
   useEffect(() => {
     onChangeRef.current = onChange;

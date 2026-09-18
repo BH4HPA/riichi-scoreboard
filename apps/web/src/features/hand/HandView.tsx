@@ -7,8 +7,7 @@ import type { TileLoc } from "./tileLoc";
 
 /**
  * 一手牌的完整展示：暗牌 + 和张 + 副露，下面跟宝牌 / 里宝指示牌。
- * 结算确认态与取景框的实时预览共用这一份 —— 同一个信息在时间轴两端的两次呈现，
- * 不该长成两个组件。传了 `onTileClick` 就可点，没传就是纯展示。
+ * 结算确认态与取景框的实时预览共用；传了 `onTileClick` 就可点，没传就是纯展示。
  */
 export function HandView({
   hand,

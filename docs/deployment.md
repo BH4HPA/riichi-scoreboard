@@ -11,7 +11,7 @@ docker compose up -d --build   # 单容器，:8787，数据卷 /data（SQLite + 
 前端单独托管（例如放到 COS 静态站）时，需要：
 
 - 构建前端前设置 `VITE_API_BASE_URL`；
-- 服务端设置 `CORS_ORIGINS`；
+- 服务端设置 `CORS_ORIGINS`；经 CDN/反向代理回源时再设 `TRUST_PROXY=1`，注册限流才按真实客户端 IP 计；
 - 把静态站点的 404 回退到 `index.html`（`/console`、`/r/:code`、`/calc` 都是前端路由）。
 
 ## 线上（GitHub Actions → 腾讯云）

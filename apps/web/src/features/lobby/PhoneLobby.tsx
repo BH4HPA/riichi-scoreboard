@@ -3,12 +3,12 @@ import { useNavigate } from "react-router";
 import { ArrowLeft, Settings2 } from "lucide-react";
 import { presetNameOf, type RoomView, type Seat } from "@riichi/core";
 import { Button } from "@/ui/button";
-import { Dialog, DialogContent, DialogFooter } from "@/ui/dialog";
 import { useRoomStore } from "@/ws/store";
 import { useCommand } from "@/ws/useRoom";
 import { ProfileEditor } from "@/features/profile/ProfileEditor";
-import { RulesEditor, RulesSummary } from "@/features/rules/RulesEditor";
-import { useMirror } from "@/features/settlement/useMirror";
+import { RulesDialog } from "@/features/rules/RulesDialog";
+import { RulesSummary } from "@/features/rules/RulesEditor";
+import { useMirror } from "@/features/mirror/useMirror";
 import { CastSwitch } from "@/features/mirror/CastSwitch";
 import { SiteFooter } from "@/features/site/SiteFooter";
 import { SeatCards } from "./SeatCards";
@@ -19,7 +19,6 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
   const send = useCommand();
   const navigate = useNavigate();
   const [rulesOpen, setRulesOpen] = useState(false);
-  const [draft, setDraft] = useState(room.rules);
   const [cast, setCast] = useState(false);
   useMirror(cast && rulesOpen, { kind: "rules" }, true);
   const ready = mySeat !== null && room.ready[mySeat] === true;
@@ -48,7 +47,6 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
           variant="outline"
           size="sm"
           onClick={() => {
-            setDraft(room.rules);
             setCast(false);
             setRulesOpen(true);
           }}
@@ -105,26 +103,14 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
         </div>
       )}
 
-      <Dialog open={rulesOpen} onOpenChange={setRulesOpen}>
-        <DialogContent title="房间规则" description="开局前所有人都可修改；开局后锁定。">
-          <CastSwitch checked={cast} onCheckedChange={setCast} />
-          <RulesEditor value={draft} onChange={setDraft} editable />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRulesOpen(false)}>
-              取消
-            </Button>
-            <Button
-              variant="accent"
-              onClick={async () => {
-                if (await ownRulesChange(() => send({ type: "setRules", rules: draft })))
-                  setRulesOpen(false);
-              }}
-            >
-              应用规则
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <RulesDialog
+        open={rulesOpen}
+        onOpenChange={setRulesOpen}
+        rules={room.rules}
+        description="开局前所有人都可修改；开局后锁定。"
+        header={<CastSwitch checked={cast} onCheckedChange={setCast} />}
+        onApply={(rules) => ownRulesChange(() => send({ type: "setRules", rules }))}
+      />
     </div>
   );
 }
