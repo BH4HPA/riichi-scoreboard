@@ -17,6 +17,8 @@ services:
     environment:
       # 前端与后端同源部署时留空；前端另行托管到 COS 时填其 origin，逗号分隔
       CORS_ORIGINS: "${CORS_ORIGINS:-}"
+      # 经 CDN/反向代理回源时设为 1：注册限流按 X-Forwarded-For 首项计 IP
+      TRUST_PROXY: "${TRUST_PROXY:-}"
       # 头像等对象存储：全空 = 本地磁盘（/data/objects）；变量含义见 .env.template
       QCLOUD_SECRET_ID: "${QCLOUD_SECRET_ID:-}"
       QCLOUD_SECRET_KEY: "${QCLOUD_SECRET_KEY:-}"
