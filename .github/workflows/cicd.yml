@@ -33,7 +33,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: ml/configs match the recognition manifest
         run: python3 ml/scripts/gen_classes.py --check
       - uses: actions/setup-node@v4
@@ -73,7 +73,7 @@ jobs:
       name: web
       url: https://riichi.ruivon.cn
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
@@ -121,7 +121,7 @@ jobs:
       name: server
       url: https://riichi-api.ruivon.cn/health
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Compute image tag
         id: tag
         run: echo "value=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
