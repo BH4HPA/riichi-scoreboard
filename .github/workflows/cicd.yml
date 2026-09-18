@@ -33,17 +33,17 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: ml/configs match the recognition manifest
         run: python3 ml/scripts/gen_classes.py --check
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - name: Enable Corepack (Yarn 4)
         run: |
           corepack enable
           yarn --version
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.yarn/berry/cache
           key: yarn-berry-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
@@ -58,7 +58,7 @@ jobs:
       - run: yarn e2e
       - name: Upload e2e traces on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-test-results
           path: test-results/
@@ -73,12 +73,12 @@ jobs:
       name: web
       url: https://riichi.ruivon.cn
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - run: corepack enable
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.yarn/berry/cache
           key: yarn-berry-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
@@ -121,7 +121,7 @@ jobs:
       name: server
       url: https://riichi-api.ruivon.cn/health
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Compute image tag
         id: tag
         run: echo "value=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
@@ -132,7 +132,7 @@ jobs:
           username: ${{ secrets.QCLOUD_DOCKER_USERNAME }}
           password: ${{ secrets.QCLOUD_DOCKER_PASSWORD }}
       - name: Build and push image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: apps/server/Dockerfile

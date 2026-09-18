@@ -4,6 +4,9 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    groups:
+      actions:
+        patterns: ["*"]
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
@@ -11,3 +14,10 @@ updates:
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
+    ignore:
+      # Types follow the runtime major (.nvmrc); bump together with Node.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # @hono/node-ws 1.x peers on @hono/node-server ^1.19; drop once node-ws supports 2.x.
+      - dependency-name: "@hono/node-server"
+        update-types: ["version-update:semver-major"]
