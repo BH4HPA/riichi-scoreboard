@@ -70,8 +70,8 @@ Yarn workspaces monorepo:
   carrying the hand only once the engine has evaluated it. Looking up the 番符表/rules on a phone stays on the phone
   unless its 「投到电视」 switch (`features/mirror/CastSwitch`, reset whenever the sheet closes) is on. Site credits (copyright, ICP record) live in
   `features/site/`: landing centers them at the page bottom, the narrow console lobby puts them in its button row, the narrow
-  console game centers them at the page bottom, the wide console pins them
-  left-aligned at the bottom of its left column, `/calc` stacks `SiteBrand` over them at the page bottom; the phone game nav puts a row below its tabs, inside the bottom safe area (padding clamped to 6–18px): room code + connection badge on the left, `SiteTicker` on the right (ICP number ⇄ logo + site name every 10 s, pure CSS — two anti-phase layers, fade out then in; plain text, not a link; brand only when no ICP is configured). PWA = `public/manifest.json` + icons only, deliberately no Service Worker (the app is useless
+  console game centers them at the page bottom under `SiteBrand`, the wide console pins them
+  left-aligned at the bottom of its left column with `SiteBrand` right-aligned on the same row (lobby and game), `/calc` stacks `SiteBrand` over them at the page bottom; the phone game nav puts a row below its tabs, inside the bottom safe area (padding clamped to 6–18px): room code + connection badge on the left, `SiteTicker` on the right (ICP number ⇄ logo + site name every 10 s, pure CSS — two anti-phase layers, fade out then in; plain text, not a link; brand only when no ICP is configured). PWA = `public/manifest.json` + icons only, deliberately no Service Worker (the app is useless
   without its WebSocket, and caching index would pin stale versions); logo master in `docs/brand/`. Tile images are flat SVGs from mahjong_graphic (`src/assets/tiles`, see NOTICE.md), rendered by
   `features/hand/TileFace`.
 

@@ -38,7 +38,7 @@ export function SiteFooter({ className }: { className?: string }) {
   );
 }
 
-/** Logo + 站名：宽屏主控台大厅左栏右下角、二维码弹窗顶部、拍照算点数页底部版权上方、手机对局底栏（`SiteTicker`，缩小）。 */
+/** Logo + 站名：宽屏主控台（大厅与对局）左栏右下角、窄屏主控台对局页脚上方、二维码弹窗顶部、拍照算点数页底部版权上方、手机对局底栏（`SiteTicker`，缩小）。 */
 export function SiteBrand({
   className,
   iconClassName,
