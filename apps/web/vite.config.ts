@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 
 const serverOrigin = process.env.SERVER_ORIGIN ?? "http://localhost:8787";
 
@@ -12,10 +12,32 @@ const devCert =
     ? { cert: fs.readFileSync(`${CERTS}/cert.pem`), key: fs.readFileSync(`${CERTS}/key.pem`) }
     : null;
 
-export default defineConfig({
+/**
+ * 站点地址与署名只在配置了才写进 <head>。不能用 index.html 的 %VITE_*% 占位：变量为空时
+ * canonical 会变成 href="/"，Vite 的 HTML 插件把它当资源去读目录，构建直接失败（EISDIR）。
+ */
+function siteMeta(env: Record<string, string>): Plugin {
+  const site = env.VITE_SITE_URL?.replace(/\/$/, "");
+  const author = env.VITE_SITE_AUTHOR;
+  return {
+    name: "riichi:site-meta",
+    transformIndexHtml: () => [
+      ...(author ? [{ tag: "meta", attrs: { name: "author", content: author } }] : []),
+      ...(site
+        ? [
+            { tag: "link", attrs: { rel: "canonical", href: `${site}/` } },
+            { tag: "meta", attrs: { property: "og:url", content: `${site}/` } },
+            { tag: "meta", attrs: { property: "og:image", content: `${site}/icon-512.png` } },
+          ]
+        : []),
+    ],
+  };
+}
+
+export default defineConfig(({ mode }) => ({
   // 产物里 Worker 用的是绝对路径（/assets/...），改子路径部署会 404 且极难查：显式钉死根部署
   base: "/",
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), siteMeta(loadEnv(mode, import.meta.dirname, "VITE_"))],
   resolve: {
     alias: { "@": path.resolve(import.meta.dirname, "./src") },
   },
@@ -36,4 +58,4 @@ export default defineConfig({
       "/ws": { target: serverOrigin, ws: true },
     },
   },
-});
+}));
