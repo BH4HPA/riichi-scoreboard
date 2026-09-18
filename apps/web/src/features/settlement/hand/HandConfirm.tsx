@@ -9,7 +9,6 @@ import { ValueResult } from "./ValueResult";
 /**
  * 识别通过时的结算界面：像主控台一样把牌摆出来，键盘收起。
  * 没把握的那张牌自己带记号，点任意一张就能换或者改和张；旗标压成一行常驻 chips。
- * props 只收牌与结果，不收 ValueDraft —— 取景框里没有 draft，这套签名要能被实时预览复用。
  */
 export function HandConfirm({
   hand,
@@ -44,8 +43,7 @@ export function HandConfirm({
     <div className="space-y-3" data-testid="hand-confirm">
       <HandView
         hand={hand}
-        // 手机宽度放不下 14 张大牌：用与编辑态一致的尺寸，横滑只剩一点点，和张基本一眼可见。
-        // 「像主控台一样」指的是只读成排展示，不是牌得一样大——电视有 1600px，手机没有。
+        // 手机宽度放不下 14 张大牌：与编辑态同尺寸，横滑只剩一点点
         size="sm"
         marks={uncertain}
         onTileClick={onTileClick}

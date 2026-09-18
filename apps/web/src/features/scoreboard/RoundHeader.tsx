@@ -22,7 +22,7 @@ export function RoundHeader({
   );
   const total = game.points.reduce((a, b) => a + b, 0);
   const expected = rules.final.startPoints * 4;
-  /** 桌上的棒：立直棒 + 本场棒（沿用旧版「场供」口径） */
+  /** 桌上的棒：立直棒 + 本场棒，界面统称「场供」 */
   const tableSticks = game.kyotaku * 1000 + game.honba * rules.scoring.honbaValue;
   const label = game.status === "finished" ? "对局结束" : roundLabel(game.kyoku, game.honba);
   return (

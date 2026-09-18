@@ -9,8 +9,7 @@ import { TileReplaceSheet } from "./TileReplaceSheet";
 
 /**
  * 牌面页的装配：识别结果自洽就收起键盘只展示牌（确认态），否则展开全键盘（编辑态）。
- * 点过「改牌」就一直留在编辑态，直到下一次识别把 recognition 换掉 —— 用户的显式选择
- * 优先于自动判定，界面不在手底下自己变形。
+ * 点过「改牌」就一直留在编辑态，直到下一次识别把 recognition 换掉：用户的显式选择优先于自动判定。
  */
 export function HandEditor({
   draft,

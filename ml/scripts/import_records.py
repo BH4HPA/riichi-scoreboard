@@ -115,7 +115,7 @@ def main() -> int:
 
     auto, manual_n = stats["自动"], stats["待人工"]
     total = auto + manual_n
-    print(f"来源：room {stats['room']} / label {stats['label']}")
+    print(f"来源：room {stats['room']} / calc {stats.get('calc', 0)} / label {stats['label']}")
     print(f"自动入库 {auto}，待人工 {manual_n}" + (f"（{manual_n / total:.0%} 是难例）" if total else ""))
     for k in ("照片缺失", "框与照片对不上"):
         if stats[k]:

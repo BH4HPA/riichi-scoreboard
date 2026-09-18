@@ -3,6 +3,7 @@ import { ChevronDown } from "lucide-react";
 import {
   dealerOf,
   formatPoints,
+  relativeSeatLabel,
   seatWind,
   WIND_LABELS,
   type GameState,
@@ -13,7 +14,6 @@ import {
 import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/controls";
 import { cn } from "@/lib/utils";
-import { relativeSeatLabel } from "@/features/settlement/format";
 import { DiffMatrix } from "./DiffMatrix";
 import { myDiffs } from "./diffRows";
 

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { XCircle } from "lucide-react";
 import { Button, type ButtonProps } from "@/ui/button";
 import { useCommand } from "@/ws/useRoom";
-import { ConfirmDialog } from "@/features/settlement/OtherDialogs";
+import { ConfirmDialog } from "@/ui/confirm-dialog";
 
 /** 解散确认：发命令后服务端断开所有连接，主控台收到断开后自动建新房。 */
 export function DissolveDialog({

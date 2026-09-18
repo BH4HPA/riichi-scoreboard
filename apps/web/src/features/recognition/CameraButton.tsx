@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { Camera } from "lucide-react";
 import { RECOGNITION_MANIFEST, type RoomRules } from "@riichi/core";
-import { useSession } from "@/api/session";
 import type { ValueDraft } from "@/features/settlement/valueDraft";
 import { Button } from "@/ui/button";
 import { useRoomStore } from "@/ws/store";
-import { applyRecognized } from "./applyRecognized";
+import { applyRecognized, attachRecognitionId } from "./applyRecognized";
 import { CameraSheet, type Capture } from "./camera/CameraSheet";
 import { RecognitionWarnings } from "./RecognitionWarnings";
 import { uploadRecognition } from "./recognize";
@@ -29,27 +28,11 @@ export function CameraButton({
 
   const onCapture = ({ blob, result }: Capture) => {
     setOpen(false);
-    // 不用 crypto.randomUUID：它只在安全上下文可用，开发机是 HTTP
-    const key = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    const key = uploadRecognition(blob, result, "room", {
+      onId: (id) => onChange((d) => attachRecognitionId(d, key, id)),
+      onFail: () => useRoomStore.getState().notify("error", "照片留存失败，不影响结算"),
+    });
     onChange((d) => applyRecognized(d, result, rules, key));
-    void useSession
-      .getState()
-      .ensure()
-      .then(({ token }) =>
-        uploadRecognition(
-          key,
-          blob,
-          result,
-          token,
-          "room",
-          (id) =>
-            onChange((d) =>
-              d.recognition?.key === key ? { ...d, recognition: { ...d.recognition, id } } : d,
-            ),
-          () => useRoomStore.getState().notify("error", "照片留存失败，不影响结算"),
-        ),
-      )
-      .catch(() => useRoomStore.getState().notify("error", "照片留存失败，不影响结算"));
   };
 
   const rec = draft.recognition;

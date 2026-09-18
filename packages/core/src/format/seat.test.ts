@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { relativeSeatLabel } from "./format";
+import { relativeSeatLabel } from "./seat";
 
 describe("relativeSeatLabel", () => {
   it("东南西北逆时针：+1 下家、+2 对家、+3 上家", () => {

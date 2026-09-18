@@ -1,17 +1,11 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import {
-  AKA_TILES,
-  ALL_TILES,
-  akaLimit,
   akaOf,
-  allHandTiles,
   baseTile,
   isAka,
   isHonor,
-  sameTile,
   tileNumber,
-  tileSuit,
   type EvaluatedHand,
   type HandInput,
   type Meld,
@@ -22,7 +16,9 @@ import { CheckRow, Label } from "@/ui/controls";
 import { cn } from "@/lib/utils";
 import { isAnkanBack } from "@/features/hand/meld";
 import { TileFace } from "@/features/hand/TileFace";
+import { TileGrid } from "@/features/hand/TileGrid";
 import { hasLoc, type TileLoc } from "@/features/hand/tileLoc";
+import { akaAvailable, countTile } from "./hand/quota";
 import { firstTakeLabel } from "./hand/firstTake";
 import { withRiichi } from "./hand/handEdits";
 import { ValueResult } from "./hand/ValueResult";
@@ -40,23 +36,7 @@ const TARGET_LABELS: Record<Target, string> = {
   ankan: "暗杠",
 };
 
-/** 同一基础牌（忽略赤标记）已录入张数。 */
-function countTile(hand: HandInput, tile: Tile): number {
-  return allHandTiles(hand).filter((t) => sameTile(t, tile)).length;
-}
-
-/** 该赤五是否还能再录入：受规则总数与同花色上限约束。 */
-function akaAvailable(hand: HandInput, tile: Tile, rules: RoomRules): boolean {
-  if (!isAka(tile)) return true;
-  const all = allHandTiles(hand);
-  const total = all.filter(isAka).length;
-  if (total >= rules.hand.akaCount) return false;
-  const suit = tileSuit(tile) as "m" | "p" | "s";
-  const inSuit = all.filter((t) => isAka(t) && tileSuit(t) === suit).length;
-  return inSuit < akaLimit(suit, rules.hand.akaCount);
-}
-
-/** 键盘牌键的点击区：撑满格子、至少 44px 高 */
+/** 键盘牌键的点击区撑满整格（约 36×44），牌图保持原尺寸居中：单手录入不用对准 26px 宽的牌 */
 const KEY_HIT = "min-h-11 w-full items-center justify-center";
 
 export function TileKeyboard({
@@ -155,8 +135,6 @@ export function TileKeyboard({
   const toggleMeldAka = (meldIndex: number, tileIndex: number) => {
     const meld = hand.melds[meldIndex]!;
     const tile = meld.tiles[tileIndex]!;
-    // 赤五不能落进暗杠扣着的那两张：界面上看不见，却照样占着赤五名额。
-    // 调用点已经不给点了，这里再挡一次 —— 不变量守在改数据的地方才不会被下一个入口绕过
     if (isAnkanBack(meld, tileIndex)) return;
     if (tileNumber(tile) !== 5 || isHonor(tile)) return;
     const next = isAka(tile) ? baseTile(tile) : akaOf(tile);
@@ -205,7 +183,6 @@ export function TileKeyboard({
           {hand.melds.map((m, i) => (
             <div key={`m${i}`} className="relative ml-3 mr-1 flex items-end gap-px">
               {m.tiles.map((t, j) => {
-                // 扣着的那两张点了也看不见变化，改动却是真的（赤五就这么被藏进过牌背）
                 const back = isAnkanBack(m, j);
                 return (
                   <TileFace
@@ -262,34 +239,13 @@ export function TileKeyboard({
           ))}
       </div>
 
-      {/* 点击区是整个格子（约 36×44），牌图保持原尺寸居中：单手录入不用对准 26px 宽的牌 */}
-      <div className="grid grid-cols-9 gap-1" data-testid="tile-keyboard">
-        {ALL_TILES.map((t) => (
-          <TileFace
-            key={t}
-            tile={t}
-            size="sm"
-            dim={disabledOnKeyboard(t)}
-            onClick={() => tap(t)}
-            buttonClassName={KEY_HIT}
-          />
-        ))}
-        {akaEnabled && (
-          <>
-            <span className="col-span-2" aria-hidden />
-            {AKA_TILES.map((t) => (
-              <TileFace
-                key={t}
-                tile={t}
-                size="sm"
-                dim={disabledOnKeyboard(t)}
-                onClick={() => tap(t)}
-                buttonClassName={KEY_HIT}
-              />
-            ))}
-          </>
-        )}
-      </div>
+      <TileGrid
+        aka={akaEnabled}
+        disabled={disabledOnKeyboard}
+        onPick={tap}
+        buttonClassName={KEY_HIT}
+        testId="tile-keyboard"
+      />
 
       <div>
         <Label>和张</Label>

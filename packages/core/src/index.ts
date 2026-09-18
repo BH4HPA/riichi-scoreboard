@@ -20,6 +20,7 @@ export * from "./format/round";
 export * from "./format/describe";
 export * from "./format/describeRevert";
 export * from "./format/rules";
+export * from "./format/seat";
 export * from "./hand/options";
 export * from "./reference/notation";
 export * from "./reference/yakuTable";

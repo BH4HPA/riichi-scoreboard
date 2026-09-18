@@ -36,8 +36,10 @@ Yarn workspaces monorepo:
 
 - `packages/core` — pure TypeScript domain: types, rules + presets, scoring, round progression, final
   settlement, reducer (`reduceRoom(state, event)` is a pure function), reference tables (番符表 data with
-  example hands in MPSZ notation), description formatting, client/server protocol types. No DOM, no wasm.
-  Shared by server (authority) and web (pre-confirm preview).
+  example hands in MPSZ notation), description formatting, client/server protocol (`protocol/`:
+  `messages` wire types, `policy` server tables such as `TOLERATES_STALE`/`STOPS_MUSIC`/`WS_CLOSE`, `view`
+  `RoomView` derivation, `uiIntent` mirror intents + validation, `rest` DTOs). `DomainError` lives in
+  `types/errors.ts`. No DOM, no wasm. Shared by server (authority) and web (pre-confirm preview).
 - `apps/server` — Hono + `@hono/node-ws` + `node:sqlite` + `riichi-rs-node` (hand → han/fu/yaku, server
   only). Rooms are event-sourced: commands carry the client's `baseSeq` and are rejected as `stale` when it
   lags, except for the commands listed in `TOLERATES_STALE` (seat commands, `start`, `dissolve`,
@@ -46,18 +48,25 @@ Yarn workspaces monorepo:
   swallow a tap); they are then validated (`validateCommand`), enriched by actor
   (`registry.enrich`: seat identity, local-player ownership, engine evaluation), reduced, appended to
   `room_events`, and the resulting `present` state is broadcast. Undo/redo stacks live in memory and are
-  rebuilt by replay; an accepted undo/redo is followed by a `reverted` message to the whole room (who, and
+  rebuilt by replay (bounded by core `UNDO_LIMIT`, so a burst of commands cannot grow memory quadratically);
+  a replay that throws surfaces as `RoomCorrupt` (logged, `internal`) rather than "room not found"; an accepted undo/redo is followed by a `reverted` message to the whole room (who, and
   which entry per core `describeRevert`) that every client shows as a notice. Transient UI intents (mirroring a phone's dialog on the TV) live in memory only.
   SQLite schema is versioned (`db/index.ts` `MIGRATIONS`, applied by `user_version`). User files go through
   `storage/ObjectStore`: local disk (served at `/api/objects/*`) or Tencent COS (`QCLOUD_*` env, `riichi/`
-  prefix, see `.env.template`). Serves the built web app with SPA fallback.
+  prefix, see `.env.template`). Abuse limits (`http/rateLimit.ts`, sliding windows): registration per IP
+  (`TRUST_PROXY=1` reads `X-Forwarded-For` behind the CDN), room creation per device, photo uploads per player
+  - global; the ws server's `maxPayload` equals the 16 KB application message cap. Serves the built web app
+    with SPA fallback.
 - `apps/web` — Vite + React 19 + Tailwind v4 + radix primitives. Routes: `/` landing (device routing:
   desktop → `/console`, tablet chooses, phone gets QR scan + six-cell code input, plus 「返回房间」 when the room in `riichi.room.last` still
   exists), `/console` (TV: two
   columns ≥ 1280px with a draggable split — `features/console/split`, default scores 0.6, clamped by
   per-column minimum widths, remembered in `riichi.console.split` — otherwise single column with history
   drawer + QR dialog), `/r/:code` (phone), `/calc` (拍照算点数, see Photo recognition).
-  Phone settlement dialogs mirror to the TV as a full-screen modal (`features/mirror/SettlementMirror`),
+  Settlement dialogs live in `features/settlement/dialogs/` (one file per dialog over a shared
+  `SettlementDialog` shell; `useDeclaredRiichi` merges riichi declarations that arrive while a dialog is open).
+  Generic confirmation is `ui/confirm-dialog`. Phone dialogs mirror to the TV as a full-screen modal
+  (`features/mirror/SettlementMirror`, intents sent via `features/mirror/useMirror`),
   carrying the hand only once the engine has evaluated it. Looking up the 番符表/rules on a phone stays on the phone
   unless its 「投到电视」 switch (`features/mirror/CastSwitch`, reset whenever the sheet closes) is on. Site credits (copyright, ICP record) live in
   `features/site/`: landing centers them at the page bottom, the narrow console lobby puts them in its button row, the narrow
@@ -68,6 +77,7 @@ Yarn workspaces monorepo:
 
 Layering rule: entry files only assemble; data/state/render responsibilities are split into directories
 named by role (see `features/*`). Server DTOs are passed through whole; conversion only at boundaries.
+`localStorage` is touched only through `lib/localStore` (private mode and quota errors degrade to defaults).
 
 ## Domain Concepts
 

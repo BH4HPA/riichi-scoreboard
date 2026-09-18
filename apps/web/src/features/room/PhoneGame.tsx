@@ -16,7 +16,7 @@ import { RoundHeader } from "@/features/scoreboard/RoundHeader";
 import { PointsGrid } from "@/features/scoreboard/PointsGrid";
 import { DiffMatrix } from "@/features/scoreboard/DiffMatrix";
 import { MyDiffs } from "@/features/scoreboard/MyDiffs";
-import { HistoryList } from "@/features/history/HistoryTable";
+import { HistoryTable } from "@/features/history/HistoryTable";
 import { FinalPanel } from "@/features/final/FinalPanel";
 import { ControlButtons } from "@/features/settlement/controls/ControlButtons";
 import { ControlHost } from "@/features/settlement/controls/ControlHost";
@@ -24,7 +24,7 @@ import { useControlDialogs } from "@/features/settlement/controls/useControlDial
 import { ReferenceSheet } from "@/features/reference/ReferenceSheet";
 import { RulesEditor } from "@/features/rules/RulesEditor";
 import { ProfileEditor, StatsPanel } from "@/features/profile/ProfileEditor";
-import { useMirror } from "@/features/settlement/useMirror";
+import { useMirror } from "@/features/mirror/useMirror";
 import { CastSwitch } from "@/features/mirror/CastSwitch";
 import { ICP } from "@/features/site/site";
 
@@ -142,7 +142,7 @@ export function PhoneGame() {
 
       <Dialog open={sheet === "history"} onOpenChange={closeSheet}>
         <DialogContent title="历史记录" description={`共 ${game.present.history.length} 条`}>
-          <HistoryList history={game.present.history} />
+          <HistoryTable history={game.present.history} />
         </DialogContent>
       </Dialog>
       <Dialog open={sheet === "reference"} onOpenChange={closeSheet}>
@@ -166,7 +166,7 @@ export function PhoneGame() {
           <h3 className="mb-2 mt-4 text-sm font-medium">战绩</h3>
           <StatsPanel />
           {/* 对局中离开只是暂离：座位保留，回首页点「返回房间」或重新扫码即可回来。
-              外面包一层：对话框给最后一个子元素加底部内边距，直接落在按钮上会把文字顶偏 */}
+              外面包一层：DialogContent 给最后一个子元素加底部内边距 */}
           <div className="mt-4">
             <Button asChild variant="outline" className="w-full">
               <Link to="/">暂离房间</Link>

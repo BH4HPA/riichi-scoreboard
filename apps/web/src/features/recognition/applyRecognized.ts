@@ -23,6 +23,13 @@ export interface DraftRecognition {
   uncertain: TileLoc[];
 }
 
+/** 上传回来的记录 id 挂回草稿；草稿已换成另一次识别时不动。 */
+export function attachRecognitionId(draft: ValueDraft, key: string, id: string): ValueDraft {
+  return draft.recognition?.key === key
+    ? { ...draft, recognition: { ...draft.recognition, id } }
+    : draft;
+}
+
 /** 这张牌值不值得让用户瞄一眼：猜出来的（含补出来的，det = -1），或者置信度低于阈值。 */
 function shaky(origin: TileOrigin, detections: readonly Detection[]): boolean {
   if (origin.guessed) return true;

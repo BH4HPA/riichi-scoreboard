@@ -27,7 +27,7 @@ export function useSeededRiichi(declared: readonly boolean[]) {
     riichi: [...declared],
     seeded: [...declared],
   }));
-  // 渲染期按新声明调整状态（React 推荐的「随 props 调整 state」写法）；无新声明时原样返回，不会循环
+  // 渲染期按新声明调整状态；无新声明时原样返回同一对象，不会循环
   const next = seedRiichi(state, declared);
   if (next !== state) setState(next);
   return [next.riichi, (riichi: boolean[]) => setState((st) => ({ ...st, riichi }))] as const;
