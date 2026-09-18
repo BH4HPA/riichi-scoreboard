@@ -35,7 +35,7 @@ export function FinalPanel({
     <div className="mt-2 flex flex-wrap gap-x-4 text-xs text-muted">
       <span>持续时间：{Math.max(0, Math.floor((finishedAt - game.startedAt) / 60000))} 分钟</span>
       <span>结束时间：{formatDateTime(finishedAt)}</span>
-      {game.tobi && <span>击飞：{names[game.tobi.seat]}</span>}
+      {game.tobi && <span>击飞：{game.tobi.seats.map((s) => names[s]).join("、")}</span>}
     </div>
   );
   if (compact) {
