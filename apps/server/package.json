@@ -20,7 +20,7 @@
     "riichi-rs-node": "^2.1.0"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.5.1",
     "esbuild": "^0.28.2",
     "tsx": "^4.23.13"
   }
