@@ -2,13 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { serve, type ServerType } from "@hono/node-server";
 import { createNodeWebSocket } from "@hono/node-ws";
 import { Hono } from "hono";
-import {
-  MUSIC_TRACKS,
-  type ClientMessage,
-  type RoomView,
-  type ServerMessage,
-  type UiState,
-} from "@riichi/core";
+import { type ClientMessage, type RoomView, type ServerMessage, type UiState } from "@riichi/core";
 import { createApp } from "../app";
 import { loadConfig } from "../config";
 import { PlayersRepo } from "../db/players";
@@ -355,8 +349,8 @@ describe("rooms end-to-end", () => {
     await tv.waitUi((u) => u.length === 0);
 
     // 立直音乐：按下 → 全员收到；他人再按 → 替换；停止；后加入者直接拿到；曲目不存在被拒
-    const trackA = MUSIC_TRACKS[0]!.id;
-    const trackB = MUSIC_TRACKS[1]!.id;
+    const trackA = "43ace007-662f-42eb-bab5-cf1c26fc7598";
+    const trackB = "07f0350b-f0ca-428d-9b5f-a86493555471";
     phones[0]!.send({ type: "music", track: trackA });
     const playing = await tv.waitState((r) => r.music?.track === trackA);
     expect(playing.music).toMatchObject({ seat: 0 });

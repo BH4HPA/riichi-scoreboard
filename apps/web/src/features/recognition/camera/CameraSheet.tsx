@@ -3,13 +3,13 @@ import { createPortal } from "react-dom";
 import { Images, X } from "lucide-react";
 import {
   RECOGNITION_CLASSES,
-  RECOGNITION_MANIFEST,
   type Detection,
   type RecognitionResult,
   type RoomRules,
 } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { HandView } from "@/features/hand/HandView";
+import { RECOGNITION_MODEL } from "../modelUrl";
 import { closeDetector, openDetector, type Detector } from "../worker/client";
 import type { FrameResult } from "../worker/protocol";
 import { BAND_DEFAULT, fitLongEdge, STILL_MAX_EDGE, type Rect } from "./band";
@@ -144,7 +144,7 @@ export function CameraSheet({
     grabbingRef.current = true;
     try {
       const got = await detector.grab();
-      const modelId = RECOGNITION_MANIFEST.model?.id;
+      const modelId = RECOGNITION_MODEL?.id;
       if (!got || !modelId) return;
       // 只认 Worker 回报的那一帧：照片与检测框必须同源，否则回流出来的训练数据是错位的
       const frame = framesRef.current.get(got.frameId);

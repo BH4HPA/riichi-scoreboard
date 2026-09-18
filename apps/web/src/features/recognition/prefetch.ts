@@ -1,4 +1,4 @@
-import { RECOGNITION_MANIFEST } from "@riichi/core";
+import { RECOGNITION_MODEL } from "./modelUrl";
 import { loadBytes } from "./worker/bytes";
 
 /**
@@ -9,7 +9,7 @@ import { loadBytes } from "./worker/bytes";
  * 失败静默：识别时会重试并把错误展示给用户。
  */
 export function prefetchDetector(): void {
-  const model = RECOGNITION_MANIFEST.model;
+  const model = RECOGNITION_MODEL;
   if (!model) return;
   // 省流量模式不预热，识别时再按需下载
   const nav = navigator as Navigator & { connection?: { saveData?: boolean } };

@@ -4,19 +4,19 @@
 # 对象名每次都是新 uuid，旧模型不会被覆盖（客户端按 immutable 缓存）；回滚 = manifest 指回旧 id。
 # 用法：ci/upload-model.sh <model.onnx> [note]
 # 需要：ml/ 的 uv 环境（校验脚本 ml/scripts/check_onnx.py 会检查类顺序与 manifest 一致，不一致不上传）；
-#       coscmd 已在 PATH（pipx install coscmd）；QCLOUD_SECRET_ID / QCLOUD_SECRET_KEY 必填，
-#       QCLOUD_COS_BUCKET 默认为 bite-go 的 static 桶，接入点默认全球加速域名（见 ci/cos-conf.sh）。
-# 桶内前缀须与 apps/web/src/lib/staticUrl.ts + features/recognition/modelUrl.ts 拼出的地址一致，改一处必须改另一处。
+#       coscmd 已在 PATH（pipx install coscmd）；QCLOUD_SECRET_ID / QCLOUD_SECRET_KEY / QCLOUD_COS_BUCKET 必填，
+#       接入点默认全球加速域名（见 ci/cos-conf.sh）；COS_KEY_PREFIX 默认 riichi，须与前端 VITE_STATIC_BASE_URL 的路径一致。
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MANIFEST="$ROOT_DIR/packages/core/src/recognition/manifest.json"
 # shellcheck source=ci/cos-conf.sh
 source "$ROOT_DIR/ci/cos-conf.sh"
-KEY_PREFIX="riichi/models"
-BUCKET="${QCLOUD_COS_BUCKET:-bitego-static-1251306253}"
-REGION="${QCLOUD_COS_REGION:-ap-shanghai}"
+KEY_PREFIX="${COS_KEY_PREFIX:-riichi}/models"
+BUCKET="${QCLOUD_COS_BUCKET:-}"
+REGION="${QCLOUD_COS_REGION:-}"
 ENDPOINT="${QCLOUD_COS_ENDPOINT:-}"
+[[ -n "$BUCKET" ]] || { echo "QCLOUD_COS_BUCKET is required" >&2; exit 1; }
 FILE="${1:-}"
 NOTE="${2:-}"
 

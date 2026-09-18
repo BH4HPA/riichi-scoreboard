@@ -18,8 +18,8 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   expect(code).toMatch(/^[A-Z2-9]{6}$/);
   // 版权与备案号常驻主控台左栏底部（大厅与对局都不用滚动就能看到）
   const footer = tv.locator("footer");
-  await expect(footer.getByRole("link", { name: /^© Ray 2014-\d{4}$/ })).toBeInViewport();
-  await expect(footer.getByRole("link", { name: "浙ICP备2022018560号-2" })).toBeInViewport();
+  await expect(footer.getByRole("link", { name: /^© .+ \d{4}-\d{4}$/ })).toBeInViewport();
+  await expect(footer.getByRole("link", { name: /ICP备/ })).toBeInViewport();
 
   const NAMES = ["东家", "南家", "西家", "北家"];
   const phones: Page[] = [];
@@ -44,7 +44,7 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   ]);
   await expect(tv.getByTestId("points-0")).toHaveText("25,000");
   await expect(phones[0]!.getByTestId("points-0")).toHaveText("25,000");
-  await expect(footer.getByRole("link", { name: /^© Ray/ })).toBeInViewport();
+  await expect(footer.getByRole("link", { name: /^© .+ \d{4}-\d{4}$/ })).toBeInViewport();
   await expect(footer.getByRole("link", { name: /ICP/ })).toBeInViewport();
   // 宽屏对局页也能再打开二维码
   await tv.getByRole("button", { name: "二维码" }).click();
@@ -60,9 +60,9 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   // 他人再按 → 换曲：手机 2 选另一首后按下，电视曲目变化、浮窗换人
   const firstTrack = await tv.getByTestId("riichi-music").getAttribute("data-track");
   await phones[2]!.getByRole("button", { name: /^立直音乐：/ }).click();
-  await phones[2]!.getByRole("button", { name: "凌云", exact: true }).click();
+  await phones[2]!.getByRole("button", { name: "测试曲二", exact: true }).click();
   await phones[2]!.getByRole("button", { name: "立直", exact: true }).click();
-  await expect(tv.getByTestId("music-float")).toContainText("西家立直 · 凌云");
+  await expect(tv.getByTestId("music-float")).toContainText("西家立直 · 测试曲二");
   expect(await tv.getByTestId("riichi-music").getAttribute("data-track")).not.toBe(firstTrack);
 
   // 手机 3 先开着荣和录入（稍后手机 0 记账后它应自动关闭）

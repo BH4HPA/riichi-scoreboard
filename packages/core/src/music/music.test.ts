@@ -1,26 +1,34 @@
 import { describe, expect, it } from "vitest";
-import manifest from "./manifest.json";
-import { findTrack, MUSIC_TRACKS } from "./index";
+import { isTrackId, parseMusicCatalog } from "./index";
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const A = "43ace007-662f-42eb-bab5-cf1c26fc7598";
+const B = "07f0350b-f0ca-428d-9b5f-a86493555471";
 
-describe("music manifest", () => {
-  it("id 全是小写 uuid v4，id 与 title 不重复，file 带 .mp3", () => {
-    expect(manifest.length).toBeGreaterThan(0);
-    for (const t of manifest) {
-      expect(t.id).toMatch(UUID);
-      expect(t.title.trim()).toBe(t.title);
-      expect(t.title).not.toBe("");
-      expect(t.file).toMatch(/\.mp3$/);
-    }
-    expect(new Set(manifest.map((t) => t.id)).size).toBe(manifest.length);
-    expect(new Set(manifest.map((t) => t.title)).size).toBe(manifest.length);
+describe("music catalog", () => {
+  it("id 只认小写 uuid v4", () => {
+    expect(isTrackId(A)).toBe(true);
+    expect(isTrackId(A.toUpperCase())).toBe(false);
+    expect(isTrackId("nope")).toBe(false);
+    expect(isTrackId(null)).toBe(false);
   });
 
-  it("运行时曲库只带 id/title；findTrack", () => {
-    const first = MUSIC_TRACKS[0]!;
-    expect(first).toEqual({ id: manifest[0]!.id, title: manifest[0]!.title });
-    expect(findTrack(first.id)).toEqual(first);
-    expect(findTrack("nope")).toBeNull();
+  it("解析清单：修剪标题；形状不对、id 重复整份拒绝", () => {
+    expect(parseMusicCatalog([{ id: A, title: " 一曲 " }])).toEqual([{ id: A, title: "一曲" }]);
+    expect(parseMusicCatalog([])).toEqual([]);
+    expect(() => parseMusicCatalog({})).toThrow();
+    expect(() => parseMusicCatalog([{ id: "x", title: "t" }])).toThrow();
+    expect(() => parseMusicCatalog([{ id: A, title: "" }])).toThrow();
+    expect(() =>
+      parseMusicCatalog([
+        { id: A, title: "a" },
+        { id: A, title: "b" },
+      ]),
+    ).toThrow();
+    expect(
+      parseMusicCatalog([
+        { id: A, title: "a" },
+        { id: B, title: "b" },
+      ]),
+    ).toHaveLength(2);
   });
 });

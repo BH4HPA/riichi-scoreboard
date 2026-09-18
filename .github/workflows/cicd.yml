@@ -16,16 +16,18 @@ concurrency:
   # main 上进行中的部署不被后续推送打断；PR 可以被新提交取代
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
+# 部署目标全部来自仓库的 Actions variables（Settings → Secrets and variables → Actions → Variables），
+# 密钥来自 secrets；仓库本身不含任何站点专属常量。
 env:
-  API_BASE_URL: https://riichi-api.ruivon.cn
-  WEB_URL: https://riichi.ruivon.cn
-  WEB_COS_BUCKET: riichi-scoreboard-1251306253
+  API_BASE_URL: ${{ vars.API_BASE_URL }}
+  WEB_URL: ${{ vars.WEB_URL }}
+  WEB_COS_BUCKET: ${{ vars.WEB_COS_BUCKET }}
   # 全球加速域名：runner 在境外，区域域名传 14 MB 的 wasm 会 UserNetworkTooSlow
-  WEB_COS_ENDPOINT: cos.accelerate.myqcloud.com
-  DOCKER_SERVER: useccr.ccs.tencentyun.com
-  IMAGE: useccr.ccs.tencentyun.com/bitego/riichi
-  DEPLOY_SSH_USER: ray
-  DEPLOY_WORKDIR: /home/ray/riichi-scoreboard
+  WEB_COS_ENDPOINT: ${{ vars.WEB_COS_ENDPOINT }}
+  DOCKER_SERVER: ${{ vars.DOCKER_SERVER }}
+  IMAGE: ${{ vars.IMAGE }}
+  DEPLOY_SSH_USER: ${{ vars.DEPLOY_SSH_USER }}
+  DEPLOY_WORKDIR: ${{ vars.DEPLOY_WORKDIR }}
 
 jobs:
   check:
@@ -83,7 +85,15 @@ jobs:
           restore-keys: yarn-berry-${{ runner.os }}-
       - run: yarn install --immutable
       - name: Build web against the API domain
-        run: VITE_API_BASE_URL="$API_BASE_URL" yarn workspace @riichi/web build
+        env:
+          VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
+          VITE_SITE_URL: ${{ vars.WEB_URL }}
+          VITE_STATIC_BASE_URL: ${{ vars.STATIC_BASE_URL }}
+          VITE_SITE_AUTHOR: ${{ vars.SITE_AUTHOR }}
+          VITE_SITE_AUTHOR_URL: ${{ vars.SITE_AUTHOR_URL }}
+          VITE_SITE_SINCE: ${{ vars.SITE_SINCE }}
+          VITE_ICP_NUMBER: ${{ vars.ICP_NUMBER }}
+        run: yarn workspace @riichi/web build
       - name: Upload to COS
         env:
           QCLOUD_SECRET_ID: ${{ secrets.QCLOUD_SECRET_ID }}

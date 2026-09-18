@@ -37,7 +37,7 @@ describe("CosStore", () => {
       {
         secretId: "id",
         secretKey: "key",
-        bucket: "bitego-static-123",
+        bucket: "example-static-123",
         region: "ap-shanghai",
         endpoint: null,
         cdnDomain: "https://static.example.com/",
@@ -52,7 +52,7 @@ describe("CosStore", () => {
       [
         "put",
         {
-          Bucket: "bitego-static-123",
+          Bucket: "example-static-123",
           Region: "ap-shanghai",
           Key: "riichi/avatars/p1/a.jpg",
           Body: Buffer.from([9]),
@@ -62,7 +62,7 @@ describe("CosStore", () => {
       ],
       [
         "del",
-        { Bucket: "bitego-static-123", Region: "ap-shanghai", Key: "riichi/avatars/p1/a.jpg" },
+        { Bucket: "example-static-123", Region: "ap-shanghai", Key: "riichi/avatars/p1/a.jpg" },
       ],
     ]);
   });

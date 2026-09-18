@@ -1,16 +1,10 @@
 import { useMemo, useState } from "react";
 import { Play } from "lucide-react";
-import {
-  canRiichi,
-  MUSIC_TRACKS,
-  seatNames,
-  type GameState,
-  type RoomRules,
-  type Seat,
-} from "@riichi/core";
+import { canRiichi, seatNames, type GameState, type RoomRules, type Seat } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { useRoomStore } from "@/ws/store";
 import { useCommand, useSocket } from "@/ws/useRoom";
+import { useMusicCatalog } from "./catalog";
 import { musicLabel } from "./label";
 import { defaultTrack, orderTracks, withLast, withPick } from "./prefs";
 import { TrackPicker } from "./TrackPicker";
@@ -36,11 +30,14 @@ export function RiichiSection({
   const notify = useRoomStore((s) => s.notify);
   const room = useRoomStore((s) => s.room);
   const [prefs, update] = useMusicPrefs();
-  const ordered = useMemo(() => orderTracks(MUSIC_TRACKS, prefs), [prefs]);
-  const [value, setValue] = useState<string | null>(() => defaultTrack(ordered, prefs));
+  const tracks = useMusicCatalog();
+  const ordered = useMemo(() => orderTracks(tracks, prefs), [tracks, prefs]);
+  const [picked, setPicked] = useState<string | null>(null);
+  // 清单是异步到的：没手动选过就跟着清单取默认曲
+  const value = picked ?? defaultTrack(ordered, prefs);
 
   const select = (id: string) => {
-    setValue(id);
+    setPicked(id);
     update((p) => withLast(p, id));
   };
   const blocked =
@@ -66,7 +63,9 @@ export function RiichiSection({
     <section>
       <h3 className="mb-1.5 text-xs font-medium text-muted">对局中</h3>
       <div className="flex items-center gap-1.5">
-        <TrackPicker tracks={ordered} value={value} onChange={select} size={size} />
+        {ordered.length > 0 && (
+          <TrackPicker tracks={ordered} value={value} onChange={select} size={size} />
+        )}
         <Button
           size={size}
           variant="accent"
@@ -77,7 +76,7 @@ export function RiichiSection({
         </Button>
       </div>
       {music && room && (
-        <p className="mt-1.5 text-xs text-muted">▶ {musicLabel(music, seatNames(room))}</p>
+        <p className="mt-1.5 text-xs text-muted">▶ {musicLabel(music, seatNames(room), tracks)}</p>
       )}
     </section>
   );

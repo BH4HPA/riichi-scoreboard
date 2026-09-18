@@ -4,6 +4,14 @@ services:
     build:
       context: .
       dockerfile: apps/server/Dockerfile
+      # 前端构建期配置：静态桶地址（曲库/识别模型）与页脚署名、备案号；留空即不显示对应内容
+      args:
+        VITE_STATIC_BASE_URL: "${VITE_STATIC_BASE_URL:-}"
+        VITE_SITE_URL: "${VITE_SITE_URL:-}"
+        VITE_SITE_AUTHOR: "${VITE_SITE_AUTHOR:-}"
+        VITE_SITE_AUTHOR_URL: "${VITE_SITE_AUTHOR_URL:-}"
+        VITE_SITE_SINCE: "${VITE_SITE_SINCE:-}"
+        VITE_ICP_NUMBER: "${VITE_ICP_NUMBER:-}"
     ports:
       - "${RIICHI_PORT:-8787}:8787"
     environment:
