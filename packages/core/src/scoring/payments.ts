@@ -78,9 +78,9 @@ export interface RonInput {
   dealer: Seat;
   base: number;
   honba: number;
-  /** 该和牌者是否收取场供与本局立直棒（双响时只有离放铳者最近的一家收） */
   kyotaku: number;
   riichi: readonly Seat[];
+  /** 该和牌者是否收取场供与本局立直棒（双响时只有离放铳者最近的一家收） */
   collectsSticks: boolean;
   pao?: Seat | undefined;
 }

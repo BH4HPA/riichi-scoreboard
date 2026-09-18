@@ -1,6 +1,7 @@
 import { settleFinal, standings } from "../final/settle";
-import { DomainError, advance, maxKyoku, type Outcome } from "../progress/advance";
-import { calcBasePoints, scoreTier, type HandValue } from "../scoring/basePoints";
+import { DomainError } from "../types/errors";
+import { advance, maxKyoku, type Outcome } from "../progress/advance";
+import { calcBasePoints, effectiveYakuman, scoreTier, type HandValue } from "../scoring/basePoints";
 import {
   applyDeltas,
   chomboPayment,
@@ -124,7 +125,6 @@ function detectTobi(
   return seat === undefined ? null : { seat, by };
 }
 
-/** 终局：分配残留场供、计算最终结果。 */
 function finish(game: GameState, ctx: GameContext): GameState {
   const final = settleFinal(game.points, game.kyotaku, ctx.rules, game.tobi);
   const history = [...game.history];
@@ -180,7 +180,7 @@ function makeWinRecord(
   const v = handValue(value);
   return {
     winner,
-    value: v,
+    value: { ...v, yakuman: effectiveYakuman(v, rules) },
     tier: scoreTier(v, rules),
     payment,
     yaku: value.kind === "hand" ? value.result.yaku : null,

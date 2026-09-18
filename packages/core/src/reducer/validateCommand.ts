@@ -1,4 +1,4 @@
-import { DomainError } from "../progress/advance";
+import { DomainError } from "../types/errors";
 import { validateRules } from "../rules/validate";
 import type { ClientCommand, ClientWinValue, RonWin } from "../types/commands";
 import type { AbortiveReason, HandInput } from "../types/state";

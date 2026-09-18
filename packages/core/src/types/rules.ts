@@ -31,13 +31,13 @@ export interface RoomRules {
     ippatsu: boolean;
     /** 人和：无 / 役满 → hand/options（disabled_yaku） */
     renhou: "none" | "yakuman";
-    /** 流局满贯 → reducer/commands/draw */
+    /** 流局满贯 → reducer/game（draw） */
     nagashiMangan: boolean;
-    /** 国士无双可抢暗杠 → 牌键盘"抢杠"选项在暗杠场景是否可用（引擎不区分，仅 UI 约束） */
+    /** 国士无双可抢暗杠 → 仅记录在规则里供对照：引擎不区分抢明杠/暗杠，界面也没有消费点 */
     kokushiAnkanChankan: boolean;
   };
   win: {
-    /** 头跳 / 双响 / 三响 → reducer/commands/ron；双响时本场各得、场供归放铳者下家 */
+    /** 头跳 / 双响 / 三响 → reducer/game（ron）；双响时本场各得、场供归放铳者下家 */
     multiRon: "atamahane" | "double" | "triple";
   };
   progress: {
@@ -51,9 +51,9 @@ export interface RoomRules {
     agariYame: boolean;
     /** 听牌止：最终局流局庄家听牌且为一位时可选择结束 → progress/advance */
     tenpaiYame: boolean;
-    /** 途中流局（九种九牌/四风连打/四家立直/四杠散了）是否成立 → reducer/commands/abortive */
+    /** 途中流局（九种九牌/四风连打/四家立直/四杠散了）是否成立 → reducer/game（abortive） */
     abortiveDraws: boolean;
-    /** 错和罚符：无 / 满贯罚符 → reducer/commands/chombo */
+    /** 错和罚符：无 / 满贯罚符 → reducer/game（chombo） */
     chombo: "none" | "mangan";
     /** 点数不足 1000 时是否允许立直 → reducer 校验立直 */
     riichiBelow1000: boolean;

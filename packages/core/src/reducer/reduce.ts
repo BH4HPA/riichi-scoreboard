@@ -1,4 +1,4 @@
-import { DomainError } from "../progress/advance";
+import { DomainError } from "../types/errors";
 import { validateRules } from "../rules/validate";
 import { isGameCommand, type LobbyCommand } from "../types/commands";
 import type { RoomEvent } from "../types/events";

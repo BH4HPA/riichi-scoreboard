@@ -3,6 +3,7 @@ export * from "./types/rules";
 export * from "./types/state";
 export * from "./types/commands";
 export * from "./types/events";
+export * from "./types/errors";
 export * from "./rules/mleague";
 export * from "./rules/presets";
 export * from "./rules/validate";

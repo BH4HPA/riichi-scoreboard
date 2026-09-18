@@ -19,7 +19,7 @@ export function isLocalPlayer(p: PlayerRef | null | undefined): boolean {
   return p?.kind === "local";
 }
 
-/** 牌面输入（牌键盘 / 未来的拍照识别产出）。赤五直接以 35/36/37 出现在牌列表中。 */
+/** 牌面输入（牌键盘或拍照识别产出）。赤五直接以 35/36/37 出现在牌列表中。 */
 export interface HandInput {
   closed: Tile[];
   melds: Meld[];
@@ -113,7 +113,6 @@ export interface GameState {
   final: FinalResult | null;
 }
 
-/** 庄家座位由局序号唯一决定。 */
 export function dealerOf(kyoku: number): Seat {
   return (kyoku % 4) as Seat;
 }

@@ -1,5 +1,5 @@
 import { kyokuWind } from "../format/round";
-import { DomainError } from "../progress/advance";
+import { DomainError } from "../types/errors";
 import type { RoomRules } from "../types/rules";
 import { dealerOf, type EvaluatedHand, type HandInput } from "../types/state";
 import {
@@ -185,7 +185,6 @@ function isTile(t: unknown): t is Tile {
   return Number.isInteger(t) && (t as number) >= 1 && (t as number) <= MAX_TILE;
 }
 
-/** 手牌与副露中的全部牌（含赤标记）。 */
 export function allHandTiles(hand: Pick<HandInput, "closed" | "melds">): Tile[] {
   return [...hand.closed, ...hand.melds.flatMap((m) => m.tiles)];
 }
@@ -203,7 +202,6 @@ export function akaLimit(suit: "m" | "p" | "s", rulesAkaCount: number): number {
   return rulesAkaCount >= 4 && suit === "p" ? 2 : 1;
 }
 
-/** 校验牌面输入的结构与规则约束。 */
 export function validateHandInput(hand: HandInput, rules: RoomRules): void {
   if (!hand.closed.every(isTile)) throw new DomainError("bad_tiles", "暗牌含非法牌");
   for (const m of hand.melds) {

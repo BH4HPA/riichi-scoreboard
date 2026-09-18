@@ -1,4 +1,4 @@
-import { DomainError } from "../progress/advance";
+import { DomainError } from "../types/errors";
 import { validateHandShape } from "../reducer/validateCommand";
 import type { HandInput } from "../types/state";
 import { MAX_TILE } from "../types/tiles";

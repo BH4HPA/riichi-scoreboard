@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { describeEntry } from "../format/describe";
-import { DomainError } from "../progress/advance";
+import { DomainError } from "../types/errors";
 import { MLEAGUE_RULES } from "../rules/mleague";
 import type { Command } from "../types/commands";
 import type { RoomEvent } from "../types/events";
