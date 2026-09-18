@@ -1,7 +1,7 @@
 import { useState } from "react";
+import { RECOGNITION_MODEL } from "@/features/recognition/modelUrl";
 import { Link, Navigate, useSearchParams } from "react-router";
 import { Monitor, Smartphone } from "lucide-react";
-import { RECOGNITION_MANIFEST } from "@riichi/core";
 import { deviceKind } from "@/lib/device";
 import { Button } from "@/ui/button";
 import { JoinPanel } from "@/features/join/JoinPanel";
@@ -58,7 +58,7 @@ export function Landing() {
         )}
         {/* 次要入口压在小字一档，成组放、与上方面板拉开：手机端 showJoin 恒为 true，放进上面的三元就看不见了 */}
         <div className="mt-4 space-y-2 text-xs text-muted">
-          {RECOGNITION_MANIFEST.model && (
+          {RECOGNITION_MODEL && (
             <p>
               <Link to="/calc" className="underline">
                 拍照算点数 →

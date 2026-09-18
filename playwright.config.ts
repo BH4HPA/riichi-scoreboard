@@ -19,7 +19,12 @@ export default defineConfig({
     actionTimeout: 10_000,
   },
   webServer: {
-    command: `rm -rf .e2e-data && yarn workspace @riichi/web build && PORT=${PORT} DATA_DIR=.e2e-data yarn workspace @riichi/server exec tsx src/index.ts`,
+    // 构建期配置给假值：静态桶域名由 e2e/helpers.ts 统一拦截，页脚要有署名与备案号可断言
+    command: [
+      "rm -rf .e2e-data",
+      "VITE_STATIC_BASE_URL=https://static.example.test/riichi VITE_SITE_URL=http://127.0.0.1:8799 VITE_SITE_AUTHOR=E2E VITE_SITE_AUTHOR_URL=https://example.test VITE_SITE_SINCE=2020 VITE_ICP_NUMBER=测ICP备00000000号-1 yarn workspace @riichi/web build",
+      `PORT=${PORT} DATA_DIR=.e2e-data yarn workspace @riichi/server exec tsx src/index.ts`,
+    ].join(" && "),
     url: `http://127.0.0.1:${PORT}/health`,
     reuseExistingServer: false,
     timeout: 120_000,

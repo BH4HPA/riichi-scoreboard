@@ -10,10 +10,12 @@ import {
 } from ".";
 import { DomainError } from "../types/errors";
 import { RulesError } from "../rules/validate";
-import { MUSIC_TRACKS } from "../music";
 import { createRoom } from "../reducer/reduce";
 import { MLEAGUE_RULES } from "../rules/mleague";
 import type { HandInput, PlayerRef, RoomState } from "../types/state";
+
+const TRACK_A = "43ace007-662f-42eb-bab5-cf1c26fc7598";
+const TRACK_B = "07f0350b-f0ca-428d-9b5f-a86493555471";
 
 const device = (id: string): PlayerRef => ({ id, name: id, avatar: null, kind: "device" });
 const local = (id: string): PlayerRef => ({ id, name: id, avatar: null, kind: "local" });
@@ -53,7 +55,7 @@ describe("autoStartEligible", () => {
 describe("toRoomView", () => {
   it("带在线状态与自动开局剩余时间", () => {
     const state = lobby([device("a"), null, null, null], [false, false, false, false]);
-    const music = { track: MUSIC_TRACKS[0]!.id, seat: 0 as const, at: 1 };
+    const music = { track: TRACK_A, seat: 0 as const, at: 1 };
     const view = toRoomView(state, 3, new Set(["a"]), 1234, music);
     expect(view.online).toEqual([true, false, false, false]);
     expect(view.autoStartIn).toBe(1234);
@@ -63,11 +65,11 @@ describe("toRoomView", () => {
 });
 
 describe("立直音乐", () => {
-  it("validateMusicTrack：null 停止、曲库 id 通过、其余拒绝", () => {
+  it("validateMusicTrack：null 停止、uuid 格式通过、其余拒绝", () => {
     expect(validateMusicTrack(null)).toBeNull();
-    expect(validateMusicTrack(MUSIC_TRACKS[1]!.id)).toBe(MUSIC_TRACKS[1]!.id);
+    expect(validateMusicTrack(TRACK_B)).toBe(TRACK_B);
     for (const bad of [undefined, 1, "", "nope", {}]) {
-      expect(() => validateMusicTrack(bad)).toThrow(/曲目不存在/);
+      expect(() => validateMusicTrack(bad)).toThrow(/曲目 id 无效/);
     }
   });
   it("STOPS_MUSIC：结算、进程类与 redo 停；座位类与 undo 不停", () => {

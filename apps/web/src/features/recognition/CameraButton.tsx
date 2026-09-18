@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Camera } from "lucide-react";
-import { RECOGNITION_MANIFEST, type RoomRules } from "@riichi/core";
+import type { RoomRules } from "@riichi/core";
 import type { ValueDraft } from "@/features/settlement/valueDraft";
 import { Button } from "@/ui/button";
 import { useRoomStore } from "@/ws/store";
 import { applyRecognized, attachRecognitionId } from "./applyRecognized";
 import { CameraSheet, type Capture } from "./camera/CameraSheet";
+import { RECOGNITION_MODEL } from "./modelUrl";
 import { RecognitionWarnings } from "./RecognitionWarnings";
 import { uploadRecognition } from "./recognize";
 
@@ -24,7 +25,7 @@ export function CameraButton({
 }) {
   const [open, setOpen] = useState(false);
 
-  if (!RECOGNITION_MANIFEST.model) return null;
+  if (!RECOGNITION_MODEL) return null;
 
   const onCapture = ({ blob, result }: Capture) => {
     setOpen(false);

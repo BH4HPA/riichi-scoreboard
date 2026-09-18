@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MusicState } from "@riichi/core";
 import { useRoomStore } from "@/ws/store";
+import { useMusicCatalog } from "./catalog";
 import { musicLabel } from "./label";
 import { loadMusic } from "./loader";
 import { MusicFloat } from "./MusicFloat";
@@ -16,8 +17,9 @@ export function RiichiMusicPlayer({
   music: MusicState | null;
   names: readonly string[];
 }) {
+  const tracks = useMusicCatalog();
   if (!music) return null;
-  return <Playing key={music.at} music={music} label={musicLabel(music, names)} />;
+  return <Playing key={music.at} music={music} label={musicLabel(music, names, tracks)} />;
 }
 
 function Playing({ music, label }: { music: MusicState; label: string }) {

@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { ArrowLeft, Camera } from "lucide-react";
 import { Link } from "react-router";
-import { RECOGNITION_MANIFEST } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Notice } from "@/ui/notice";
 import { CameraSheet } from "@/features/recognition/camera/CameraSheet";
+import { RECOGNITION_MODEL } from "@/features/recognition/modelUrl";
 import { CalcContextCard, type CalcContext } from "@/features/calc/context/CalcContextCard";
 import { useEvaluation } from "@/features/calc/evaluate/useEvaluation";
 import { CalcResult } from "@/features/calc/result/CalcResult";
@@ -59,7 +59,7 @@ export function Calc() {
 
       {shot.phase === "idle" &&
         // 相机用不了（无权限、非 HTTPS）不在这里拦：取景页自己说明原因、禁用快门并给相册入口
-        (!RECOGNITION_MANIFEST.model ? (
+        (!RECOGNITION_MODEL ? (
           <p className="text-sm text-muted">识别模型还没有发布，暂时不能拍照识别。</p>
         ) : (
           <Button variant="accent" size="lg" onClick={shot.shoot}>

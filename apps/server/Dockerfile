@@ -10,6 +10,8 @@ RUN yarn install --immutable
 COPY packages ./packages
 COPY apps ./apps
 COPY tsconfig.base.json ./
+# 前端的构建期配置（见 .env.template）；单容器同源部署时由 compose 的 build.args 传入
+ARG VITE_STATIC_BASE_URL="" VITE_SITE_URL="" VITE_SITE_AUTHOR="" VITE_SITE_AUTHOR_URL="" VITE_SITE_SINCE="" VITE_ICP_NUMBER=""
 RUN yarn workspace @riichi/web build && yarn workspace @riichi/server build
 
 # 运行时：server 产物已把依赖打包进去，只有 wasm 引擎作为外部模块

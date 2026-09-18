@@ -24,7 +24,7 @@ Package manager is **Yarn 4** (via corepack). Node >= 22.13 (node:sqlite); use 2
 - CI/CD: `.github/workflows/cicd.yml` runs the gates above (plus e2e) on every push/PR; pushes to `main`
   deploy the web build to COS (`ci/deploy-web-to-cos.sh`, global-acceleration endpoint; then
   `ci/verify-web-deploy.sh` checks every `dist` file is really served — size and `.wasm` type
-  — so a half-finished upload fails the run) and the server image to CCR + the bitego server
+  — so a half-finished upload fails the run) and the server image to the container registry + the deploy server
   over SSH (`ci/deploy-server.sh`). Rollback = re-run the workflow on an older commit. See
   `docs/deployment.md` (README is the human-facing overview; `docs/development.md` has local HTTPS setup).
   The web job `needs` the server job: a new frontend may rely on new protocol fields, while an old
@@ -179,9 +179,13 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   can press it for local players with `seat: null`), the TV plays the track from the static bucket
   (`features/music/url.ts`) and shows a float badge; the name is derived from the seat snapshot. The
   server clears it after any command in `STOPS_MUSIC` (settlement, adjust, redo, endGame/newGame/toLobby/
-  start/dissolve); settlement buttons also send `track: null` on click while playing. Catalog =
-  `packages/core/src/music/manifest.json` (lowercase uuid object names; upload with `ci/upload-music.sh`).
+  start/dissolve); settlement buttons also send `track: null` on click while playing. Catalog objects are named by lowercase uuid (upload with `ci/upload-music.sh`).
   Phone keeps `riichi.music.prefs` in localStorage (last pick, per-track use counts drive the order).
+  The catalog is **not in the repo**: `ci/upload-music.sh <dir>` publishes `<VITE_STATIC_BASE_URL>/music/manifest.json`
+  (`[{id, title}]`) next to the mp3s; the web fetches it once per page (`features/music/catalog.ts`, empty when
+  the static base is unset), the server only checks the id format (`isTrackId`). Deployment-specific values
+  (static base, site URL, author, ICP) are build-time `VITE_*` env (see `.env.template`); CI reads them from
+  GitHub Actions variables.
 - Riichi declaration: a seated phone's 「▶ 立直」 also commits `declareRiichi` (seat rules as `setReady`:
   own device seat or any local seat; stale-tolerant but carries the kyoku/honba/history count it was pressed
   on and is rejected when that no longer matches; idempotent — a no-op reduce is not persisted; rejected

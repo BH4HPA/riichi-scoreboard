@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 在服务器上执行：拉取最新仓库、登录镜像仓库、拉取指定 tag 的镜像并重启容器、等待健康检查。
 # 用法：bash ci/deploy-server.sh <tag>
-# 环境：先读 ~/.env（腾讯云密钥、static 桶、CCR 登录，与 bite-go 共用），再读仓库 .env
+# 环境：先读 ~/.env（云密钥、static 桶、镜像仓库登录），再读仓库 .env
 #       （RIICHI_IMAGE / RIICHI_PORT / CORS_ORIGINS）。服务器上只允许通过本脚本起服务：
 #       直接 `docker compose up` 会在这台 2 GB 机器上本地构建，且缺少密钥时会静默退回本地存储模式。
 set -euo pipefail

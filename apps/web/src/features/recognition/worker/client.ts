@@ -1,4 +1,4 @@
-import { RECOGNITION_MANIFEST } from "@riichi/core";
+import { RECOGNITION_MODEL } from "../modelUrl";
 import { loadBytes, type LoadProgress } from "./bytes";
 import type { FrameResult, FromWorker, ToWorker } from "./protocol";
 
@@ -146,7 +146,7 @@ function spawn(modelId: string, imgsz: number, onProgress?: LoadProgress): Promi
 
 /** 取（或创建）识别线程。模型未发布时抛错。 */
 export function openDetector(onProgress?: LoadProgress): Promise<Detector> {
-  const model = RECOGNITION_MANIFEST.model;
+  const model = RECOGNITION_MODEL;
   if (!model) return Promise.reject(new Error("尚未发布识别模型"));
   if (!handle) return (handle = spawn(model.id, model.imgsz, onProgress));
   // 线程已在建：字节可能还在下，把进度回调挂到那一轮下载上（loadBytes 会立刻重放当前进度）

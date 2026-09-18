@@ -83,11 +83,11 @@ scripts/export.sh runs/v1/weights/best.pt
 ```bash
 # 1. 把线上库拷到本机（运行镜像里没有脚本也没有 core，导出在本机跑）
 #    先 checkpoint：WAL 模式下最近的写还在 -wal 里，直接拷主库会丢掉刚打的那几局
-ssh bitego "docker exec riichi-scoreboard-riichi-1 node --input-type=module -e \
+ssh <server> "docker exec riichi-scoreboard-riichi-1 node --input-type=module -e \
   \"const {DatabaseSync} = await import('node:sqlite'); const d = new DatabaseSync('/data/riichi.sqlite'); \
   d.exec('PRAGMA wal_checkpoint(TRUNCATE)'); d.close()\" \
   && docker cp riichi-scoreboard-riichi-1:/data/riichi.sqlite /tmp/riichi.sqlite"
-scp bitego:/tmp/riichi.sqlite /tmp/
+scp <server>:/tmp/riichi.sqlite /tmp/
 
 # 2. 导出（位置对齐在 TS 侧做，见 apps/server/src/recognition/align.ts）
 yarn workspace @riichi/server exec tsx scripts/export-recognitions.ts /tmp/riichi.sqlite > records.ndjson

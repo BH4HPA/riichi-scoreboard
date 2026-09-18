@@ -122,7 +122,7 @@ export function PhoneGame() {
             房间 <span className="font-semibold tabular text-fg">{room.code}</span>
           </span>
           <ConnectionBadge />
-          <span className="ml-auto truncate">{ICP.number}</span>
+          {ICP && <span className="ml-auto truncate">{ICP.number}</span>}
         </div>
         <div className="mx-auto grid max-w-md grid-cols-4">
           {NAV.map(([key, Icon, label]) => (

@@ -58,22 +58,34 @@ iOS 从主屏打开的应用和 Safari 的 localStorage 互不相通，所以同
 
 数据库结构按 `user_version` 自动迁移，升级镜像无需手工处理。从 v1 数据升级时，头像字段会被清空（旧的 `DATA_DIR/avatars` 目录不再使用，可以手动删掉），玩家重新上传即可。
 
+## 站点配置（构建期）
+
+前端的站点专属信息都是构建期环境变量（`VITE_*`，见 `.env.template`），仓库本身不含任何部署方的域名、桶名或署名：
+
+| 变量                                                                                | 作用                                                                 |
+| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `VITE_API_BASE_URL`                                                                 | 前端单独托管时接口域名；同源部署留空                                 |
+| `VITE_STATIC_BASE_URL`                                                              | 静态桶里本项目的公共前缀：曲库与识别模型都从这里取；留空即没有这两项 |
+| `VITE_SITE_URL`                                                                     | 站点公开地址（canonical / og:url）                                   |
+| `VITE_SITE_AUTHOR` / `VITE_SITE_AUTHOR_URL` / `VITE_SITE_SINCE` / `VITE_ICP_NUMBER` | 页脚署名与备案号，可选                                               |
+
+单容器同源部署时它们作为 `docker compose` 的 build args 传入（`.env` 里写好即可）；线上 CI 从 GitHub Actions
+variables 读（`STATIC_BASE_URL`、`SITE_AUTHOR`、`SITE_AUTHOR_URL`、`SITE_SINCE`、`ICP_NUMBER`，以及部署目标
+`API_BASE_URL`、`WEB_URL`、`WEB_COS_BUCKET`、`WEB_COS_ENDPOINT`、`DOCKER_SERVER`、`IMAGE`、`DEPLOY_SSH_USER`、
+`DEPLOY_WORKDIR`）。
+
 ## 曲库（立直音乐）
 
-曲库清单在 `packages/core/src/music/manifest.json`，字段含义：
+曲库不在仓库里：清单 `<VITE_STATIC_BASE_URL>/music/manifest.json`（`[{id, title}]`）与音频
+`<VITE_STATIC_BASE_URL>/music/<id>.mp3` 都放在部署方的静态桶。前端每次打开页面取一次清单，
+服务端只校验曲目 id 的格式；没配静态桶或清单取不到就没有选曲入口，「▶ 立直」仍可声明立直。
 
-- `id`：桶内对象名（uuid）
-- `title`：展示名
-- `file`：本地原文件名
+发布步骤（本机执行，需要先 `pipx install coscmd`）：
 
-音频固定从 `https://static.bitego.net/riichi/music/<id>.mp3` 播放（常量在 `apps/web/src/features/music/url.ts`），服务端和前端都不需要额外配置。
-
-加曲步骤：
-
-1. 在 manifest 里追加一条，`id` 用 `uuidgen | tr A-Z a-z` 生成（必须小写）；
-2. 在本机执行 `QCLOUD_SECRET_ID=… QCLOUD_SECRET_KEY=… ci/upload-music.sh <放原文件的目录>`（需要先 `pipx install coscmd`）；
-3. 推到 `main`。
+1. 准备一个目录，放 `manifest.json`（数组，每项 `{id, title, file}`：`id` 用 `uuidgen | tr A-Z a-z` 生成，`file` 为本地音频文件名）和音频文件；
+2. `QCLOUD_SECRET_ID=… QCLOUD_SECRET_KEY=… QCLOUD_COS_BUCKET=… ci/upload-music.sh <该目录>`；只改曲名或下架时加 `--manifest-only`；
+3. 刷新 CDN 上 `music/manifest.json` 的缓存。
 
 ## 识别模型发布
 
-类目录和当前发布的模型记录在 `packages/core/src/recognition/manifest.json`，模型对象放在 `https://static.bitego.net/riichi/models/<id>.onnx`。`ci/upload-model.sh` 负责校验、上传，并把 `model` 字段写回 manifest；`model` 为 `null` 时，手机上不显示拍照识别入口。训练流程见 [`ml/README.md`](../ml/README.md)。
+类目录和当前发布的模型记录在 `packages/core/src/recognition/manifest.json`，模型对象放在 `<VITE_STATIC_BASE_URL>/models/<id>.onnx`。`ci/upload-model.sh` 负责校验、上传，并把 `model` 字段写回 manifest；`model` 为 `null` 时，手机上不显示拍照识别入口。训练流程见 [`ml/README.md`](../ml/README.md)。

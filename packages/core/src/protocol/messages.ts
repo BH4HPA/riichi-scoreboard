@@ -1,4 +1,4 @@
-import { findTrack } from "../music";
+import { isTrackId } from "../music";
 import type { ClientCommand } from "../types/commands";
 import { DomainError } from "../types/errors";
 import type { EvaluatedHand, HandInput } from "../types/state";
@@ -6,12 +6,10 @@ import type { Seat } from "../types/tiles";
 import type { UiIntent, UiState } from "./uiIntent";
 import type { RoomView } from "./view";
 
-/** 校验客户端发来的立直音乐请求：null = 停止；否则必须是曲库里的 id。 */
+/** 校验客户端发来的立直音乐请求：null = 停止；否则必须是曲目 id 的格式（曲库在静态桶，服务端不持有）。 */
 export function validateMusicTrack(input: unknown): string | null {
   if (input === null) return null;
-  if (typeof input !== "string" || !findTrack(input)) {
-    throw new DomainError("bad_music", "曲目不存在");
-  }
+  if (!isTrackId(input)) throw new DomainError("bad_music", "曲目 id 无效");
   return input;
 }
 
