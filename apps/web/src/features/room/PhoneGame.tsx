@@ -37,7 +37,7 @@ const NAV: Array<[Exclude<Sheet, null>, typeof History, string]> = [
   ["me", User, "我的"],
 ];
 
-/** 手机对局页：计分卡 + 操作栏 + 点差，底部工具栏打开记录/番符表/规则/我的。 */
+/** 手机对局页：计分卡 + 点差 + 操作栏（第一屏先看局势，操作往下翻），底部工具栏打开记录/番符表/规则/我的。 */
 export function PhoneGame() {
   const room = useRoomStore((s) => s.room)!;
   const playerId = useRoomStore((s) => s.playerId);
@@ -79,6 +79,21 @@ export function PhoneGame() {
         rules={room.rules}
         mySeat={mySeat}
       />
+      {!finished && (
+        <div className="rounded-xl border border-border bg-surface p-3">
+          {mySeat !== null ? (
+            <MyDiffs
+              game={game.present}
+              seats={room.seats}
+              names={names}
+              rules={room.rules}
+              mySeat={mySeat}
+            />
+          ) : (
+            <DiffMatrix game={game.present} names={names} rules={room.rules} />
+          )}
+        </div>
+      )}
       <div className="rounded-xl border border-border bg-surface p-3">
         <ControlButtons
           game={game}
@@ -97,21 +112,6 @@ export function PhoneGame() {
         mirror
         mySeat={mySeat}
       />
-      {!finished && (
-        <div className="rounded-xl border border-border bg-surface p-3">
-          {mySeat !== null ? (
-            <MyDiffs
-              game={game.present}
-              seats={room.seats}
-              names={names}
-              rules={room.rules}
-              mySeat={mySeat}
-            />
-          ) : (
-            <DiffMatrix game={game.present} names={names} rules={room.rules} />
-          )}
-        </div>
-      )}
 
       <nav
         className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 pb-[clamp(0.375rem,env(safe-area-inset-bottom),1.125rem)] backdrop-blur"
@@ -131,8 +131,9 @@ export function PhoneGame() {
             </button>
           ))}
         </div>
-        {/* 信息行借用 Home 指示条上方的安全区：纯文本不可点，留白封顶 18px 保证压不到指示条 */}
-        <div className="mx-auto flex max-w-md items-center gap-2 pl-4 pr-3 pt-0.5 text-[11px] text-muted">
+        {/* 信息行借用 Home 指示条上方的安全区（纯文本不可点）：底部留白封顶 18px，高过指示条顶端（约 13px）又不被 34px 的安全区撑满。
+            min-h-5 = 连接徽标的高度：断线重连时这一行不变高，上面的 tab 不跳 */}
+        <div className="mx-auto flex min-h-5 max-w-md items-center gap-2 pl-4 pr-3 text-[11px] text-muted">
           <span className="shrink-0">
             房间 <span className="font-semibold tabular text-fg">{room.code}</span>
           </span>
