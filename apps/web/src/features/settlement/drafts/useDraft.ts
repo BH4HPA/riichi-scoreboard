@@ -1,13 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useRoomStore } from "@/ws/store";
 import { draftStamp } from "./stamp";
-import {
-  draftKey,
-  ensureDraft,
-  updateDraft,
-  useDraftStore,
-  type DraftKind,
-} from "./store";
+import { draftKey, ensureDraft, updateDraft, useDraftStore, type DraftKind } from "./store";
 
 function currentStamp(): string | null {
   const room = useRoomStore.getState().room;
