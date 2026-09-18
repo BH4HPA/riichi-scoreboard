@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: ml/configs match the recognition manifest
         run: python3 ml/scripts/gen_classes.py --check
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - name: Enable Corepack (Yarn 4)
@@ -74,7 +74,7 @@ jobs:
       url: https://riichi.ruivon.cn
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
       - run: corepack enable
