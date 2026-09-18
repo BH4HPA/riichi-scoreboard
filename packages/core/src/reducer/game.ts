@@ -121,8 +121,8 @@ function detectTobi(
 ) {
   if (!rules.progress.tobi.enabled) return null;
   const limit = rules.progress.tobi.threshold === "at0" ? 0 : -1;
-  const seat = SEATS.find((s) => after[s]! <= limit && before[s]! > limit);
-  return seat === undefined ? null : { seat, by };
+  const seats = SEATS.filter((s) => after[s]! <= limit && before[s]! > limit);
+  return seats.length === 0 ? null : { seats, by };
 }
 
 function finish(game: GameState, ctx: GameContext): GameState {

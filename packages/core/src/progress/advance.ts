@@ -19,8 +19,12 @@ export function maxKyoku(rules: RoomRules): number {
   return lastKyoku(rules) + (rules.progress.enchousen.enabled ? 4 : 0);
 }
 
+/**
+ * 和了止/听牌止只在「最后一局」谈：规定局数的末局（南4/东4），以及延长战的绝对末局（西4/南4）。
+ * 西入后的其它局不算——西场是有人达标即终局，不是庄家想停就停。
+ */
 export function isFinalKyoku(kyoku: number, rules: RoomRules): boolean {
-  return kyoku >= lastKyoku(rules);
+  return kyoku === lastKyoku(rules) || kyoku === maxKyoku(rules);
 }
 
 function anyTobi(points: readonly number[], rules: RoomRules): boolean {

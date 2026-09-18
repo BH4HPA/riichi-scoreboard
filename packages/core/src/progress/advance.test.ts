@@ -48,6 +48,27 @@ describe("advance", () => {
     );
     expect(advance(game({ kyoku: 7 }), { kind: "win", dealerWon: true }, R).status).toBe("playing");
   });
+  it("西入后只有西4 才能和了止；西场有人达标即终局", () => {
+    const west = {
+      ...R,
+      progress: {
+        ...R.progress,
+        agariYame: true,
+        enchousen: { enabled: true, threshold: 30000 },
+      },
+    };
+    // 西1 庄家（座位 0）和牌且为唯一一位但未达标：不能和了止
+    const west1 = game({ kyoku: 8, points: [29000, 24000, 24000, 23000] });
+    expect(() => advance(west1, { kind: "win", dealerWon: true }, west, true)).toThrow(DomainError);
+    expect(advance(west1, { kind: "win", dealerWon: true }, west).status).toBe("playing");
+    // 西4 庄家（座位 3）和牌且为唯一一位：可以和了止
+    const west4 = game({ kyoku: 11, points: [23000, 24000, 24000, 29000] });
+    expect(advance(west4, { kind: "win", dealerWon: true }, west, true).status).toBe("finished");
+    // 西场任一局有人达标即终局
+    const reached = game({ kyoku: 8, points: [31000, 23000, 23000, 23000] });
+    expect(advance(reached, { kind: "win", dealerWon: false }, west).status).toBe("finished");
+  });
+
   it("东风战在东4 结束", () => {
     const east = { ...R, progress: { ...R.progress, length: "east" as const } };
     expect(advance(game({ kyoku: 3 }), { kind: "draw", dealerTenpai: false }, east).status).toBe(
