@@ -20,8 +20,11 @@ interface Deps {
 }
 
 const JSON_MAX_BYTES = 16 * 1024;
-/** 注册无需凭证，是所有「每玩家」配额的源头：按 IP 限每小时新身份数 */
-export const REGISTRATIONS_PER_HOUR = 30;
+/**
+ * 注册无需凭证，是所有「每玩家」配额的源头：按 IP 限每小时新身份数。
+ * 上限要容得下一个场馆共用一个出口 IP、几十台手机同时首次进房的场景，只挡脚本式刷号。
+ */
+export const REGISTRATIONS_PER_HOUR = 300;
 
 export function cleanName(input: unknown): string | null {
   if (typeof input !== "string") return null;
