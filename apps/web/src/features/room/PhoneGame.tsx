@@ -26,7 +26,7 @@ import { RulesEditor } from "@/features/rules/RulesEditor";
 import { ProfileEditor, StatsPanel } from "@/features/profile/ProfileEditor";
 import { useMirror } from "@/features/mirror/useMirror";
 import { CastSwitch } from "@/features/mirror/CastSwitch";
-import { ICP } from "@/features/site/site";
+import { SiteTicker } from "@/features/site/SiteTicker";
 
 type Sheet = "reference" | "rules" | "history" | "me" | null;
 
@@ -114,16 +114,9 @@ export function PhoneGame() {
       )}
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+        className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 pb-[clamp(0.375rem,env(safe-area-inset-bottom),1.125rem)] backdrop-blur"
         aria-label="功能"
       >
-        <div className="mx-auto flex max-w-md items-center gap-2 pt-1.5 pl-4 pr-3 text-[11px] text-muted">
-          <span>
-            房间 <span className="font-semibold tabular text-fg">{room.code}</span>
-          </span>
-          <ConnectionBadge />
-          {ICP && <span className="ml-auto truncate">{ICP.number}</span>}
-        </div>
         <div className="mx-auto grid max-w-md grid-cols-4">
           {NAV.map(([key, Icon, label]) => (
             <button
@@ -131,12 +124,20 @@ export function PhoneGame() {
               type="button"
               onClick={() => setSheet(key)}
               aria-pressed={sheet === key}
-              className="flex flex-col items-center gap-0.5 py-2 text-[11px] text-muted hover:text-fg aria-pressed:text-fg"
+              className="flex flex-col items-center gap-0.5 pb-1 pt-2 text-[11px] text-muted hover:text-fg aria-pressed:text-fg"
             >
               <Icon className="h-5 w-5" />
               {label}
             </button>
           ))}
+        </div>
+        {/* 信息行借用 Home 指示条上方的安全区：纯文本不可点，留白封顶 18px 保证压不到指示条 */}
+        <div className="mx-auto flex max-w-md items-center gap-2 pl-4 pr-3 pt-0.5 text-[11px] text-muted">
+          <span className="shrink-0">
+            房间 <span className="font-semibold tabular text-fg">{room.code}</span>
+          </span>
+          <ConnectionBadge />
+          <SiteTicker className="ml-auto" />
         </div>
       </nav>
 

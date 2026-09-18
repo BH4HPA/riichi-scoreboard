@@ -38,11 +38,17 @@ export function SiteFooter({ className }: { className?: string }) {
   );
 }
 
-/** Logo + 站名：宽屏主控台大厅左栏右下角、二维码弹窗顶部、拍照算点数页底部版权上方。 */
-export function SiteBrand({ className }: { className?: string }) {
+/** Logo + 站名：宽屏主控台大厅左栏右下角、二维码弹窗顶部、拍照算点数页底部版权上方、手机对局底栏（`SiteTicker`，缩小）。 */
+export function SiteBrand({
+  className,
+  iconClassName,
+}: {
+  className?: string;
+  iconClassName?: string;
+}) {
   return (
     <span className={cn("flex items-center gap-2 text-sm font-semibold", className)}>
-      <img src="/icon-192.png" alt="" className="h-7 w-7 rounded-lg" />
+      <img src="/icon-192.png" alt="" className={cn("h-7 w-7 rounded-lg", iconClassName)} />
       立直麻将计分板
     </span>
   );
