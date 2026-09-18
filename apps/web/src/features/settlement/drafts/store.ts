@@ -39,7 +39,7 @@ export function updateDraft<S>(
   if (!entry || entry.generation !== generation) return;
   const current = (entry.state as S | null) ?? init();
   const next = update(current);
-  // 没有实际变化就不落盘：用户没动过的草稿保持「未动过」
+  // 没有实际变化就不落盘：state 留 null，表单继续按当下的默认值渲染（useDeclaredRiichi 挂载时必调一次 update）
   if (next !== current) putEntry(key, { ...entry, state: next });
 }
 

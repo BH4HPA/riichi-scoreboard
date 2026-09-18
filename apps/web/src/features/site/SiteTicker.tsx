@@ -12,10 +12,10 @@ export function SiteTicker({ className }: { className?: string }) {
   );
   if (!ICP) return <span className={className}>{brand}</span>;
   // 两层叠在同一格：宽度取较宽者，轮换时左边不抖。窄屏又断线时位置不够：列宽可缩到 0（minmax），
-  // 备案号层撑满才出省略号（grid 子项默认按内容定宽），站名层裁掉尾部，都不去挤房间号和连接状态
+  // 备案号出省略号、站名层裁掉尾部，都不去挤房间号和连接状态
   return (
     <span className={cn("grid min-w-0 grid-cols-[minmax(0,1fr)]", className)}>
-      <span className="animate-site-ticker col-start-1 row-start-1 w-full truncate text-right">
+      <span className="animate-site-ticker col-start-1 row-start-1 truncate text-right">
         {ICP.number}
       </span>
       <span
