@@ -19,9 +19,10 @@ ENV NODE_ENV=production PORT=8787 DATA_DIR=/data WEB_DIST=/app/web
 COPY --from=build /app/node_modules/riichi-rs-node ./node_modules/riichi-rs-node
 COPY --from=build /app/apps/server/dist ./server
 COPY --from=build /app/apps/web/dist ./web
-# 以镜像自带的非 root 用户运行；/data 卷首次创建时继承这里的属主
-RUN mkdir -p /data && chown node:node /data
-USER node
+COPY apps/server/docker-entrypoint.sh /usr/local/bin/riichi-entrypoint
+# 入口以 root 把数据卷（可能是旧版镜像以 root 建的）交给 node 用户，再用 su-exec 降权运行
+RUN apk add --no-cache su-exec && chmod +x /usr/local/bin/riichi-entrypoint
 EXPOSE 8787
 HEALTHCHECK --interval=15s --timeout=3s --retries=5 CMD wget -qO- -Y off http://127.0.0.1:8787/health || exit 1
+ENTRYPOINT ["riichi-entrypoint"]
 CMD ["node", "server/index.js"]
