@@ -54,9 +54,10 @@ export function DialogContent({
             <X className="h-4 w-4" />
           </DialogPrimitive.Close>
         </div>
-        {/* 下内边距放在最后一个子元素上（sticky 底栏才能贴到滚动区底边），并且不小于 iPhone 底部安全区。
-            这条选择器比子元素自己的 pb-* 优先级高，所以底栏的安全区留白也统一在这里给 */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-3 [&>*:last-child]:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        {/* 底部留白不小于 iPhone 底部安全区，给在最后一个子元素上而不是滚动区自己的 padding：sticky 底栏才能贴到滚动区底边。
+            底栏用 padding（留白要带着它的底色；这条选择器比它自己的 pb-* 优先级高），
+            其余内容用 margin：自带边框的盒子（如空的历史记录）不会被改掉内边距、外沿贴到弹窗底 */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-3 [&>*:last-child:not([data-dialog-footer])]:mb-[max(0.75rem,env(safe-area-inset-bottom))] [&>[data-dialog-footer]:last-child]:pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {children}
         </div>
       </DialogPrimitive.Content>
@@ -71,6 +72,7 @@ export function DialogContent({
 export function DialogFooter({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
+      data-dialog-footer
       className={cn(
         "sticky bottom-0 -mx-4 mt-4 flex flex-row justify-end gap-2 border-t border-border bg-surface px-4 pt-3",
         className,

@@ -84,6 +84,31 @@ body {
   animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
 
+/* 手机对局底栏的备案号 / 站名轮换：两层反相，先淡出再淡入，不叠在一起。
+   反相写在这里而不是用 Tailwind 的任意值类：本文件的类不分层，animation 简写会压过 utilities 层里的 animation-delay */
+@keyframes site-ticker {
+  0%,
+  47% {
+    opacity: 1;
+  }
+  48.5%,
+  98.5% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.animate-site-ticker,
+.animate-site-ticker-alt {
+  animation: site-ticker 20s ease-in-out infinite;
+}
+
+.animate-site-ticker-alt {
+  animation-delay: -10s;
+}
+
 /* 取景框定格的视觉回执：iOS 全系没有 navigator.vibrate，只靠震动等于没有反馈 */
 @keyframes riichi-flash {
   from {

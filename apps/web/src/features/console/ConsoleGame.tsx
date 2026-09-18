@@ -17,7 +17,7 @@ import { ControlButtons } from "@/features/settlement/controls/ControlButtons";
 import { ControlHost } from "@/features/settlement/controls/ControlHost";
 import { useControlDialogs } from "@/features/settlement/controls/useControlDialogs";
 import { MirrorOverlay } from "@/features/mirror/MirrorOverlay";
-import { SiteFooter } from "@/features/site/SiteFooter";
+import { SiteBrand, SiteFooter } from "@/features/site/SiteFooter";
 
 /** 主控台对局页：宽屏双栏（左记分右历史，中间可拖动），窄屏（Pad）单栏 + 历史抽屉；两者都有二维码弹窗。 */
 export function ConsoleGame({
@@ -102,7 +102,12 @@ export function ConsoleGame({
               </div>
             )}
           </div>
-          {wide && <SiteFooter className="shrink-0" />}
+          {wide && (
+            <div className="flex shrink-0 items-center justify-between gap-4">
+              <SiteFooter />
+              <SiteBrand className="shrink-0" />
+            </div>
+          )}
         </div>
         {wide && <SplitHandle ratio={ratio} ratioAt={ratioAt} onChange={setRatio} />}
         {wide && (
@@ -111,8 +116,13 @@ export function ConsoleGame({
           </div>
         )}
       </main>
-      {/* 窄屏整页滚动：页脚贴在屏幕底部，内容超一屏时跟在最后 */}
-      {!wide && <SiteFooter className="mt-auto justify-center pt-2" />}
+      {/* 窄屏整页滚动：站名 + 页脚贴在屏幕底部，内容超一屏时跟在最后 */}
+      {!wide && (
+        <div className="mt-auto flex flex-col items-center gap-2 pt-2">
+          <SiteBrand />
+          <SiteFooter className="justify-center" />
+        </div>
+      )}
 
       {!wide && (
         <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>

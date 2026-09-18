@@ -52,6 +52,13 @@ test("截图：番符表与主控台", async ({ browser }) => {
   await tv.getByTestId("points-0").waitFor({ timeout: 15_000 }); // 全员准备后自动开局
   await phones[0]!.getByTestId("points-0").waitFor();
   await phones[0]!.screenshot({ path: `${OUT}/phone-game.png` });
+  // 底栏轮换的另一态（Logo + 站名）：直接盖掉动画定住两层，不去猜动画走到哪了
+  const paused = await phones[0]!.addStyleTag({
+    content: `.animate-site-ticker { animation: none !important; opacity: 0 !important; }
+      .animate-site-ticker-alt { animation: none !important; opacity: 1 !important; }`,
+  });
+  await phones[0]!.screenshot({ path: `${OUT}/phone-game-brand.png` });
+  await paused.evaluate((el) => el.remove());
 
   // 手机 2 牌面荣和
   await phones[2]!.getByRole("button", { name: "荣和", exact: true }).click();

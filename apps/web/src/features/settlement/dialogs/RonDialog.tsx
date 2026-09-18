@@ -24,7 +24,6 @@ import { ValuePicker } from "../ValuePicker";
 import { mirrorWin } from "./mirrorWin";
 import { roundDescription, type SettlementDialogProps, type SettlementFormProps } from "./shared";
 import { SettlementDialog } from "./SettlementDialog";
-import { ResetDraft } from "./TsumoDialog";
 import { useDeclaredRiichi } from "./useDeclaredRiichi";
 import { FooterSummary, WinPreview } from "./WinPreview";
 
@@ -205,7 +204,6 @@ function RonForm({ game, names, rules, mirror, mySeat, onDone }: SettlementFormP
   return (
     <>
       <div className="space-y-3">
-        {form.touched && <ResetDraft onReset={form.reset} />}
         <SeatSelect
           label="放铳者"
           names={names}

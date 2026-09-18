@@ -35,5 +35,9 @@ export function ConnectionBadge() {
     reconnecting: "重新连接中…",
     closed: "连接已关闭",
   }[status];
-  return <span className="rounded-md bg-neg/15 px-2 py-0.5 text-xs text-neg">{text}</span>;
+  return (
+    <span className="shrink-0 whitespace-nowrap rounded-md bg-neg/15 px-2 py-0.5 text-xs text-neg">
+      {text}
+    </span>
+  );
 }

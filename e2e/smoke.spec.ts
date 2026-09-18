@@ -51,6 +51,15 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   await expect(tv.getByRole("dialog").getByTestId("room-code")).toHaveText(code);
   await tv.keyboard.press("Escape");
 
+  // 手机底栏：信息行在四个 tab 之下；备案号与站名两层都在，由 CSS 动画轮换（opacity 不进断言：时刻不定）
+  const nav = phones[0]!.getByRole("navigation", { name: "功能" });
+  const infoBox = await nav.getByText(/^房间/).boundingBox();
+  const tabBox = await nav.getByRole("button", { name: "记录" }).boundingBox();
+  expect(infoBox!.y).toBeGreaterThan(tabBox!.y + tabBox!.height - 1);
+  await expect(nav.getByText(/ICP备/)).toHaveCSS("animation-name", "site-ticker");
+  // 站名层必须反相，否则两段字叠在一起
+  await expect(nav.locator(".animate-site-ticker-alt")).toHaveCSS("animation-delay", "-10s");
+
   // 立直音乐：手机 1 按下 → 电视挂上 <audio> 与浮窗；点结算键 → 停（音频请求拦掉，只看状态）
   await tv.route("**/*.mp3", (route) => route.abort());
   await phones[1]!.getByRole("button", { name: "立直", exact: true }).click();
