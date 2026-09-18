@@ -28,12 +28,6 @@ export function ensureDraft(key: string, stamp: string): void {
   putEntry(key, { stamp, generation: (prev?.generation ?? 0) + 1, state: null });
 }
 
-/** 清空重填：同一局面换一份新的。 */
-export function resetDraft(key: string): void {
-  const prev = useDraftStore.getState().entries[key];
-  if (prev) putEntry(key, { ...prev, generation: prev.generation + 1, state: null });
-}
-
 /** 只写进仍是同一代次的草稿。 */
 export function updateDraft<S>(
   key: string,

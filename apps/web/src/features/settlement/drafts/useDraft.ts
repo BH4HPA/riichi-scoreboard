@@ -4,7 +4,6 @@ import { draftStamp } from "./stamp";
 import {
   draftKey,
   ensureDraft,
-  resetDraft,
   updateDraft,
   useDraftStore,
   type DraftKind,
@@ -46,11 +45,8 @@ export function useDraft<S>(kind: DraftKind, init: () => S, onStale: () => void)
 
   return {
     state: (entry?.state as S | null) ?? init(),
-    /** 用户动过草稿（决定是否显示「清空重填」） */
-    touched: entry?.state != null,
     generation,
     update: (fn: (s: S) => S) => updateDraft(key, generation, init, fn),
-    reset: () => resetDraft(key),
     /** 包住提交命令：返回 false 且局面已变时关闭弹窗 */
     submit: async (run: () => Promise<boolean>): Promise<boolean> => {
       submitting.current = true;

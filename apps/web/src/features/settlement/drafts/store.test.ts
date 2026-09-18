@@ -3,7 +3,6 @@ import {
   clearRoomDrafts,
   draftKey,
   ensureDraft,
-  resetDraft,
   updateDraft,
   useDraftStore,
 } from "./store";
@@ -24,7 +23,7 @@ describe("结算草稿 store", () => {
     expect(entry(b)?.state).toBeNull();
   });
 
-  it("局面一致时沿用草稿；局面变了换新一代", () => {
+  it("局面一致时沿用草稿；局面变了换新一代，旧代次的回写被丢弃", () => {
     const k = draftKey("R", "ron");
     ensureDraft(k, "s1");
     updateDraft(k, 1, init, () => ({ n: 5 }));
@@ -32,12 +31,7 @@ describe("结算草稿 store", () => {
     expect(entry(k)).toEqual({ stamp: "s1", generation: 1, state: { n: 5 } });
     ensureDraft(k, "s2");
     expect(entry(k)).toEqual({ stamp: "s2", generation: 2, state: null });
-  });
-
-  it("旧代次的异步回写被丢弃；清空重填也换代", () => {
-    const k = draftKey("R", "tsumo");
-    ensureDraft(k, "s");
-    resetDraft(k);
+    // 旧代次的异步回写（算番、照片留存）写不进新草稿
     updateDraft(k, 1, init, () => ({ n: 9 }));
     expect(entry(k)?.state).toBeNull();
     updateDraft(k, 2, init, (s) => ({ n: s.n + 2 }));

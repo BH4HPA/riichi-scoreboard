@@ -141,7 +141,6 @@ function TsumoForm({ game, names, rules, mirror, mySeat, onDone }: SettlementFor
   return (
     <>
       <div className="space-y-3">
-        {form.touched && <ResetDraft onReset={form.reset} />}
         <SeatSelect
           label="自摸者"
           names={names}
@@ -199,16 +198,5 @@ function TsumoForm({ game, names, rules, mirror, mySeat, onDone }: SettlementFor
         </Button>
       </DialogFooter>
     </>
-  );
-}
-
-/** 草稿动过才出现：清空当前录入，回到默认值。 */
-export function ResetDraft({ onReset }: { onReset: () => void }) {
-  return (
-    <div className="-mb-2 flex justify-end">
-      <Button variant="ghost" size="sm" className="h-7 text-muted" onClick={onReset}>
-        清空重填
-      </Button>
-    </div>
   );
 }
