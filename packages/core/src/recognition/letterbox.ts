@@ -1,6 +1,5 @@
 import type { Detection } from "./types";
 
-/** 把 width×height 的图等比缩放后居中放进 size×size 的正方形（与 ultralytics letterbox 一致）。 */
 export interface LetterboxGeometry {
   scale: number;
   padX: number;
@@ -10,6 +9,7 @@ export interface LetterboxGeometry {
   height: number;
 }
 
+/** 把 width×height 的图等比缩放后居中放进 size×size 的正方形（与 ultralytics letterbox 一致）。 */
 export function letterboxGeometry(width: number, height: number, size = 640): LetterboxGeometry {
   const scale = size / Math.max(width, height);
   const w = Math.round(width * scale);

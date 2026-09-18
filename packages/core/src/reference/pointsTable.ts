@@ -12,7 +12,6 @@ export interface PointCell {
   tsumo: { ko: number; oya: number } | null;
 }
 
-/** 由基本点得到某方的荣和/自摸数值。 */
 export function pointsFromBase(base: number, role: PointRole): PointCell {
   if (role === "oya") {
     return {

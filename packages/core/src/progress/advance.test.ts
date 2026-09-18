@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { MLEAGUE_RULES } from "../rules/mleague";
 import { dealerOf, type GameState } from "../types/state";
-import { DomainError, advance } from "./advance";
+import { DomainError } from "../types/errors";
+import { advance } from "./advance";
 
 const R = MLEAGUE_RULES;
 

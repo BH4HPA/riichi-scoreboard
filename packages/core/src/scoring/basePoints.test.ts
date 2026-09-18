@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MLEAGUE_RULES } from "../rules/mleague";
-import { calcBasePoints, scoreTier } from "./basePoints";
+import { calcBasePoints, effectiveYakuman, scoreTier } from "./basePoints";
 import { ronPayment, tsumoPayment } from "./payments";
 
 const R = MLEAGUE_RULES;
@@ -105,6 +105,8 @@ describe("calcBasePoints (M-League)", () => {
   it("复合役满叠加开关", () => {
     expect(calcBasePoints({ han: 0, fu: 0, yakuman: 2 }, R)).toBe(16000);
     expect(calcBasePoints({ han: 0, fu: 0, yakuman: 2 }, noStack)).toBe(8000);
+    expect(effectiveYakuman({ han: 0, fu: 0, yakuman: 2 }, R)).toBe(2);
+    expect(effectiveYakuman({ han: 0, fu: 0, yakuman: 2 }, noStack)).toBe(1);
   });
 });
 

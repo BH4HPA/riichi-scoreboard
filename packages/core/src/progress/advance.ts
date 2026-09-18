@@ -1,3 +1,4 @@
+import { DomainError } from "../types/errors";
 import type { RoomRules } from "../types/rules";
 import { dealerOf, type GameState } from "../types/state";
 import { standings } from "../final/settle";
@@ -7,16 +8,6 @@ export type Outcome =
   | { kind: "draw"; dealerTenpai: boolean }
   | { kind: "abortive" }
   | { kind: "chombo" };
-
-export class DomainError extends Error {
-  constructor(
-    public readonly code: string,
-    message: string,
-  ) {
-    super(message);
-    this.name = "DomainError";
-  }
-}
 
 /** 规定局数的最后一局索引（东风战 3，半庄 7）。 */
 export function lastKyoku(rules: RoomRules): number {

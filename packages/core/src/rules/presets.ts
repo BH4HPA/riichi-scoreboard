@@ -145,7 +145,6 @@ export function findPreset(
   return presets.find((p) => (BUILTIN_KEYS.get(p) ?? rulesKey(p.rules)) === key) ?? null;
 }
 
-/** 房间级展示用：内置预设名，否则「自定义」。 */
 export function presetNameOf(rules: RoomRules): string {
   return findPreset(rules)?.name ?? "自定义";
 }

@@ -19,15 +19,6 @@ import type {
   TileOrigin,
 } from "./types";
 
-/**
- * 检测框 → 手牌。摆牌约定（与用户定稿）：
- * - 暗牌连排，和张横放接在任一端（同一组，不留空）；暗牌组含和张恒为 3n+2 张。
- * - 副露 3/4 张且含一张横置，或 牌背-X-X-牌背 的暗杠；放在手牌行右侧、下方或上方都行。
- * - 指示牌在手牌行上方，不含横置与牌背，每行 ≤5 张；两行时上表下里，一行全表。
- * - 照片已由用户裁剪，只含手牌 / 副露 / 指示牌；多出来的行只报警告。
- * 前提：detections 的 cls 已在类目录范围内（decodeNmsOutput / validate 都保证）。
- * 不抛错：能拼多少拼多少，问题写进 warnings，交编辑器让用户改。
- */
 export interface LayoutOptions {
   /** 行聚类阈值：相邻框中心的纵向差超过 rowGap × 中位牌高 视为新行 */
   rowGap: number;
@@ -263,6 +254,15 @@ function isCleanRow(items: Item[]): boolean {
   return items.length <= MAX_INDICATORS && items.every((i) => !i.side && i.tile !== null);
 }
 
+/**
+ * 检测框 → 手牌。摆牌约定：
+ * - 暗牌连排，和张横放接在任一端（同一组，不留空）；暗牌组含和张恒为 3n+2 张。
+ * - 副露 3/4 张且含一张横置，或 牌背-X-X-牌背 的暗杠；放在手牌行右侧、下方或上方都行。
+ * - 指示牌在手牌行上方，不含横置与牌背，每行 ≤5 张；两行时上表下里，一行全表。
+ * - 照片已由用户裁剪，只含手牌 / 副露 / 指示牌；多出来的行只报警告。
+ * 前提：detections 的 cls 已在类目录范围内（decodeNmsOutput / validate 都保证）。
+ * 不抛错：能拼多少拼多少，问题写进 warnings，交编辑器让用户改。
+ */
 export function layoutHand(
   allDetections: readonly Detection[],
   options: Partial<LayoutOptions> = {},
@@ -378,7 +378,6 @@ export function layoutHand(
   // 采信的框：暗牌组整组（含被忽略的牌背，它们也是照片里的实物）
   const used = new Set<number>(closedSeg.map((i) => i.detIndex));
 
-  // 暗牌 + 和张
   const closedTiles = closedSeg.filter((i) => i.tile !== null);
   if (closedTiles.length < closedSeg.length) warn("back_in_hand", "info", "暗牌里有牌背，已忽略");
   const sideTiles = closedTiles.filter((i) => i.side);

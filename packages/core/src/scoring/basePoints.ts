@@ -40,10 +40,16 @@ export function scoreTier(value: HandValue, rules: RoomRules): ScoreTier {
   return fu * 2 ** (han + 2) >= 2000 ? "mangan" : "normal";
 }
 
-/** 基本点（闲家荣和 ×4、庄家荣和 ×6、自摸按 1/2 倍分摊，各自向上取整到百）。 */
+/** 规则下实际计分的役满倍数：不叠加时复合役满也只按一倍算（历史记录与文案同此口径）。 */
+export function effectiveYakuman(value: HandValue, rules: RoomRules): number {
+  return rules.scoring.yakumanStacking ? value.yakuman : Math.min(value.yakuman, 1);
+}
+
+/** 基本点：支付方按庄闲倍率与自摸分摊再取整（见 scoring/payments）。 */
 export function calcBasePoints(value: HandValue, rules: RoomRules): number {
-  const { han, fu, yakuman } = value;
-  if (yakuman > 0) return 8000 * (rules.scoring.yakumanStacking ? yakuman : 1);
+  const { han, fu } = value;
+  const yakuman = effectiveYakuman(value, rules);
+  if (yakuman > 0) return 8000 * yakuman;
   switch (scoreTier(value, rules)) {
     case "kazoeYakuman":
       return 8000;
@@ -60,7 +66,6 @@ export function calcBasePoints(value: HandValue, rules: RoomRules): number {
   }
 }
 
-/** 役满倍数文案：役满 / 两倍役满 / 三倍役满… */
 export function yakumanLabel(count: number): string {
   if (count <= 1) return "役满";
   const numerals = ["", "", "两倍", "三倍", "四倍", "五倍", "六倍"];

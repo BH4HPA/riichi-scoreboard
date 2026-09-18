@@ -7,13 +7,13 @@ import {
   toRoomView,
   validateEvaluateRequest,
   validateMusicTrack,
-} from "./protocol";
-import { DomainError } from "./progress/advance";
-import { RulesError } from "./rules/validate";
-import { MUSIC_TRACKS } from "./music";
-import { createRoom } from "./reducer/reduce";
-import { MLEAGUE_RULES } from "./rules/mleague";
-import type { HandInput, PlayerRef, RoomState } from "./types/state";
+} from ".";
+import { DomainError } from "../types/errors";
+import { RulesError } from "../rules/validate";
+import { MUSIC_TRACKS } from "../music";
+import { createRoom } from "../reducer/reduce";
+import { MLEAGUE_RULES } from "../rules/mleague";
+import type { HandInput, PlayerRef, RoomState } from "../types/state";
 
 const device = (id: string): PlayerRef => ({ id, name: id, avatar: null, kind: "device" });
 const local = (id: string): PlayerRef => ({ id, name: id, avatar: null, kind: "local" });
