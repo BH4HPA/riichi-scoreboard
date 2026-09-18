@@ -43,7 +43,7 @@ jobs:
         run: |
           corepack enable
           yarn --version
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.yarn/berry/cache
           key: yarn-berry-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
@@ -78,7 +78,7 @@ jobs:
         with:
           node-version-file: .nvmrc
       - run: corepack enable
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.yarn/berry/cache
           key: yarn-berry-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
