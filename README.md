@@ -161,9 +161,16 @@ docker compose up -d --build   # 单容器运行，:8787
 | [ml/README.md](ml/README.md)               | 牌面检测模型的数据、训练、导出与发布                        |
 | [CLAUDE.md](CLAUDE.md)                     | 架构与领域概念的完整说明（协议、事件溯源、识别流水线细节）  |
 
-## 致谢
+## 许可证
 
-- 牌图来自 [lietxia/mahjong_graphic](https://github.com/lietxia/mahjong_graphic)，见 [`apps/web/src/assets/tiles/NOTICE.md`](apps/web/src/assets/tiles/NOTICE.md)
-- 番符计算使用 [riichi-rs-node](https://www.npmjs.com/package/riichi-rs-node)（[riichi-rust](https://github.com/MahjongPantheon/riichi-rust) 的 wasm 封装）
+代码以 [GNU AGPL-3.0-or-later](LICENSE) 发布：可以自由部署、修改、再分发，但对外提供服务的修改版必须公开源码。
+选它有两个原因：这是一个网络服务，AGPL 保证托管的分叉把改进交回来；`ml/` 依赖 Ultralytics YOLO（AGPL-3.0），
+训练出的检测模型按其条款同属 AGPL 派生物，整仓同一许可证最省事。
+
+## 致谢与第三方
+
+- 牌图来自 [lietxia/mahjong_graphic](https://github.com/lietxia/mahjong_graphic)（M+ 式自由许可），见 [`apps/web/src/assets/tiles/NOTICE.md`](apps/web/src/assets/tiles/NOTICE.md)
+- 番符计算使用 [riichi-rs-node](https://www.npmjs.com/package/riichi-rs-node)（[riichi-rust](https://github.com/MahjongPantheon/riichi-rust) 的 wasm 封装；上游仓库尚未声明许可证，同组织其它项目为 GPL-3.0）
+- 牌面检测：[Ultralytics YOLO11](https://github.com/ultralytics/ultralytics)（AGPL-3.0）训练，手机端由 [onnxruntime-web](https://onnxruntime.ai/)（MIT）推理
 
 <p align="center"><sub>© <a href="https://r-ay.cn">Ray</a> 2014-present</sub></p>
