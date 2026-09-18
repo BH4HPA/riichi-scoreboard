@@ -1,4 +1,5 @@
 import { DomainError } from "../progress/advance";
+import { validateRules } from "../rules/validate";
 import type { ClientCommand, ClientWinValue, RonWin } from "../types/commands";
 import type { AbortiveReason, HandInput } from "../types/state";
 import { MAX_TILE, type Seat } from "../types/tiles";
@@ -101,10 +102,7 @@ export function validateCommand(input: unknown): ClientCommand {
   if (!isRecord(input) || typeof input.type !== "string") bad("命令格式错误");
   switch (input.type) {
     case "setRules":
-      return {
-        type: "setRules",
-        rules: input.rules as ClientCommand extends never ? never : never,
-      };
+      return { type: "setRules", rules: validateRules(input.rules) };
     case "sit":
       return { type: "sit", seat: seat(input.seat, "座位") };
     case "sitLocal": {

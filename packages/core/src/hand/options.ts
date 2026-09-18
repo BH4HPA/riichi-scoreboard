@@ -1,6 +1,7 @@
+import { kyokuWind } from "../format/round";
 import { DomainError } from "../progress/advance";
 import type { RoomRules } from "../types/rules";
-import type { EvaluatedHand, HandInput } from "../types/state";
+import { dealerOf, type EvaluatedHand, type HandInput } from "../types/state";
 import {
   baseTile,
   doraFromIndicator,
@@ -169,8 +170,12 @@ export interface EngineOutput {
 export interface HandContext {
   seat: Seat;
   dealer: Seat;
-  /** 场风 */
   roundWind: Wind;
+}
+
+/** 某局里某座位和牌的场况（庄家与场风都由局序号决定）。 */
+export function handContextAt(kyoku: number, seat: Seat): HandContext {
+  return { seat, dealer: dealerOf(kyoku), roundWind: kyokuWind(kyoku) };
 }
 
 /** 副露占用的手牌张数：吃/碰/杠都折算 3 张（杠子第 4 张不计入 14 张）。 */

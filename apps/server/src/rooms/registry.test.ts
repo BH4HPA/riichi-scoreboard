@@ -5,7 +5,13 @@ import { PlayersRepo } from "../db/players";
 import { ResultsRepo } from "../db/results";
 import { RoomsRepo } from "../db/rooms";
 import { MLEAGUE_RULES } from "@riichi/core";
-import { RoomRegistry, type LiveRoom, type RoomClient } from "./registry";
+import {
+  describeError,
+  RoomCorrupt,
+  RoomRegistry,
+  type LiveRoom,
+  type RoomClient,
+} from "./registry";
 
 /** 假客户端：收集广播，供断言最后一次状态。 */
 function fakeClient(
@@ -300,5 +306,21 @@ describe("RoomRegistry：在线状态、离线座位回收、自动开局", () =
     registry.apply(room, room.seq, { type: "sitLocal", seat: 0, playerId: fourth.id }, actorOf(tv));
     expect(room.state.ready).toEqual([true, true, true, true]);
     expect(last(tv).autoStartIn).toBeNull();
+  });
+
+  it("事件流里有回放不了的事件：报 RoomCorrupt（内部错误，进日志），而不是「房间不存在」", () => {
+    const rooms = new RoomsRepo(db);
+    rooms.appendEvent(room.code, {
+      seq: 1,
+      at: now,
+      actor: { playerId: null, clientId: "system" },
+      command: { type: "setReady", seat: 9 as 0, ready: true },
+    });
+    const cold = new RoomRegistry(rooms, new ResultsRepo(db), players, () => now, AUTO_MS);
+    expect(() => cold.get(room.code)).toThrow(RoomCorrupt);
+    expect(describeError(new RoomCorrupt("X", null))).toMatchObject({
+      code: "room_corrupt",
+      internal: true,
+    });
   });
 });

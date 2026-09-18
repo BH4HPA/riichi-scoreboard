@@ -3,8 +3,7 @@ import type { Hono } from "hono";
 import type { UpgradeWebSocket, WSContext } from "hono/ws";
 import {
   assertSeat,
-  dealerOf,
-  kyokuWind,
+  handContextAt,
   validateHandShape,
   WS_CLOSE,
   WS_KEEPALIVE,
@@ -28,8 +27,8 @@ interface Deps {
   idleMs?: number | undefined;
 }
 
-/** 单条消息上限：一手牌面 + 元数据远小于此。 */
-const MAX_MESSAGE_BYTES = 16 * 1024;
+/** 单条消息上限：一手牌面 + 元数据远小于此。同时作为 ws 服务器的 maxPayload。 */
+export const MAX_MESSAGE_BYTES = 16 * 1024;
 
 function parse(raw: unknown): ClientMessage | null {
   if (typeof raw !== "string" || raw.length > MAX_MESSAGE_BYTES) return null;
@@ -160,11 +159,7 @@ export function mountWebSocket(app: Hono, upgradeWebSocket: UpgradeWebSocket, de
                 assertSeat(msg.seat);
                 const result = evaluateHand(
                   validateHandShape(msg.hand),
-                  {
-                    seat: msg.seat,
-                    dealer: dealerOf(game.kyoku),
-                    roundWind: kyokuWind(game.kyoku),
-                  },
+                  handContextAt(game.kyoku, msg.seat),
                   room.state.rules,
                 );
                 send(ws, { type: "evaluate", id: id ?? "", result });

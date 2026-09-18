@@ -128,6 +128,24 @@ describe("reduceRoom / lobby", () => {
     expect(room.seats[0]).toBeNull();
     expect(room.seats[2]?.id).toBe("a");
   });
+
+  it("对自己已占的座位重复入座是空操作（不清准备、返回同一对象）", () => {
+    const seated = replay(
+      createRoom("X", MLEAGUE_RULES),
+      events([
+        { type: "sit", seat: 1, player: players[0]! },
+        { type: "setReady", seat: 1, ready: true },
+      ]),
+    );
+    const again = reduceRoom(seated, {
+      seq: 3,
+      at: 3,
+      actor: { playerId: "a", clientId: "c" },
+      command: { type: "sit", seat: 1, player: players[0]! },
+    });
+    expect(again).toBe(seated);
+    expect(again.ready[1]).toBe(true);
+  });
 });
 
 describe("reduceRoom / 整局回放", () => {

@@ -67,9 +67,10 @@ export async function saveAvatar(
 }
 
 export async function clearAvatar(deps: AvatarDeps, player: PlayerRow): Promise<PlayerRow> {
-  const row = deps.players.update(player.id, { avatar: null, avatarKey: null });
+  deps.players.update(player.id, { avatar: null, avatarKey: null });
   await removeQuietly(deps.store, player.avatar_key);
-  return row;
+  // 删对象期间可能有并发的档案修改；返回最新行，调用方据此同步座位快照
+  return deps.players.byId(player.id) ?? player;
 }
 
 async function removeQuietly(store: ObjectStore, key: string | null): Promise<void> {

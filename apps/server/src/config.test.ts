@@ -15,4 +15,11 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ QCLOUD_SECRET_ID: "id" })).toThrow(/QCLOUD_SECRET_KEY/);
     expect(() => loadConfig({ PORT: "abc" })).toThrow(/PORT/);
   });
+
+  it("TRUST_PROXY 只认 1/true", () => {
+    expect(loadConfig({}).trustProxy).toBe(false);
+    expect(loadConfig({ TRUST_PROXY: "1" }).trustProxy).toBe(true);
+    expect(loadConfig({ TRUST_PROXY: "true" }).trustProxy).toBe(true);
+    expect(loadConfig({ TRUST_PROXY: "yes" }).trustProxy).toBe(false);
+  });
 });

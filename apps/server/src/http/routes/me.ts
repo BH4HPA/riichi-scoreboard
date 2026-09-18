@@ -8,6 +8,7 @@ import { requirePlayer, type AuthEnv } from "../../auth/deviceToken";
 import type { RoomRegistry } from "../../rooms/registry";
 import type { ObjectStore } from "../../storage";
 import { AVATAR_MAX_BYTES, AvatarError, clearAvatar, saveAvatar } from "../avatars";
+import { clientIp, rateLimit, SlidingWindow } from "../rateLimit";
 
 interface Deps {
   players: PlayersRepo;
@@ -15,9 +16,12 @@ interface Deps {
   results: ResultsRepo;
   registry: RoomRegistry;
   store: ObjectStore;
+  trustProxy: boolean;
 }
 
 const JSON_MAX_BYTES = 16 * 1024;
+/** 注册无需凭证，是所有「每玩家」配额的源头：按 IP 限每小时新身份数 */
+export const REGISTRATIONS_PER_HOUR = 30;
 
 export function cleanName(input: unknown): string | null {
   if (typeof input !== "string") return null;
@@ -28,9 +32,14 @@ export function cleanName(input: unknown): string | null {
 export function meRoutes(deps: Deps): Hono {
   const app = new Hono();
   const jsonLimit = bodyLimit({ maxSize: JSON_MAX_BYTES });
+  const registerLimit = rateLimit(
+    new SlidingWindow(REGISTRATIONS_PER_HOUR),
+    (c) => clientIp(c, deps.trustProxy),
+    "注册过于频繁，请稍后再试",
+  );
 
   /** 首次访问：签发设备 token。 */
-  app.post("/register", jsonLimit, async (c) => {
+  app.post("/register", registerLimit, jsonLimit, async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { name?: unknown };
     const name = cleanName(body.name) ?? DEFAULT_PLAYER_NAME;
     const row = deps.players.create(name, Date.now());
