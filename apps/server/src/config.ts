@@ -12,6 +12,8 @@ export interface ServerConfig {
   corsOrigins: string[];
   /** 房间闲置多久后从内存卸载（毫秒） */
   roomIdleMs: number;
+  /** 经反向代理/CDN 部署时为 true：请求方 IP 取 X-Forwarded-For 首项（限流按 IP 计） */
+  trustProxy: boolean;
   /** 腾讯云 COS；null 表示用本地磁盘 */
   cos: CosConfig | null;
 }
@@ -67,6 +69,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
       .map((s) => s.trim())
       .filter(Boolean),
     roomIdleMs: intEnv(env, "ROOM_IDLE_MS", 60 * 60 * 1000),
+    trustProxy: env.TRUST_PROXY === "1" || env.TRUST_PROXY === "true",
     cos: cosEnv(env),
   };
 }

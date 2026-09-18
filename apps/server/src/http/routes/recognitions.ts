@@ -7,6 +7,7 @@ import type { RecognitionsRepo } from "../../db/recognitions";
 import type { ObjectStore } from "../../storage";
 import { RECOGNITION_PHOTO_MAX_BYTES } from "@riichi/core";
 import { PhotoError, savePhoto, validatePhoto } from "../photos";
+import { SlidingWindow } from "../rateLimit";
 
 interface Deps {
   players: PlayersRepo;
@@ -20,32 +21,14 @@ const PATCH_MAX_BYTES = 64 * 1024;
 /** 每玩家每小时的照片上传上限；注册是免费的，所以再加一层全局总量兜底（照片进对象存储永久保存） */
 export const UPLOADS_PER_HOUR = 60;
 export const UPLOADS_PER_HOUR_GLOBAL = 600;
-const HOUR = 60 * 60 * 1000;
 
-/** 滑动窗口计数：playerId → 最近一小时内的上传时间戳；另有全局窗口。 */
+/** 每玩家 + 全局两级窗口；坏照片不计入（由调用方在校验通过后才计）。 */
 export class UploadLimiter {
-  private readonly hits = new Map<string, number[]>();
-  private global: number[] = [];
+  private readonly perPlayer = new SlidingWindow(UPLOADS_PER_HOUR);
+  private readonly global = new SlidingWindow(UPLOADS_PER_HOUR_GLOBAL);
 
   allow(playerId: string, now: number): boolean {
-    const since = now - HOUR;
-    if (this.hits.size > 1000) this.sweep(since);
-    this.global = this.global.filter((t) => t > since);
-    const recent = (this.hits.get(playerId) ?? []).filter((t) => t > since);
-    if (recent.length >= UPLOADS_PER_HOUR || this.global.length >= UPLOADS_PER_HOUR_GLOBAL) {
-      this.hits.set(playerId, recent);
-      return false;
-    }
-    recent.push(now);
-    this.global.push(now);
-    this.hits.set(playerId, recent);
-    return true;
-  }
-
-  private sweep(since: number): void {
-    for (const [id, ts] of this.hits) {
-      if (!ts.some((t) => t > since)) this.hits.delete(id);
-    }
+    return this.perPlayer.allow(playerId, now) && this.global.allow("*", now);
   }
 }
 

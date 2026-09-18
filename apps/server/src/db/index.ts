@@ -107,7 +107,7 @@ export function schemaVersion(db: Database): number {
 export function openDatabase(file: string | ":memory:"): Database {
   if (file !== ":memory:") fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
-  db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
+  db.exec("PRAGMA journal_mode = WAL;");
   migrate(db);
   return db;
 }

@@ -14,6 +14,7 @@ import { loadConfig } from "../config";
 import { PlayersRepo } from "../db/players";
 import { ResultsRepo } from "../db/results";
 import { RoomsRepo } from "../db/rooms";
+import { ROOMS_PER_HOUR } from "../http/routes/rooms";
 import { RoomRegistry } from "./registry";
 
 let server: ServerType;
@@ -150,6 +151,19 @@ describe("rooms end-to-end", () => {
       headers: { Authorization: `Bearer ${me.token}` },
     });
     expect(missing.status).toBe(404);
+  });
+
+  it("REST：同一设备每小时建房数有上限（429）", async () => {
+    const me = await register("刷房");
+    const create = () =>
+      app.request("/api/rooms", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${me.token}` },
+      });
+    for (let i = 0; i < ROOMS_PER_HOUR; i++) expect((await create()).status).toBe(201);
+    const limited = await create();
+    expect(limited.status).toBe(429);
+    expect(await limited.json()).toMatchObject({ error: "too_many" });
   });
 
   it("WS：四人入座开局，两端同步；并发命令只成功一个；ui 镜像随断开清理", async () => {

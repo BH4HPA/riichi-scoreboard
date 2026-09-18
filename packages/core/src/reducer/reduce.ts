@@ -3,7 +3,14 @@ import { validateRules } from "../rules/validate";
 import { isGameCommand, type LobbyCommand } from "../types/commands";
 import type { RoomEvent } from "../types/events";
 import type { RoomRules } from "../types/rules";
-import { isLocalPlayer, seatNames, type PlayerRef, type RoomState } from "../types/state";
+import {
+  isLocalPlayer,
+  seatNames,
+  type GameState,
+  type PlayerRef,
+  type RoomState,
+  type Undoable,
+} from "../types/state";
 import { applyGameCommand, createGame, declareRiichi } from "./game";
 import { createUndoable, push, redo, undo } from "./undoable";
 import { assertSeat } from "./validateCommand";
@@ -44,6 +51,7 @@ function applyLobbyCommand(room: RoomState, cmd: LobbyCommand): RoomState {
       assertSeat(cmd.seat);
       const seats = [...room.seats];
       const existing = seats.findIndex((p) => p?.id === cmd.player.id);
+      if (existing === cmd.seat) return room;
       if (existing !== -1) seats[existing] = null;
       if (seats[cmd.seat]) throw new DomainError("seat_taken", "该座位已有人");
       seats[cmd.seat] = cmd.player;
@@ -136,12 +144,12 @@ export function reduceRoom(room: RoomState, event: RoomEvent): RoomState {
   if (cmd.type === "undo") {
     const game = undo(room.game);
     if (!game) throw new DomainError("nothing_to_undo", "暂无可撤销的结算");
-    return { ...room, game, phase: game.present.status === "finished" ? "finished" : "playing" };
+    return withGame(room, game);
   }
   if (cmd.type === "redo") {
     const game = redo(room.game);
     if (!game) throw new DomainError("nothing_to_redo", "暂无可重做的结算");
-    return { ...room, game, phase: game.present.status === "finished" ? "finished" : "playing" };
+    return withGame(room, game);
   }
 
   const present = applyGameCommand(room.game.present, cmd, {
@@ -150,14 +158,14 @@ export function reduceRoom(room: RoomState, event: RoomEvent): RoomState {
     names: seatNames(room),
     rules: room.rules,
   });
-  return {
-    ...room,
-    game: push(room.game, present),
-    phase: present.status === "finished" ? "finished" : "playing",
-  };
+  return withGame(room, push(room.game, present));
 }
 
-/** 从事件流回放。 */
+/** 房间阶段跟随当前局面：对局结束即 finished，否则 playing。 */
+function withGame(room: RoomState, game: Undoable<GameState>): RoomState {
+  return { ...room, game, phase: game.present.status === "finished" ? "finished" : "playing" };
+}
+
 export function replay(room: RoomState, events: readonly RoomEvent[]): RoomState {
   return events.reduce(reduceRoom, room);
 }

@@ -5,9 +5,8 @@ import {
   RulesError,
   autoStartEligible,
   createRoom,
-  dealerOf,
+  handContextAt,
   isLocalPlayer,
-  kyokuWind,
   reduceRoom,
   replay,
   rulesKey,
@@ -80,6 +79,17 @@ export class RoomClosed extends Error {
   }
 }
 
+/** 事件流回放失败（规则模型变更后旧事件不再合法等）：与「不存在」区分开，必须进日志。 */
+export class RoomCorrupt extends Error {
+  constructor(
+    code: string,
+    override readonly cause: unknown,
+  ) {
+    super(`房间 ${code} 的记录无法恢复`);
+    this.name = "RoomCorrupt";
+  }
+}
+
 class StaleCommand extends Error {
   constructor() {
     super("房间状态已更新，请刷新后重试");
@@ -127,19 +137,20 @@ export class RoomRegistry {
   /** 内存没有则从事件流回放；已解散的房间用 closed_at 短路，不回放。 */
   get(code: string): LiveRoom {
     const cached = this.rooms.get(code);
-    if (cached?.state.phase === "closed") {
-      // 解散后本应由 ws 层 closeRoom 卸载；若未来到这里说明收尾被跳过，补做一次
-      this.closeRoom(cached);
-      throw new RoomClosed(code);
-    }
     if (cached) return cached;
     const row = this.roomsRepo.get(code);
     if (!row) throw new RoomNotFound(code);
     if (row.closed_at !== null) throw new RoomClosed(code);
     const events = this.roomsRepo.events(code);
+    let state: RoomState;
+    try {
+      state = replay(createRoom(code, row.rules), events);
+    } catch (err) {
+      throw new RoomCorrupt(code, err);
+    }
     const live: LiveRoom = {
       code,
-      state: replay(createRoom(code, row.rules), events),
+      state,
       seq: events.length ? events[events.length - 1]!.seq : 0,
       clients: new Map(),
       ui: new Map(),
@@ -264,11 +275,9 @@ export class RoomRegistry {
       throw new DomainError("forbidden", `只能${what}自己的座位`);
     };
     switch (cmd.type) {
-      case "setRules": {
-        // 规则确有变化才清准备；非法规则不补标记，交 reducer 照常报错
-        const next = rulesKey(cmd.rules);
-        return next !== null && next !== rulesKey(state.rules) ? { ...cmd, resetReady: true } : cmd;
-      }
+      case "setRules":
+        // 规则确有变化才清准备
+        return rulesKey(cmd.rules) !== rulesKey(state.rules) ? { ...cmd, resetReady: true } : cmd;
       case "sit": {
         const row = actor.playerId ? this.players.byId(actor.playerId) : null;
         if (!row) throw new DomainError("unauthorized", "需要先注册设备");
@@ -310,11 +319,7 @@ export class RoomRegistry {
     if (value.kind === "manual") return value;
     const game = state.game?.present;
     if (!game) throw new DomainError("no_game", "尚未开局");
-    const result = evaluateHand(
-      value.hand,
-      { seat, dealer: dealerOf(game.kyoku), roundWind: kyokuWind(game.kyoku) },
-      state.rules,
-    );
+    const result = evaluateHand(value.hand, handContextAt(game.kyoku, seat), state.rules);
     return { kind: "hand", hand: value.hand, result };
   }
 
@@ -392,8 +397,7 @@ export class RoomRegistry {
   }
 
   broadcastState(room: LiveRoom): void {
-    const payload = JSON.stringify({ type: "state", room: this.view(room) });
-    for (const c of room.clients.values()) c.send(payload);
+    this.broadcast(room, { type: "state", room: this.view(room) });
   }
 
   broadcastUi(room: LiveRoom): void {
@@ -436,5 +440,7 @@ export function describeError(err: unknown): ErrorInfo {
   }
   if (err instanceof RoomClosed)
     return { code: "room_closed", message: err.message, internal: false };
+  if (err instanceof RoomCorrupt)
+    return { code: "room_corrupt", message: err.message, internal: true };
   return { code: "internal", message: "服务器内部错误", internal: true };
 }

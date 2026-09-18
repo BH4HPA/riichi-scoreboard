@@ -111,7 +111,10 @@ export function createApp({
     return c.json({ ok: true });
   });
   app.route("/api/me/locals", localRoutes({ players, results, registry, store }));
-  app.route("/api/me", meRoutes({ players, presets, results, registry, store }));
+  app.route(
+    "/api/me",
+    meRoutes({ players, presets, results, registry, store, trustProxy: config.trustProxy }),
+  );
   app.route("/api/rooms", roomRoutes({ registry, players }));
   app.route("/api/evaluate", evaluateRoutes({ players }));
   app.route("/api/recognitions", recognitionRoutes({ players, recognitions, store, modelId }));

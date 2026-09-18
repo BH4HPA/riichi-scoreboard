@@ -3,10 +3,13 @@ import { createNodeWebSocket } from "@hono/node-ws";
 import { Hono } from "hono";
 import { createApp } from "./app";
 import { loadConfig } from "./config";
+import { MAX_MESSAGE_BYTES } from "./rooms/ws";
 
 const config = loadConfig();
 const shell = new Hono();
 const { injectWebSocket, upgradeWebSocket, wss } = createNodeWebSocket({ app: shell });
+// ws 默认允许 100 MiB 的单帧并在内存里拼完才交付；应用层的长度校验拦不住分片攻击
+wss.options.maxPayload = MAX_MESSAGE_BYTES;
 const { app, registry, db } = createApp({ config, upgradeWebSocket });
 shell.route("/", app);
 
