@@ -4,16 +4,18 @@ import { api, ApiError } from "@/api/client";
 import { useSession } from "@/api/session";
 import { forgetConsoleRoom, readConsoleRoom } from "./consoleRooms";
 
-export interface SavedConsoleRoom {
-  /** 仍然开着的房间码；没有则为 null */
-  code: string | null;
-  /** 本机记着一个码、正在向服务端确认：调用方先按「有房间」排版，免得确认回来时按钮换文案、页面跳动 */
-  pending: boolean;
-}
+/**
+ * 本机上次开的某种房型的主控台房间，现在怎么样了：
+ * - `none`：本机没记着，或者确认它已经不在了（已忘掉）——点进去一定是新建；
+ * - `open`：确认还开着——点进去一定是回到它；
+ * - `unknown`：记着一个码但没法确认（正在问、断网、服务端出错）——点进去两种都可能，调用方不要写动词。
+ */
+export type SavedConsoleRoom =
+  { state: "none" } | { state: "open"; code: string } | { state: "unknown" };
 
 /**
- * 本机上次开的、现在仍然开着的主控台房间（每种房型一个），供首页决定按钮写「继续」还是「创建」。
- * 与手机的「返回房间」（`useLastRoom`）同一套做法：只在已有设备身份时探测，房间没了就忘掉它。
+ * 供首页决定按钮写「继续」还是「创建」。与手机的「返回房间」（`useLastRoom`）同一套做法：
+ * 只在已有设备身份时探测，房间确实没了才忘掉它。
  */
 export function useSavedConsoleRooms(): Record<RoomKind, SavedConsoleRoom> {
   const token = useSession((s) => s.token);
@@ -24,7 +26,7 @@ export function useSavedConsoleRooms(): Record<RoomKind, SavedConsoleRoom> {
         string | null
       >,
   );
-  const [alive, setAlive] = useState<Partial<Record<RoomKind, string | null>>>({});
+  const [probed, setProbed] = useState<Partial<Record<RoomKind, SavedConsoleRoom>>>({});
 
   useEffect(() => {
     if (!token) return;
@@ -33,17 +35,22 @@ export function useSavedConsoleRooms(): Record<RoomKind, SavedConsoleRoom> {
       const code = saved[kind];
       if (!code) continue;
       api<{ room: RoomView }>(`/api/rooms/${code}`, { token })
-        .then(({ room }) =>
-          room.phase !== "closed" && (room.kind ?? "yonma") === kind ? code : null,
-        )
-        .catch((err: unknown) => {
+        .then(({ room }): SavedConsoleRoom => {
+          // 房型对不上（服务端回滚到不认房型的版本）：主控台会另建一个，这个码不会再被用到
+          if (room.phase !== "closed" && (room.kind ?? "yonma") === kind) {
+            return { state: "open", code };
+          }
+          return { state: "none" };
+        })
+        .catch((err: unknown): SavedConsoleRoom => {
           if (err instanceof ApiError && [401, 404, 410].includes(err.status)) {
             forgetConsoleRoom(kind);
+            return { state: "none" };
           }
-          return null;
+          return { state: "unknown" };
         })
         .then((result) => {
-          if (active) setAlive((prev) => ({ ...prev, [kind]: result }));
+          if (active) setProbed((prev) => ({ ...prev, [kind]: result }));
         });
     }
     return () => {
@@ -52,12 +59,10 @@ export function useSavedConsoleRooms(): Record<RoomKind, SavedConsoleRoom> {
   }, [token, saved]);
 
   return Object.fromEntries(
-    ROOM_KINDS.map((kind) => [
-      kind,
-      {
-        code: alive[kind] ?? null,
-        pending: Boolean(token && saved[kind]) && !(kind in alive),
-      },
-    ]),
+    ROOM_KINDS.map((kind): [RoomKind, SavedConsoleRoom] => {
+      // 没有设备身份就没有可回的房间：主控台会先注册、再新建
+      if (!saved[kind] || !token) return [kind, { state: "none" }];
+      return [kind, probed[kind] ?? { state: "unknown" }];
+    }),
   ) as Record<RoomKind, SavedConsoleRoom>;
 }

@@ -13,10 +13,11 @@ import { TenScoreGrid } from "./scoreboard/TenScoreGrid";
 import { TenControlButtons } from "./settlement/TenControlButtons";
 import { TenControlHost } from "./settlement/TenControlHost";
 import { useTenDialogs } from "./settlement/useTenDialogs";
+import { canPickFor } from "./stageB/canPick";
 import { GuessBoard } from "./stageB/GuessBoard";
 
 /**
- * 二人房的手机对局页：得分卡 → Stage B 的全牌型板（防守方与没入座的人可以指定，进攻方只读）→ 操作栏。
+ * 二人房的手机对局页：得分卡 → Stage B 的全牌型板（谁可以指定见 `canPickFor`）→ 操作栏。
  * 底部「规则」页先放规则说明（可投到电视），再放只读的房间规则。
  */
 export function TenPhoneGame({ room }: { room: TenRoomView }) {
@@ -63,8 +64,11 @@ export function TenPhoneGame({ room }: { room: TenRoomView }) {
       <TenScoreGrid game={present} seats={room.seats} names={names} mySeat={mySeat} />
       {stageB && (
         <div className="rounded-xl border border-border bg-surface p-3">
-          {/* 防守方本人可以指定；没入座的手机（旁观 / 代记）也可以；进攻方只读 */}
-          <GuessBoard stage={stageB} names={names} pickable={mySeat !== stageB.attacker} />
+          <GuessBoard
+            stage={stageB}
+            names={names}
+            pickable={canPickFor(stageB, room.seats, mySeat)}
+          />
         </div>
       )}
       <div className="rounded-xl border border-border bg-surface p-3">
@@ -80,6 +84,7 @@ export function TenPhoneGame({ room }: { room: TenRoomView }) {
       <TenControlHost
         dialog={controls.dialog}
         onClose={controls.close}
+        gameNo={room.gameNo}
         game={present}
         names={names}
         rules={room.rules}

@@ -149,6 +149,8 @@ describe("二人房 / Stage B", () => {
     const b = apply(room, declare(room, 0, false));
     expect(() => apply(b, guess(5, 5))).toThrow(/两张不同/);
     expect(() => apply(b, guess(1, 35))).toThrow(/两张不同/);
+    // 指定过的牌不再接受（任意一张重复都算）
+    expect(() => apply(b, guess(1, 2), guess(2, 3))).toThrow(/已经指定过/);
     const two = apply(b, guess(1, 2), guess(31, 9));
     expect(present(two).stage).toMatchObject({
       guesses: [

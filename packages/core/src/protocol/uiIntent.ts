@@ -140,8 +140,6 @@ export function validateUiIntent(input: unknown): UiIntent {
       ) {
         return bad();
       }
-      const summary = v.summary;
-      if (summary !== null && typeof summary !== "string") return bad();
       if (v.loser !== null) assertSeat(v.loser);
       const riichi = seatListOrBad(v.riichi);
       if (!Array.isArray(v.wins) || v.wins.length > 3) return bad();
@@ -150,7 +148,7 @@ export function validateUiIntent(input: unknown): UiIntent {
         kind: "settlement",
         mode: v.mode as (typeof SETTLEMENT_MODES)[number],
         deltas: deltas as number[] | null,
-        summary: typeof summary === "string" ? summary.slice(0, SUMMARY_MAX) : null,
+        summary: summaryOrBad(v.summary),
         loser: v.loser as Seat | null,
         riichi,
         wins,

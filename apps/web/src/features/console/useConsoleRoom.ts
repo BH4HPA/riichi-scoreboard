@@ -20,6 +20,10 @@ export function useConsoleRoom(kind: RoomKind) {
       body: { kind },
       token,
     });
+    // 服务端回滚到不认房型的版本时会忽略 kind、建出四人房：不记这个码（否则每次进来房型都对不上、再建一个），如实报错
+    if ((room.kind ?? "yonma") !== kind) {
+      throw new Error("服务端暂不支持这种房型，请稍后再试");
+    }
     writeConsoleRoom(kind, room.code);
     return room.code;
   }, [ensure, kind]);

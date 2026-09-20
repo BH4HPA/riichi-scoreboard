@@ -12,7 +12,8 @@ const KIND_INFO: Record<RoomKind, { name: string; hint: string; icon: typeof Use
 
 /**
  * 首页的「开哪种房间」：每种房型一个主按钮。主控台会回到本机上次开的那个房间，所以按钮文案跟着走——
- * 那个房间还在就写「继续 … 房间码」，旁边给「新建」；没有才写「创建」。点了「创建」不会进到旧房间。
+ * 确认那个房间还在就写「继续 … 房间码」，旁边给「新建」；确认没有才写「创建」；没法确认（正在问、断网）
+ * 就只写房型名、不写动词。写了「创建」的按钮不会把人带进旧房间。
  */
 export function RoomKindPicker() {
   const saved = useSavedConsoleRooms();
@@ -21,7 +22,8 @@ export function RoomKindPicker() {
     <div className="grid gap-3">
       {ROOM_KINDS.map((kind) => {
         const { name, hint, icon: Icon } = KIND_INFO[kind];
-        const { code, pending } = saved[kind];
+        const room = saved[kind];
+        const code = room.state === "open" ? room.code : null;
         return (
           <div key={kind} className="flex gap-2">
             <Button
@@ -31,12 +33,15 @@ export function RoomKindPicker() {
               className="h-16 min-w-0 flex-1 justify-start"
               data-testid={`open-${kind}`}
             >
-              <Link to={consolePath(kind)} aria-busy={pending}>
+              <Link to={consolePath(kind)} aria-busy={room.state === "unknown"}>
                 <Icon className="h-5 w-5 shrink-0" />
                 <span className="min-w-0 text-left">
-                  {/* 确认期间不写动词：回来时只补上房间码，不会从「创建」跳成「继续」 */}
                   <span className="block truncate">
-                    {pending ? name : code ? `继续${name}房间 ${code}` : `创建${name}房间`}
+                    {room.state === "unknown"
+                      ? `${name}房间`
+                      : code
+                        ? `继续${name}房间 ${code}`
+                        : `创建${name}房间`}
                   </span>
                   <span className="block truncate text-xs font-normal opacity-80">{hint}</span>
                 </span>

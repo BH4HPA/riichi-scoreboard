@@ -166,10 +166,25 @@ describe("二人房 / 描述", () => {
     const drawn = apply(won, { type: "tenDraw", reason: "noDeclare" });
     expect(describeTenEntry(g(drawn).history[0]!)).toBe("第 2 局 1 本场：18 巡内无人宣言，流局。");
 
-    expect(describeTenRevert(g(declared), g(room))).toBe("阿东的立直");
-    expect(describeTenRevert(g(guessed), g(declared))).toBe("第 1 轮指定");
-    expect(describeTenRevert(g(won), g(guessed))).toBe("第 1 局 阿东自摸和");
+    // 撤销提示用当前的座位昵称：对局中改过名，开局快照里的是旧名字
+    const names = ["东哥", "阿西"];
+    expect(describeTenRevert(g(declared), g(room), names)).toBe("东哥的立直");
+    expect(describeTenRevert(g(guessed), g(declared), names)).toBe("第 1 轮指定");
+    expect(describeTenRevert(g(won), g(guessed), names)).toBe("第 1 局 阿东自摸和");
     const ended = apply(won, { type: "endGame" });
-    expect(describeTenRevert(g(ended), g(won))).toBe("终局");
+    expect(describeTenRevert(g(ended), g(won), names)).toBe("终局");
+
+    // 全牌型板是便利不是必经步骤：一轮都没记时不写「第 0 轮」
+    const verbal = apply(drawn, { type: "tenDeclare", seat: 1, riichi: false, entries: 2 });
+    const hit = apply(verbal, { type: "tenDraw", reason: "guessed" });
+    expect(describeTenEntry(g(hit).history[0]!)).toBe(
+      "第 3 局 2 本场：闲家 阿西 听牌宣言，被猜中待牌，流局。",
+    );
+    const again = apply(hit, { type: "tenDeclare", seat: 1, riichi: false, entries: 3 });
+    const tsumo = apply(again, {
+      type: "tenTsumo",
+      value: { kind: "manual", han: 1, fu: 30, yakuman: 0 },
+    });
+    expect(describeTenEntry(g(tsumo).history[0]!)).toContain("听牌宣言后，防守方未猜中，自摸");
   });
 });

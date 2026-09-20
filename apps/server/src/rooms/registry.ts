@@ -7,12 +7,14 @@ import {
   createRoom,
   roomHandContext,
   isLocalPlayer,
+  isRoomKind,
   nextTenMarkAt,
   reduceRoom,
   replay,
   rulesKey,
   describeRevert,
   describeTenRevert,
+  seatNames,
   seatOfPlayer,
   seatsOnline,
   STOPS_MUSIC,
@@ -109,7 +111,9 @@ function samePlayer(a: PlayerRef, b: PlayerRef): boolean {
 /** 撤销 / 重做提示里「哪一步」的描述；房型不变，所以前后一定同型。未开局为 null。 */
 function revertedWhat(prev: RoomState, next: RoomState): string | null {
   if (prev.kind === "ten" && next.kind === "ten") {
-    return prev.game && next.game ? describeTenRevert(prev.game.present, next.game.present) : null;
+    return prev.game && next.game
+      ? describeTenRevert(prev.game.present, next.game.present, seatNames(next))
+      : null;
   }
   if (prev.kind === "yonma" && next.kind === "yonma") {
     return prev.game && next.game ? describeRevert(prev.game.present, next.game.present) : null;
@@ -161,6 +165,8 @@ export class RoomRegistry {
     const events = this.roomsRepo.events(code);
     let state: RoomState;
     try {
+      // 行上的房型来自别的版本（回滚前建的新房型）就不认：按未知房型建座位会得到一个零座位的房间
+      if (!isRoomKind(row.kind)) throw new Error(`unknown room kind ${String(row.kind)}`);
       state = replay(createRoom(code, row.rules, row.kind), events);
     } catch (err) {
       throw new RoomCorrupt(code, err);

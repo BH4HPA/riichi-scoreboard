@@ -4,8 +4,8 @@ import { useRoomStore } from "@/ws/store";
 import { TIME_MARK_TEXT } from "./marks";
 
 /**
- * 档位升高时提示一次。首帧（刚进页面、刷新、重连后的第一份状态）只显示徽标不弹提示——
- * 否则时间到之后每刷新一次都弹。
+ * 档位升高时提示一次。刚进页面（含刷新）看到的第一份状态只显示徽标不弹提示——否则时间到之后每刷新一次都弹。
+ * 断线自动重连不算「刚进页面」：页面没有重挂，断线期间跨了档，重连后照常提示。
  */
 export function useTimeMarkNotice(mark: TenTimeMark): void {
   const notify = useRoomStore((s) => s.notify);

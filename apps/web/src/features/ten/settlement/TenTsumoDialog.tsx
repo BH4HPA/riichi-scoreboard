@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   describeValue,
   formatPoints,
@@ -12,6 +12,7 @@ import {
 } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { DialogFooter } from "@/ui/dialog";
+import { useRoomStore } from "@/ws/store";
 import { useCommand } from "@/ws/useRoom";
 import { useMirror } from "@/features/mirror/useMirror";
 import { confirmRecognized } from "@/features/recognition/recognize";
@@ -51,18 +52,43 @@ export function TenTsumoDialog({
   ...rest
 }: Props & { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { stage } = game;
-  // 只在 Stage B 打开；别人撤销了宣言时草稿的局面戳会变，表单随之关闭，这里先不渲染
-  if (stage.kind !== "B") return null;
+  const round = `${tenRoundLabel(game.round, game.honba)}，庄家：${rest.names[game.dealer]}`;
+  // 弹窗开着时别人撤销了宣言：阶段回到 A。表单不能跟着消失了事——这里的开关状态还留着，下次再有人宣言它会自己
+  // 弹回来——所以照常渲染一个关闭器，走与「局面已变化」同样的提示与关闭。
   return (
     <SettlementDialog
       open={open}
       onOpenChange={onOpenChange}
-      title={`自摸和 · ${rest.names[stage.attacker]}（${tenDeclareLabel(stage.riichi)}）`}
-      description={`${tenRoundLabel(game.round, game.honba)}，庄家：${rest.names[game.dealer]}`}
+      title={
+        stage.kind === "B"
+          ? `自摸和 · ${rest.names[stage.attacker]}（${tenDeclareLabel(stage.riichi)}）`
+          : "自摸和"
+      }
+      description={round}
     >
-      {(onDone) => <TenTsumoForm game={game} stage={stage} {...rest} onDone={onDone} />}
+      {(onDone) =>
+        stage.kind === "B" ? (
+          <TenTsumoForm game={game} stage={stage} {...rest} onDone={onDone} />
+        ) : (
+          <StaleCloser onDone={onDone} />
+        )
+      }
     </SettlementDialog>
   );
+}
+
+/** 它的出现本身就意味着要关：挂载时提示一次并关闭弹窗 */
+function StaleCloser({ onDone }: { onDone: () => void }) {
+  const notify = useRoomStore((s) => s.notify);
+  const done = useRef(onDone);
+  useEffect(() => {
+    done.current = onDone;
+  });
+  useEffect(() => {
+    notify("info", "局面已变化，结算已关闭");
+    done.current();
+  }, [notify]);
+  return null;
 }
 
 function TenTsumoForm({

@@ -106,6 +106,10 @@ export function applyTenCommand(
       if (!ALL_TILES.includes(a) || !ALL_TILES.includes(b) || a === b) {
         throw new DomainError("bad_tiles", "请指定两张不同的牌");
       }
+      // 指定过的牌不再接受：再猜一次没有意义（进攻方宣言后不换牌），也让一局的轮数有界（34 种牌，至多 17 轮）
+      if (stage.guesses.some((g) => g.includes(a) || g.includes(b))) {
+        throw new DomainError("guessed_already", "这张牌已经指定过了");
+      }
       return { ...game, stage: { ...stage, guesses: [...stage.guesses, [a, b]] } };
     }
 

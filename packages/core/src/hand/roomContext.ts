@@ -7,7 +7,7 @@ import { handContextAt, type HandContext } from "./options";
  * 《天》二人麻将的和牌场况：场风固定东，自风只有庄家东 / 闲家西。
  * 借四人座位表达：庄家坐 0（东），闲家坐 2（西）——`handContextAt` 会把二人房的 1 号位算成南。
  */
-export function tenHandContext(isDealer: boolean): HandContext {
+function tenHandContext(isDealer: boolean): HandContext {
   return { seat: isDealer ? 0 : 2, dealer: 0, roundWind: 0 };
 }
 

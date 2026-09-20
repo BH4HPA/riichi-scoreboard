@@ -10,12 +10,15 @@ export function draftStamp(gameNo: number, game: GameState): string {
 }
 
 /**
- * 二人房：同一场、同一阶段、同样的历史。防守方逐轮指定不在其中——
- * 进攻方录手牌时对方还在指定，不该每指定一轮就把弹窗关掉。
+ * 二人房：同一场、同样的历史、同一次宣言。宣言是可撤销的步骤，同一局里 Stage B 可能出现不止一次
+ * （撤销后换人宣言、立直改成听牌宣言），所以「这次宣言是谁、是什么」也在戳里——不然旧草稿会带着另一次宣言的
+ * 立直与手牌被沿用。防守方逐轮指定不在其中：进攻方录手牌时对方还在指定，不该每指定一轮就把弹窗关掉。
  */
 export function tenDraftStamp(gameNo: number, game: TenGameState): string {
   const top = game.history[0]?.seq ?? 0;
-  return `${gameNo}:${game.status}:${game.stage.kind}:${game.history.length}:${top}`;
+  const { stage } = game;
+  const declared = stage.kind === "B" ? `B${stage.attacker}${stage.riichi ? "r" : "t"}` : "A";
+  return `${gameNo}:${game.status}:${declared}:${game.history.length}:${top}`;
 }
 
 /** 当前房间的草稿局面戳；未开局为 null。 */

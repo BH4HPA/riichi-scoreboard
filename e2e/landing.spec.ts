@@ -38,6 +38,22 @@ test("桌面 UA 打开首页先选房型：创建四人房；回首页后按钮�
   await ctx.close();
 });
 
+test("首页没法确认上次的房间还在不在（服务端出错）：按钮不写「创建」也不写「继续」", async ({
+  browser,
+}) => {
+  const ctx = await newContext(browser, { ...devices["Desktop Chrome"] });
+  const page = await ctx.newPage();
+  await page.goto("/console");
+  const code = (await page.getByTestId("room-code").textContent())!.trim();
+  await page.route(`**/api/rooms/${code}`, (route) => route.fulfill({ status: 503, body: "{}" }));
+  await page.goto("/");
+  // 点进去其实会回到那个房间：这时写「创建」就是说谎
+  await expect(page.getByTestId("open-yonma")).toHaveText(/^四人麻将房间/);
+  await expect(page.getByTestId("new-yonma")).toHaveCount(0);
+  await expect(page.getByTestId("open-ten")).toHaveText(/创建二人麻将房间/);
+  await ctx.close();
+});
+
 test("旧书签 /console（不带房型）仍然是四人房", async ({ browser }) => {
   const ctx = await newContext(browser, { ...devices["Desktop Chrome"] });
   const page = await ctx.newPage();

@@ -34,9 +34,12 @@ export function TenControlButtons({
   const { present } = game;
   const finished = present.status === "finished";
   const stageB = present.stage.kind === "B";
-  // 撤销一次立直宣言时曲子还在放（服务端按命令类型停曲，撤销不在其列）：这里顺带停掉
+  // 撤销的那一步正是立直宣言（Stage B 还没指定过）时曲子还在放——服务端按命令类型停曲，撤销不在其列——这里顺带停掉；
+  // 撤销一轮指定不停：那一局的立直还在
   const undo = () => {
-    if (musicPlaying) socket.music(null);
+    const { stage } = present;
+    const undoesRiichi = stage.kind === "B" && stage.riichi && stage.guesses.length === 0;
+    if (undoesRiichi && musicPlaying) socket.music(null);
     void send({ type: "undo" });
   };
 
@@ -108,14 +111,17 @@ export function TenControlButtons({
               返回大厅
             </Button>
           )}
-          <Button
-            size={size}
-            variant="outline"
-            className="text-neg"
-            onClick={() => onOpen("newGame")}
-          >
-            <RefreshCcw className="h-4 w-4" /> 重开一局
-          </Button>
+          {/* 重开要先终局（服务端如此）：对局中不摆一个点了必然失败的键 */}
+          {finished && (
+            <Button
+              size={size}
+              variant="outline"
+              className="text-neg"
+              onClick={() => onOpen("newGame")}
+            >
+              <RefreshCcw className="h-4 w-4" /> 重开一局
+            </Button>
+          )}
         </div>
       </section>
       {dissolvable && (

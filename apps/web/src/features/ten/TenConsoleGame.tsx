@@ -1,10 +1,4 @@
-import {
-  isLocalPlayer,
-  seatNames,
-  type TenGameView,
-  type TenRoomView,
-  type UiState,
-} from "@riichi/core";
+import { seatNames, type TenGameView, type TenRoomView, type UiState } from "@riichi/core";
 import { ConsoleGameShell } from "@/features/console/ConsoleGameShell";
 import { useTimeMarkNotice } from "./clock/useTimeMarkNotice";
 import { TenFinalPanel } from "./final/TenFinalPanel";
@@ -16,12 +10,12 @@ import { TenStageHint } from "./scoreboard/TenStageHint";
 import { TenControlButtons } from "./settlement/TenControlButtons";
 import { TenControlHost } from "./settlement/TenControlHost";
 import { useTenDialogs } from "./settlement/useTenDialogs";
+import { canPickFor } from "./stageB/canPick";
 import { GuessBoard } from "./stageB/GuessBoard";
 
 /**
  * 二人房的主控台对局页。Stage B 时宽屏右栏从历史换成全牌型板（结算后自动换回）；
- * 窄屏没有右栏，全牌型板放在得分卡下面。防守方是本地玩家（没有手机）时主控台替他指定，
- * 否则主控台只读——与宣言同一条规则：设备玩家的事由本人在手机上做。
+ * 窄屏没有右栏，全牌型板放在得分卡下面。主控台能否替防守方指定见 `canPickFor`。
  */
 export function TenConsoleGame({
   room,
@@ -39,7 +33,7 @@ export function TenConsoleGame({
   const { present } = game;
   const finished = present.status === "finished";
   const stageB = !finished && present.stage.kind === "B" ? present.stage : null;
-  const pickable = stageB !== null && isLocalPlayer(room.seats[1 - stageB.attacker]);
+  const pickable = stageB !== null && canPickFor(stageB, room.seats, null);
   useTimeMarkNotice(room.timeMark);
 
   return (
@@ -90,6 +84,7 @@ export function TenConsoleGame({
       <TenControlHost
         dialog={controls.dialog}
         onClose={controls.close}
+        gameNo={room.gameNo}
         game={present}
         names={names}
         rules={room.rules}

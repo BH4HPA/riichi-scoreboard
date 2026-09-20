@@ -8,11 +8,6 @@ export const TEN_DRAW_LABELS: Record<TenDrawReason, string> = {
   exhausted: "王牌流局",
 };
 
-export const TEN_ENTRY_KIND_LABELS: Record<TenEntry["kind"], string> = {
-  tenTsumo: "自摸和",
-  tenDraw: "流局",
-};
-
 export function tenDeclareLabel(riichi: boolean): string {
   return riichi ? "立直" : "听牌宣言";
 }
@@ -32,15 +27,22 @@ export function describeTenEntry(entry: TenEntry): string {
   if (entry.kind === "tenTsumo") {
     const name = entry.names[entry.winner]!;
     const honba = entry.honba > 0 ? `（含 ${entry.honba} 本场）` : "";
-    return `${head}：${role(entry.winner, entry.dealer)} ${name} ${tenDeclareLabel(entry.riichi)}后，防守方指定 ${entry.rounds} 轮未中，自摸 ${describeValue(entry.value, entry.tier)}，得 ${formatPoints(entry.gain)} 点${honba}。`;
+    return `${head}：${role(entry.winner, entry.dealer)} ${name} ${tenDeclareLabel(entry.riichi)}后，${missed(entry.rounds)}，自摸 ${describeValue(entry.value, entry.tier)}，得 ${formatPoints(entry.gain)} 点${honba}。`;
   }
   if (entry.attacker === null) return `${head}：18 巡内无人宣言，流局。`;
   const name = entry.names[entry.attacker]!;
   const how =
     entry.reason === "guessed"
-      ? `第 ${entry.rounds} 轮被猜中待牌`
-      : `指定 ${entry.rounds} 轮未中，摸到王牌仍未和`;
+      ? entry.rounds > 0
+        ? `第 ${entry.rounds} 轮被猜中待牌`
+        : "被猜中待牌"
+      : `${missed(entry.rounds)}，摸到王牌仍未和`;
   return `${head}：${role(entry.attacker, entry.dealer)} ${name} ${tenDeclareLabel(entry.riichi)}，${how}，流局。`;
+}
+
+/** 指定没有记在全牌型板上（口头进行）时不写轮数 */
+function missed(rounds: number): string {
+  return rounds > 0 ? `防守方指定 ${rounds} 轮未中` : "防守方未猜中";
 }
 
 function shortEntry(entry: TenEntry): string {
@@ -54,7 +56,12 @@ function shortEntry(entry: TenEntry): string {
  * 撤销/重做前后的局面差异 → 被撤掉（或重做回来）的是哪一步。
  * 二人房的宣言与指定也是可撤销的步骤，所以除了历史条目还要看阶段。
  */
-export function describeTenRevert(before: TenGameState, after: TenGameState): string {
+export function describeTenRevert(
+  before: TenGameState,
+  after: TenGameState,
+  /** 当前的座位昵称（对局中可以改名，开局快照里的可能是旧名字） */
+  names: readonly string[],
+): string {
   const [longer, shorter] =
     before.history.length >= after.history.length ? [before, after] : [after, before];
   // 历史新条目在头部：多出来的那一条就是第 0 条
@@ -65,7 +72,7 @@ export function describeTenRevert(before: TenGameState, after: TenGameState): st
   if (b.kind !== a.kind) {
     const declared = b.kind === "B" ? b : a.kind === "B" ? a : null;
     if (declared) {
-      return `${longer.players[declared.attacker]!.name}的${tenDeclareLabel(declared.riichi)}`;
+      return `${names[declared.attacker]}的${tenDeclareLabel(declared.riichi)}`;
     }
   }
   if (b.kind === "B" && a.kind === "B" && b.guesses.length !== a.guesses.length) {

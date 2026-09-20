@@ -38,7 +38,7 @@ export interface YonmaRoomView extends RoomViewShell {
 export interface TenRoomView extends RoomViewShell {
   kind: "ten";
   game: TenGameView | null;
-  /** 暗计时的提示档（广播时刻计，见 `ten/clock.ts`）；未在对局中为 0。只给档位、不给剩余时间 */
+  /** 暗计时的提示档（广播时刻计，见 `ten/clock.ts`）；未在对局中为 0。只给档位、不给倒计时 */
   timeMark: TenTimeMark;
 }
 

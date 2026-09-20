@@ -65,6 +65,38 @@ test("二人房：首页选房型 → 投屏规则说明 → 宣言 → 全牌�
   // Stage A 没有和牌入口（不是灰着，是不出现）
   await expect(east.getByRole("button", { name: "自摸和" })).toHaveCount(0);
   await expect(east.getByRole("button", { name: "无人宣言流局" })).toBeVisible();
+  // 重开要先终局：对局中不摆一个点了必然失败的键
+  await expect(east.getByRole("button", { name: "重开一局" })).toHaveCount(0);
+
+  // ── 误点了立直 → 打开自摸和才发现 → 对方撤销宣言：弹窗带提示关闭，不会在下次宣言时自己弹回来 ──
+  await east.getByRole("button", { name: "立直", exact: true }).click();
+  await expect(east.getByTestId("sticks-0")).toHaveText("立直棒 9");
+  await east.getByRole("button", { name: "自摸和" }).click();
+  await east.getByRole("dialog").getByRole("button", { name: "3", exact: true }).click();
+  await west.getByRole("button", { name: "撤销" }).click();
+  await expect(east.getByRole("dialog")).toHaveCount(0);
+  // 紧跟着到的撤销广播盖过了「局面已变化」：留在屏幕上的这一句正好说明弹窗为什么关了
+  await expect(east.getByText(/阿西 撤销了：阿东的立直/)).toBeVisible();
+  await expect(tv.getByTestId("sticks-0")).toHaveText("立直棒 10");
+  await expect(tv.getByTestId("music-float")).toHaveCount(0);
+  // 改按听牌宣言：是另一次宣言，旧草稿（立直、选好的 3 番）不沿用
+  await east.getByRole("button", { name: "听牌宣言" }).click();
+  await expect(tv.getByTestId("ten-stage")).toHaveText("Stage B · 阿东 听牌宣言");
+  await expect(east.getByRole("dialog")).toHaveCount(0);
+  await east.getByRole("button", { name: "自摸和" }).click();
+  const redo = east.getByRole("dialog");
+  await expect(redo.getByText("自摸和 · 阿东（听牌宣言）")).toBeVisible();
+  await expect(redo.getByRole("button", { name: "3", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  await redo.getByRole("tab", { name: "牌面" }).click();
+  await expect(redo.getByRole("checkbox", { name: "立直", exact: true })).not.toBeChecked();
+  await expect(redo.getByText("本局是听牌宣言：不算立直，也没有一发和里宝。")).toBeVisible();
+  await redo.getByRole("tab", { name: "番符" }).click();
+  await redo.getByRole("button", { name: "取消" }).click();
+  await east.getByRole("button", { name: "撤销" }).click();
+  await expect(tv.getByTestId("ten-stage")).toHaveText("Stage A · 比谁先听牌");
 
   // ── 阿东立直：扣 1 根立直棒、电视放曲、进入 Stage B，右栏从历史换成全牌型板 ──
   await east.getByRole("button", { name: "立直", exact: true }).click();
@@ -125,6 +157,18 @@ test("二人房：首页选房型 → 投屏规则说明 → 宣言 → 全牌�
   await expect(
     tv.getByText(/阿东 立直后，防守方指定 2 轮未中，自摸 3 番 30 符，得 6,000 点/),
   ).toBeVisible();
+  await expect(tv.getByRole("heading", { name: "第 2 局 1 本场" })).toBeVisible();
+
+  // ── 两台手机同时开着「无人宣言流局」：一台确认后另一台的确认框自动关掉，不会多记一局 ──
+  await east.getByRole("button", { name: "无人宣言流局" }).click();
+  await west.getByRole("button", { name: "无人宣言流局" }).click();
+  await east.getByRole("button", { name: "确认流局" }).click();
+  await expect(west.getByRole("dialog")).toHaveCount(0);
+  await expect(west.getByText("局面已变化，结算已关闭")).toBeVisible();
+  await expect(tv.getByRole("heading", { name: "第 3 局 2 本场" })).toBeVisible();
+  await tv.getByRole("button", { name: "操作" }).click();
+  await tv.getByRole("dialog").getByRole("button", { name: "撤销" }).click();
+  await tv.keyboard.press("Escape");
   await expect(tv.getByRole("heading", { name: "第 2 局 1 本场" })).toBeVisible();
 
   // ── 阿西听牌宣言（不扣立直棒）→ 阿东猜中 → 流局 ──

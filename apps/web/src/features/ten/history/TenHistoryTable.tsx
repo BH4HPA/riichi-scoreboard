@@ -2,7 +2,6 @@ import {
   describeTenEntry,
   formatDiff,
   TEN_DRAW_LABELS,
-  TEN_ENTRY_KIND_LABELS,
   tenRoundLabel,
   type TenEntry,
 } from "@riichi/core";
@@ -20,9 +19,7 @@ function EntryCard({ entry, tv }: { entry: TenEntry; tv: boolean }) {
       >
         <span className="font-semibold tabular">{tenRoundLabel(entry.round, entry.honba)}</span>
         <Badge tone="outline" size={tv ? "md" : "sm"}>
-          {entry.kind === "tenDraw"
-            ? TEN_DRAW_LABELS[entry.reason]
-            : TEN_ENTRY_KIND_LABELS[entry.kind]}
+          {entry.kind === "tenDraw" ? TEN_DRAW_LABELS[entry.reason] : "自摸和"}
         </Badge>
         <span className="text-muted">庄家 {entry.names[entry.dealer]}</span>
         {entry.kind === "tenTsumo" && (

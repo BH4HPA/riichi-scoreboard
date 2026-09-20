@@ -5,10 +5,13 @@ import {
   type TenDrawReason,
   type TenGameState,
 } from "@riichi/core";
+import { useEffect, useRef } from "react";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
+import { useRoomStore } from "@/ws/store";
 import { useCommand } from "@/ws/useRoom";
 import { DissolveDialog } from "@/features/console/DissolveButton";
 import { useMirror } from "@/features/mirror/useMirror";
+import { tenDraftStamp } from "@/features/settlement/drafts/stamp";
 import { TenTsumoDialog } from "./TenTsumoDialog";
 import type { TenDialog } from "./useTenDialogs";
 
@@ -19,16 +22,23 @@ function drawDescription(reason: TenDrawReason, game: TenGameState, names: strin
   const { stage } = game;
   if (reason === "noDeclare" || stage.kind !== "B") return `18 巡内没有人宣言。${after}`;
   const who = `${names[stage.attacker]}（${tenDeclareLabel(stage.riichi)}）`;
+  // 全牌型板是便利不是必经步骤：一轮都没记（口头指定）时不写轮数
+  const rounds = stage.guesses.length;
   return reason === "guessed"
-    ? `防守方第 ${stage.guesses.length} 轮猜中了 ${who}的待牌。${after}`
+    ? `防守方${rounds > 0 ? `第 ${rounds} 轮` : ""}猜中了 ${who}的待牌。${after}`
     : `${who} 摸到王牌仍未和牌，也没有被猜中。${after}`;
 }
 
-/** 流局确认：打开期间把「正在记哪种流局」镜像到电视。 */
+/**
+ * 流局确认：打开期间把「正在记哪种流局」镜像到电视。
+ * 它写入一局的结果，所以和自摸和表单一样盯着局面戳：两台手机同时开着「无人宣言流局」，一台确认后另一台的
+ * 弹窗文案看起来仍然成立，再点一次就多记一局——戳变了就关掉并提示。
+ */
 function TenDrawConfirm({
   reason,
   open,
   onOpenChange,
+  gameNo,
   game,
   names,
   mirror,
@@ -36,11 +46,31 @@ function TenDrawConfirm({
   reason: TenDrawReason;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  gameNo: number;
   game: TenGameState;
   names: string[];
   mirror: boolean;
 }) {
   const send = useCommand();
+  const notify = useRoomStore((s) => s.notify);
+  const stamp = tenDraftStamp(gameNo, game);
+  const opened = useRef<string | null>(null);
+  const submitting = useRef(false);
+  const close = useRef(onOpenChange);
+  useEffect(() => {
+    close.current = onOpenChange;
+  });
+  useEffect(() => {
+    if (!open) {
+      opened.current = null;
+      return;
+    }
+    if (opened.current === null) opened.current = stamp;
+    // 自己提交期间到达的变化正是自己这一笔，不算
+    if (opened.current === stamp || submitting.current) return;
+    notify("info", "局面已变化，结算已关闭");
+    close.current(false);
+  }, [open, stamp, notify]);
   const description = drawDescription(reason, game, names);
   useMirror(
     open,
@@ -60,7 +90,12 @@ function TenDrawConfirm({
       title={`记为「${TEN_DRAW_LABELS[reason]}」？`}
       description={description}
       confirmText="确认流局"
-      onConfirm={() => send({ type: "tenDraw", reason })}
+      onConfirm={async () => {
+        submitting.current = true;
+        return send({ type: "tenDraw", reason }).finally(() => {
+          submitting.current = false;
+        });
+      }}
     />
   );
 }
@@ -69,6 +104,7 @@ function TenDrawConfirm({
 export function TenControlHost({
   dialog,
   onClose,
+  gameNo,
   game,
   names,
   rules,
@@ -77,6 +113,7 @@ export function TenControlHost({
 }: {
   dialog: TenDialog | null;
   onClose: () => void;
+  gameNo: number;
   game: TenGameState;
   names: string[];
   rules: RoomRules;
@@ -106,6 +143,7 @@ export function TenControlHost({
           key={reason}
           reason={reason}
           {...openOf(reason)}
+          gameNo={gameNo}
           game={game}
           names={names}
           mirror={mirror}
@@ -125,7 +163,7 @@ export function TenControlHost({
       <ConfirmDialog
         {...openOf("newGame")}
         title="重开一局？"
-        description="得分、立直棒、局数与历史记录将重置，1 小时从头计；座位与规则保持不变。此操作不可撤销。"
+        description="开一局新的：得分、立直棒、局数与历史记录从头开始，1 小时重新计；座位与规则保持不变。此操作不可撤销。"
         confirmText="确认重开"
         danger
         onConfirm={() => send({ type: "newGame" })}

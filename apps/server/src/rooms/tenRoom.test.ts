@@ -10,7 +10,7 @@ import { openDatabase } from "../db";
 import { PlayersRepo } from "../db/players";
 import { ResultsRepo } from "../db/results";
 import { RoomsRepo } from "../db/rooms";
-import { RoomRegistry, type LiveRoom, type RoomClient } from "./registry";
+import { RoomCorrupt, RoomRegistry, type LiveRoom, type RoomClient } from "./registry";
 
 function fakeClient(
   playerId: string,
@@ -226,6 +226,11 @@ describe("二人房（《天》规则）", () => {
     expect(last(a).timeMark).toBe(0);
     advance(50 * MIN);
     expect(last(a).timeMark).toBe(1);
+  });
+
+  it("行上的房型不认识（回滚前建的新房型）：当作损坏的房间，不会建出零座位的房间", () => {
+    db.prepare("UPDATE rooms SET kind = 'sanma' WHERE code = ?").run(room.code);
+    expect(() => build().get(room.code)).toThrow(RoomCorrupt);
   });
 
   it("重启等价：房型随房间行落库，回放后进房的人按开局时刻拿到当前档位", () => {
