@@ -77,7 +77,10 @@ export function applyRecognized(
 ): ValueDraft {
   const { closed, melds, capped } = capAka(result.hand.closed, result.hand.melds, rules);
   const fold = (t: number) => (rules.hand.akaCount === 0 && isAka(t) ? baseTile(t) : t);
-  const warnings = [...result.warnings];
+  // 表里张数不等只在用里宝的规则下才是问题：不用里宝时里宝行下面会整行丢掉，结果自洽
+  const warnings = result.warnings.filter(
+    (w) => rules.hand.uraDora || w.code !== "indicator_mismatch",
+  );
   const maxDora = rules.hand.kanDora ? 5 : 1;
   let doraIndicators = result.hand.doraIndicators.map(fold);
   if (doraIndicators.length > maxDora) {
@@ -91,6 +94,7 @@ export function applyRecognized(
   // 里宝只有立直者才翻：照片里有里宝指示牌就是立直的证据，直接勾上
   let riichi = draft.hand.riichi;
   let riichiAuto = false;
+  // 表宝牌按规则截断后，里宝跟着截到同样张数
   let uraIndicators = result.hand.uraIndicators.map(fold).slice(0, doraIndicators.length);
   if (uraIndicators.length > 0) {
     if (!rules.hand.uraDora) {

@@ -22,6 +22,7 @@ export type RecognitionWarningCode =
   | "bad_group"
   | "extra_rows"
   | "too_many_dora"
+  | "indicator_mismatch"
   | "kan_mismatch"
   | "odd_box";
 

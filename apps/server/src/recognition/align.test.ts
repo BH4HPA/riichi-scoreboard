@@ -169,17 +169,17 @@ describe("align", () => {
     expect(out.labels).toHaveLength(noisy.length);
   });
 
-  it("里宝行比表宝行长 → 送人工：截掉的框没有位置，照单全收会带着模型原判进 auto", () => {
+  it("里宝行比表宝行长 → 送人工：多半漏检了一张表宝牌，那张实物没有框", () => {
     const dets = [...hand.dets, ...row(["6s"], 30, 20).dets, ...row(["3m", "4m"], 30, 110).dets];
     const b = layoutHand(dets);
     expect(b.hand.doraIndicators).toEqual([TILE.S6]);
-    expect(b.hand.uraIndicators).toEqual([TILE.M3]);
+    expect(b.hand.uraIndicators).toEqual([TILE.M3, TILE.M4]);
     const out = align(dets, b.hand, {
       ...emptyHand([...b.hand.closed], [...b.hand.doraIndicators]),
       uraIndicators: [...b.hand.uraIndicators],
     });
     expect(out.status).toBe("manual");
-    expect(out.reason).toContain("里宝指示牌多于表宝牌");
+    expect(out.reason).toContain("表里指示牌张数不等");
   });
 
   it("同牌连排的末尾被改 → 送人工：和「删掉前面一张再补一张」分不开，该重标的框不同", () => {
