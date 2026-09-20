@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { canUseCamera } from "@/lib/device";
 
-/** 请求的分辨率：取景带裁完还要 letterbox 到 640，源越清楚每张牌剩的像素越多 */
+/** 请求的分辨率：裁出手牌那一块还要 letterbox 到 640，源越清楚每张牌剩的像素越多 */
 const CONSTRAINTS: MediaStreamConstraints = {
   video: {
     facingMode: { ideal: "environment" },

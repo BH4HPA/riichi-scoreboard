@@ -3,7 +3,14 @@ import { validateHandShape } from "../reducer/validateCommand";
 import type { HandInput } from "../types/state";
 import { MAX_TILE } from "../types/tiles";
 import { RECOGNITION_CLASSES } from "./classes";
-import type { Detection, RecognitionPatch, RecognizedHand } from "./types";
+import {
+  RECOGNITION_WARNING_CODES,
+  type Detection,
+  type RecognitionPatch,
+  type RecognitionSessionSummary,
+  type RecognizedHand,
+  type RecognitionWarningCode,
+} from "./types";
 
 export const MAX_DETECTIONS = 300;
 
@@ -85,4 +92,52 @@ export function validateRecognitionPatch(v: unknown): RecognitionPatch {
   if (v.corrected !== undefined) patch.corrected = corrected(v.corrected);
   if (Object.keys(patch).length === 0) bad("没有可更新的字段");
   return patch;
+}
+
+/** 摘要里的计数上限：取景页 60 秒没认出牌就停流，正常会话远到不了；只为挡住离谱的数 */
+const MAX_COUNT = 1_000_000;
+
+function count(v: unknown, what: string, max = MAX_COUNT): number {
+  const n = finite(v, what);
+  if (!Number.isInteger(n) || n < 0 || n > max) bad(`${what}无效`);
+  return n;
+}
+
+function oneOf<T extends string | number>(v: unknown, all: readonly T[], what: string): T {
+  if (!all.includes(v as T)) bad(`${what}无效`);
+  return v as T;
+}
+
+function size(v: unknown, what: string): string {
+  if (typeof v !== "string" || !/^\d{1,5}x\d{1,5}$/.test(v)) bad(`${what}无效`);
+  return v;
+}
+
+/** POST /api/recognition-sessions 的请求体。 */
+export function validateRecognitionSession(v: unknown): RecognitionSessionSummary {
+  if (!isRecord(v)) bad("请求体无效");
+  if (v.modelId !== null && (typeof v.modelId !== "string" || !/^[0-9a-f-]{36}$/.test(v.modelId)))
+    bad("模型 id 无效");
+  if (!isRecord(v.blocking)) bad("阻塞统计无效");
+  const blocking: Partial<Record<RecognitionWarningCode, number>> = {};
+  for (const [code, n] of Object.entries(v.blocking)) {
+    blocking[oneOf(code, RECOGNITION_WARNING_CODES, "阻塞统计")] = count(n, "阻塞统计");
+  }
+  return {
+    source: oneOf(v.source, ["room", "label", "calc"] as const, "来源"),
+    outcome: oneOf(v.outcome, ["auto", "manual", "album", "abandoned"] as const, "收场方式"),
+    modelId: v.modelId,
+    durationMs: count(v.durationMs, "时长", 86_400_000),
+    frames: count(v.frames, "帧数"),
+    settledFrames: count(v.settledFrames, "帧数"),
+    secondPasses: count(v.secondPasses, "帧数"),
+    msAvg: count(v.msAvg, "耗时", 600_000),
+    blocking,
+    keyChanges: count(v.keyChanges, "跳变次数"),
+    maxVotes: count(v.maxVotes, "票数", 100),
+    rotation: oneOf(v.rotation, [0, 90, 270] as const, "方向"),
+    rotationSource: oneOf(v.rotationSource, ["none", "manual", "gyro"] as const, "方向来源"),
+    video: size(v.video, "画面尺寸"),
+    viewport: size(v.viewport, "取景区域尺寸"),
+  };
 }

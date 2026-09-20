@@ -98,4 +98,17 @@ describe("数据库迁移", () => {
     expect(row.updated_at).toBe(200);
     expect(repo.patch(id, "p1", {}, 400)).toBe(false);
   });
+
+  it("v5 库升级到 v6：识别记录原样保留，多出取景会话表", () => {
+    const db = new DatabaseSync(":memory:");
+    for (const sql of MIGRATIONS.slice(0, 5)) db.exec(sql);
+    db.exec("PRAGMA user_version = 5");
+    const id = new RecognitionsRepo(db).create("p1", "hands/p1/a.jpg", "m", "calc", 1);
+    migrate(db);
+    expect(schemaVersion(db)).toBe(MIGRATIONS.length);
+    expect(db.prepare("SELECT source FROM recognitions WHERE id = ?").get(id)).toEqual({
+      source: "calc",
+    });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM recognition_sessions").get()).toEqual({ n: 0 });
+  });
 });

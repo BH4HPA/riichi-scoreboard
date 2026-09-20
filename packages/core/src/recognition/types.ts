@@ -13,17 +13,20 @@ export type RecognizedHand = Pick<
   "closed" | "melds" | "winTile" | "doraIndicators" | "uraIndicators"
 >;
 
-export type RecognitionWarningCode =
-  | "no_tiles"
-  | "count"
-  | "no_win_tile"
-  | "multi_win"
-  | "back_in_hand"
-  | "bad_group"
-  | "extra_rows"
-  | "too_many_dora"
-  | "kan_mismatch"
-  | "odd_box";
+export const RECOGNITION_WARNING_CODES = [
+  "no_tiles",
+  "count",
+  "no_win_tile",
+  "multi_win",
+  "back_in_hand",
+  "bad_group",
+  "extra_rows",
+  "too_many_dora",
+  "indicator_mismatch",
+  "kan_mismatch",
+  "odd_box",
+] as const;
+export type RecognitionWarningCode = (typeof RECOGNITION_WARNING_CODES)[number];
 
 /**
  * 分两档，**在发出处指定**而不是按 code 查表：同一个 code 在不同上下文语义不同
@@ -104,3 +107,36 @@ export interface RecognitionPatch {
 
 /** 识别照片上传的字节上限（服务端校验与手机端编码兜底共用） */
 export const RECOGNITION_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
+
+/** 一次取景怎么收场的：自动定格、手按快门、相册选图，或者什么都没拍就关了 */
+export type RecognitionSessionOutcome = "auto" | "manual" | "album" | "abandoned";
+
+/**
+ * 一次取景会话的摘要（POST /api/recognition-sessions，取景页关闭时上报一条，**不含照片**）。
+ * 留存的识别记录全是「定格成功」的那一帧，认不稳、放弃的会话不留任何痕迹——这条摘要补的就是这个盲区：
+ * 花了多久、跑了几帧、几帧算数、被哪条 blocking 挡了多少次、牌面跳了几次。
+ */
+export interface RecognitionSessionSummary {
+  source: RecognitionSource;
+  outcome: RecognitionSessionOutcome;
+  modelId: string | null;
+  durationMs: number;
+  /** 出了结果的帧数 / 其中收紧到手牌周围的（可计票的）帧数 / 当场识别了第二遍的帧数 */
+  frames: number;
+  settledFrames: number;
+  secondPasses: number;
+  /** 单帧平均耗时（含第二遍） */
+  msAvg: number;
+  /** 各条 blocking 挡了多少帧（只数可计票的帧） */
+  blocking: Partial<Record<RecognitionWarningCode, number>>;
+  /** 相邻两个可计票的帧牌面指纹不同的次数：越大说明识别结果越跳 */
+  keyChanges: number;
+  /** 窗口里同一指纹最多攒到过几票 */
+  maxVotes: number;
+  /** 收场时界面的方向，及它最后一次是谁定的 */
+  rotation: 0 | 90 | 270;
+  rotationSource: "none" | "manual" | "gyro";
+  /** 相机帧与取景区域的尺寸，"宽x高"；没出过帧时为 "0x0" */
+  video: string;
+  viewport: string;
+}

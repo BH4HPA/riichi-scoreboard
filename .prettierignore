@@ -3,3 +3,4 @@ dist
 data
 .yarn
 yarn.lock
+packages/core/src/recognition/__fixtures__

@@ -30,6 +30,11 @@ export interface LayoutOptions {
   lowConf: number;
   /** 低于此置信度的框不参与布局（评估集里误检在 0.32–0.34，真牌最低 0.60） */
   minConf: number;
+  /**
+   * 调用方已知画面是正的（取景页按设备朝向转正过）：跳过「多数框宽 > 高 ⇒ 竖拍」的投票。
+   * 整帧里侧着看的牌山、两侧玩家的牌河都是宽框，票数接近时会把正的画面误判成竖拍。
+   */
+  upright: boolean;
 }
 
 export const DEFAULT_LAYOUT: LayoutOptions = {
@@ -39,15 +44,41 @@ export const DEFAULT_LAYOUT: LayoutOptions = {
   sideAspect: 1.0,
   lowConf: 0.5,
   minConf: 0.4,
+  upright: false,
 };
+
+/** 入参坐标系里的矩形 [x1, y1, x2, y2] */
+export type Box = readonly [number, number, number, number];
+
+/**
+ * 手牌周围的窗口，单位是**手牌行**正放牌的中位牌高 H / 牌宽 W（不取全图中位数：远处牌河的牌更小，
+ * 数量一多就会把窗口拉窄）。副露与指示牌只在窗口里找，窗口外的一律当牌河 / 牌山。
+ * 数值来自线上实拍（2026-09-19，50 条）：被采信的指示牌行距手牌行中心最远 3.61H，表里两行之间 0.89–1.2H；
+ * 评估集里副露摆在手牌下方的最远 2.8H。副露多的近拍里行是一层层摞上去的，所以按「逐跳」量而不是量到手牌行。
+ */
+export const HAND_WINDOW = {
+  /** 一跳：副露行、第一行指示牌，距上一个已采信的行（手牌行或更近的副露行）的中心 */
+  hop: 4,
+  /** 第二行指示牌距第一行中心 */
+  secondHop: 2,
+  /** 左右留给还没认出来的副露 */
+  side: 1.5,
+} as const;
 
 export interface LayoutResult {
   hand: RecognizedHand;
   warnings: RecognitionWarning[];
   provenance: HandProvenance;
+  /**
+   * 手牌可能占据的区域（入参坐标系）：取景据此裁出下一遍要识别的范围。
+   * 只由手牌行的位置与尺度决定，不随指示牌有没有认出来伸缩，所以逐帧稳定。没有暗牌组时为 null。
+   */
+  window: Box | null;
 }
 
 const MAX_MELDS = 4;
+/** 「这个方向不设边」：调用方会把窗口夹进画面 */
+const FAR = 1e9;
 const MAX_INDICATORS = 5;
 
 /** 补出来的牌（暗杠只露中间两张、杠里一张认成牌背）没有对应的框 */
@@ -259,7 +290,9 @@ function isCleanRow(items: Item[]): boolean {
  * - 暗牌连排，和张横放接在任一端（同一组，不留空）；暗牌组含和张恒为 3n+2 张。
  * - 副露 3/4 张且含一张横置，或 牌背-X-X-牌背 的暗杠；放在手牌行右侧、下方或上方都行。
  * - 指示牌在手牌行上方，不含横置与牌背，每行 ≤5 张；两行时上表下里，一行全表。
- * - 照片已由用户裁剪，只含手牌 / 副露 / 指示牌；多出来的行只报警告。
+ * - 照片可以带着牌河与牌山：手牌组取「暗牌 + 窗口内副露恰为 14 张」的那组，副露与指示牌只在
+ *   `HAND_WINDOW` 里找，窗口外多出来的牌只报 `extra_rows`。
+ * - 有里宝时表里张数必然相等：不等且远的那行更长，远行是牌河的末行；其余不等报 `indicator_mismatch`。
  * 前提：detections 的 cls 已在类目录范围内（decodeNmsOutput / validate 都保证）。
  * 不抛错：能拼多少拼多少，问题写进 warnings，交编辑器让用户改。
  */
@@ -302,14 +335,22 @@ export function layoutHand(
         usedDetections: [],
         rejectedDetections: sorted(rejected),
       },
+      window: null,
     };
   }
 
-  const swap = isPortrait(kept);
-  // 牌是刚性的，同一张照片里正放牌的框比例高度一致；明显更窄的框是误检（残缺、杂物），剔除
+  const swap = !opts.upright && isPortrait(kept);
+  // 牌是刚性的，同一行里正放牌的框比例高度一致；明显更窄的框是误检（残缺、杂物），剔除。
+  // 按行比而不是全图比：侧着看的牌山、远处的牌河比例与手牌不同，混在一起算中位数会把手牌里正常的牌也判成异常
   const all = toItems(kept, swap, opts.sideAspect);
-  const ratioRef = median(all.filter((i) => !i.side).map((i) => i.w / i.h));
-  const items = all.filter((i) => i.side || i.w / i.h >= 0.85 * ratioRef);
+  const ratio = (i: Item) => i.w / i.h;
+  const globalRef = median(all.filter((i) => !i.side).map(ratio));
+  const roughH = median(all.filter((i) => !i.side).map((i) => i.h));
+  const items = clusterRows(all, opts.rowGap * roughH).flatMap((row) => {
+    const up = row.filter((i) => !i.side);
+    const ref = up.length >= 3 ? median(up.map(ratio)) : globalRef;
+    return row.filter((i) => i.side || ratio(i) >= 0.85 * ref);
+  });
   if (items.length < all.length) {
     warn("odd_box", "info", `${all.length - items.length} 个检测框形状异常，已忽略`);
     const keptItems = new Set(items);
@@ -336,7 +377,75 @@ export function layoutHand(
     const p = parts.get(g);
     return !!p && p.closed === null && p.melds.length > 0;
   };
-  // 暗牌组：优先「暗牌段含一张横置的和张」（两张暗牌配四杠时，5 张的指示牌行也是 3n+2，靠横置区分），
+  const hasSide = (seg: Item[]) => seg.some((i) => i.side && i.tile !== null);
+  const rowOf = new Map<Item[], Row>();
+  for (const row of rows) for (const g of row.groups) rowOf.set(g, row);
+  /** 以某个暗牌段为准的牌高 / 牌宽：窗口的尺子 */
+  const scaleOf = (seg: Item[]) => {
+    const up = seg.filter((i) => !i.side);
+    return up.length > 0
+      ? { h: median(up.map((i) => i.h)), w: median(up.map((i) => i.w)) }
+      : { h: medH, w: medW };
+  };
+  /** 从手牌行往一侧逐行走出去的行序 */
+  const outward = (hand: Row, dir: -1 | 1) =>
+    rows
+      .filter((r) => r !== hand && Math.sign(r.cy - hand.cy) === dir)
+      .sort((a, b) => Math.abs(a.cy - hand.cy) - Math.abs(b.cy - hand.cy));
+  /** 含纯副露组、且离上一个这样的行（或手牌行）不超过一跳的行：副露多时是一层层摞上去的 */
+  const meldRows = (closedGroup: Item[], hand: Row, h: number): Set<Row> => {
+    const near = new Set<Row>([hand]);
+    for (const dir of [-1, 1] as const) {
+      let from = hand.cy;
+      for (const row of outward(hand, dir)) {
+        if (Math.abs(row.cy - from) > HAND_WINDOW.hop * h) break;
+        if (!row.groups.some((g) => g !== closedGroup && isPureMelds(g))) continue;
+        near.add(row);
+        from = row.cy;
+      }
+    }
+    return near;
+  };
+  /** 窗口内的纯副露组，由近及远（先按行距，同一行按横向距离） */
+  const nearbyMeldGroups = (closedGroup: Item[], hand: Row, h: number) => {
+    const cx = (g: Item[]) => g.reduce((n, i) => n + i.cx, 0) / Math.max(1, g.length);
+    const at = cx(closedGroup);
+    return [...meldRows(closedGroup, hand, h)]
+      .flatMap((row) =>
+        row.groups
+          .filter((g) => g !== closedGroup && isPureMelds(g))
+          .map((g) => ({ g, dy: Math.abs(row.cy - hand.cy), dx: Math.abs(cx(g) - at) })),
+      )
+      .sort((a, b) => a.dy - b.dy || a.dx - b.dx)
+      .map(({ g }) => g);
+  };
+  /** 一手牌恰 14 张：暗牌段定下来以后，还容得下几组副露 */
+  const meldRoom = (seg: Item[]) => (seg.length % 3 === 2 ? (14 - seg.length) / 3 : MAX_MELDS);
+
+  // 暗牌组第一优先：暗牌段 + 3 × 窗口内副露组数 凑得成 14 的那组——牌河里 5 张带立直宣言牌的一行
+  // 也是「3n+2 含横置」，但它凑不成 14；和张没横放的真手牌（线上 4/50）照样胜出。同级取含横置和张的、再取最下面的
+  const complete = (): [Item[], Row, Item[]] | null => {
+    let best: [Item[], Row, Item[]] | null = null;
+    for (const row of rows) {
+      for (const g of row.groups) {
+        const p = parts.get(g);
+        if (!p?.closed) continue;
+        const seg = p.closed;
+        // 同组拆出来的副露必须全算；别处的由近及远补，够数即可（多出来的是牌山、牌河里凑巧成形的）
+        const need = meldRoom(seg) - p.melds.length;
+        const near = nearbyMeldGroups(g, row, scaleOf(seg).h);
+        const available = near.reduce((n, m) => n + parts.get(m)!.melds.length, 0);
+        if (need < 0 || available < need) continue;
+        const better =
+          !best ||
+          (hasSide(seg) && !hasSide(best[2])) ||
+          (hasSide(seg) === hasSide(best[2]) && row.cy > best[1].cy);
+        if (better) best = [g, row, seg];
+      }
+    }
+    return best;
+  };
+  // 凑不成 14（漏检、多认）时的兜底：优先「暗牌段含一张横置的和张」（两张暗牌配四杠时，5 张的指示牌行也是 3n+2，靠横置区分），
   // 其次「暗牌段无横置」，最后任一非副露组（漏检把暗牌切碎时，不让两张的指示牌行冒充暗牌）；
   // 同级取暗牌段最长、再取最下面的行
   const pick = (ok: (g: Item[], seg: Item[]) => boolean): [Item[], Row, Item[]] | null => {
@@ -356,8 +465,8 @@ export function layoutHand(
     }
     return best;
   };
-  const hasSide = (seg: Item[]) => seg.some((i) => i.side && i.tile !== null);
   const closedPick =
+    complete() ??
     pick((g, seg) => !!parts.get(g)?.closed && hasSide(seg)) ??
     // 拆不开的组（副露里一张认错）按整组长度参与：比两张的指示牌行长，用户改一张就行
     pick((g) => !!parts.get(g)?.closed || !parts.has(g)) ??
@@ -372,6 +481,7 @@ export function layoutHand(
     closedGroup = [];
     closedSeg = [];
   }
+  const scale = scaleOf(closedSeg);
   if (closedSeg.length % 3 !== 2)
     warn("bad_group", "blocking", `暗牌组应为 3n+2 张，实际 ${closedSeg.length} 张`);
   let droppedBacks = parts.get(closedGroup)?.dropped ?? 0;
@@ -402,15 +512,11 @@ export function layoutHand(
     closedOrigins.push(originOf(winItem, winGuessed));
   }
 
-  // 副露：暗牌所在组拆出来的副露段 + 其他任何行里能拆成纯副露的组
+  // 副露：暗牌所在组拆出来的副露段 + 窗口内能拆成纯副露的组（窗口外含横置的牌多半是牌河里的立直宣言牌）
   const melds: Meld[] = [];
   const meldOrigins: TileOrigin[][] = [];
   const consumed = new Set<Item[]>([closedGroup]);
   const addMeld = (seg: Item[]) => {
-    if (melds.length >= MAX_MELDS) {
-      warn("bad_group", "blocking", "副露超过 4 组，多出的已忽略");
-      return;
-    }
     if (isAnkan(seg)) {
       const [a, b] = [seg[1]!, seg[2]!];
       if (a.tile === null || b.tile === null) {
@@ -452,43 +558,95 @@ export function layoutHand(
     melds.push({ open: true, tiles: faces });
     meldOrigins.push(origins);
   };
-  for (const seg of parts.get(closedGroup)?.melds ?? []) addMeld(seg);
+  const ownMelds = parts.get(closedGroup)?.melds ?? [];
+  if (ownMelds.length > MAX_MELDS) warn("bad_group", "blocking", "副露超过 4 组，多出的已忽略");
+  for (const seg of ownMelds.slice(0, MAX_MELDS)) addMeld(seg);
+  // 没有暗牌组时无从谈窗口：照片里只有副露，全收
+  const meldGroups = closedPick
+    ? nearbyMeldGroups(closedGroup, handRow, scale.h)
+    : rows.flatMap((row) => row.groups.filter(isPureMelds));
+  // 凑满 14 张就不再收：牌山里的牌背时有时无地拼成「暗杠」，照单全收会让逐帧结果来回跳。
+  // 由近及远选，选定后仍按画面顺序（自上而下、从左到右）输出——回流靠组序与用户确认的手牌逐位对齐
+  const room = closedPick ? meldRoom(closedSeg) - melds.length : MAX_MELDS;
+  const chosen = new Map<Item[], Item[][]>();
+  let skipped = 0;
+  let left = room;
+  for (const g of meldGroups) {
+    if (left <= 0) break;
+    // 一组里只容得下一部分时取离手牌近的那几段；没取的算场外牌
+    const at = closedGroup.reduce((n, i) => n + i.cx, 0) / Math.max(1, closedGroup.length);
+    const mid = (seg: Item[]) => seg.reduce((n, i) => n + i.cx, 0) / seg.length;
+    const segs = [...parts.get(g)!.melds].sort(
+      (p, q) => Math.abs(mid(p) - at) - Math.abs(mid(q) - at),
+    );
+    const taken = new Set(segs.slice(0, left));
+    skipped += segs.slice(left).flat().length;
+    chosen.set(
+      g,
+      parts.get(g)!.melds.filter((seg) => taken.has(seg)),
+    );
+    left -= taken.size;
+  }
   for (const row of rows) {
     for (const g of row.groups) {
-      if (g === closedGroup || !isPureMelds(g)) continue;
+      const segs = chosen.get(g);
+      if (segs === undefined) continue;
       consumed.add(g);
       droppedBacks += parts.get(g)!.dropped;
-      for (const seg of parts.get(g)!.melds) addMeld(seg);
+      for (const seg of segs) addMeld(seg);
     }
   }
   if (droppedBacks > 0)
     warn("back_in_hand", "info", `手牌与副露之间有 ${droppedBacks} 张牌背，已忽略`);
 
-  // 指示牌行：手牌行之外、剩余的组不含横置/牌背且 ≤5 张的行。横拍只看上方；竖拍分不清哪边是「上」，
-  // 两侧都收集、取有干净行的那一侧（两侧都有取行数多的）。离手牌近的是里宝，远的是表宝牌。
+  // 指示牌行：从手牌行往外逐行走，干净（不含横置/牌背、≤5 张）且一跳之内才收，遇到别的就停——
+  // 指示牌与手牌之间不会隔着牌河。横拍只看上方；竖拍分不清哪边是「上」，两侧都走、取行数多的那一侧。
+  // 离手牌近的是里宝，远的是表宝牌。
   const leftover = rows
     .map((row) => ({ row, tiles: row.groups.filter((g) => !consumed.has(g)).flat() }))
     .filter(({ tiles }) => tiles.length > 0);
   const gapToHand = 0.5 * medH;
   const sideOf = (r: Row) =>
     r.cy < handRow.cy - gapToHand ? -1 : r.cy > handRow.cy + gapToHand ? 1 : 0;
-  const candidates = (dir: -1 | 1) =>
-    leftover
-      .filter(({ row, tiles }) => sideOf(row) === dir && isCleanRow(tiles))
-      .map(({ row, tiles }) => ({
-        dist: Math.abs(row.cy - handRow.cy),
-        tiles: [...tiles].sort((a, b) => a.cx - b.cx),
-      }))
-      .sort((a, b) => a.dist - b.dist);
-  const up = candidates(-1);
-  const down = swap ? candidates(1) : [];
-  const indicatorRows = (down.length > up.length ? down : up).map((c) => c.tiles);
-  const usedIndicators = indicatorRows.slice(0, 2).flat();
+  const hops = [HAND_WINDOW.hop * scale.h, HAND_WINDOW.secondHop * scale.h];
+  const leftoverOf = new Map(leftover.map(({ row, tiles }) => [row, tiles]));
+  const walk = (dir: -1 | 1): Item[][] => {
+    const taken: Item[][] = [];
+    let from = handRow.cy;
+    for (const row of outward(handRow, dir)) {
+      if (taken.length === hops.length) break;
+      // 已采信的副露行：指示牌可以摆在它外侧，跳距从它起算
+      if (row.groups.some((g) => consumed.has(g))) from = row.cy;
+      const tiles = leftoverOf.get(row);
+      // 只有牌背的行是零星误检（白板偶尔认成牌背），不算数也不挡路
+      if (!tiles || tiles.every((t) => t.tile === null)) continue;
+      if (sideOf(row) !== dir) continue;
+      if (!isCleanRow(tiles) || Math.abs(row.cy - from) > hops[taken.length]!) break;
+      taken.push([...tiles].sort((a, b) => a.cx - b.cx));
+      from = row.cy;
+    }
+    return taken;
+  };
+  const up = walk(-1);
+  const down = swap ? walk(1) : [];
+  let indicatorRows = down.length > up.length ? down : up;
+  if (indicatorRows.length === 2) {
+    const [near, far] = [indicatorRows[0]!, indicatorRows[1]!];
+    // 有里宝时表里张数必然相等。远的那行更长：它是牌河的末行，近的那行才是表宝牌
+    if (far.length > near.length) indicatorRows = [near];
+    else if (far.length < near.length)
+      warn(
+        "indicator_mismatch",
+        "blocking",
+        `表宝牌指示牌 ${far.length} 张、里宝 ${near.length} 张，张数应当相等`,
+      );
+  }
+  const usedIndicators = indicatorRows.flat();
   usedIndicators.forEach((i) => used.add(i.detIndex));
   const takenRows = new Set(usedIndicators);
   const extra = leftover.reduce(
     (n, { tiles }) => n + tiles.filter((t) => !takenRows.has(t)).length,
-    0,
+    skipped,
   );
   if (extra > 0) warn("extra_rows", "info", `有 ${extra} 张牌不在手牌、副露或指示牌的位置，已忽略`);
   let doraIndicators: Tile[] = [];
@@ -500,19 +658,37 @@ export function layoutHand(
   if (indicatorRows.length === 1) {
     doraIndicators = tilesOf(indicatorRows[0]!);
     doraOrigins = originsOf(indicatorRows[0]!);
-  } else if (indicatorRows.length >= 2) {
+  } else if (indicatorRows.length === 2) {
     uraIndicators = tilesOf(indicatorRows[0]!);
     uraOrigins = originsOf(indicatorRows[0]!);
     doraIndicators = tilesOf(indicatorRows[1]!);
     doraOrigins = originsOf(indicatorRows[1]!);
   }
-  if (uraIndicators.length > doraIndicators.length) {
-    warn("too_many_dora", "info", "里宝指示牌多于表宝牌，已截断");
-    uraIndicators = uraIndicators.slice(0, doraIndicators.length);
-    uraOrigins = uraOrigins.slice(0, doraIndicators.length);
-  }
 
   const total = closed.length + melds.length * 3;
+  // 窗口：横向是已认出的牌（暗牌 + 副露，副露可以摆在别的行）两侧各留 side，纵向是指示牌与副露可能出现的范围。
+  // **没凑满 14 张时放开**：整帧缩小后的那一遍常把手牌行漏检成几段、或漏掉一两组副露，窗口若只围着认出来的
+  // 那一段，下一遍就再也看不见其余的牌，会在「认不全 → 回整帧 → 还是这一段」里打转。横向放到整帧宽，
+  // 纵向按还缺的副露组数每组多留一跳。
+  const windowOf = (): Box => {
+    const missing = Math.min(MAX_MELDS, Math.max(0, Math.ceil((14 - total) / 3)));
+    // 只看选中的组：没选中的多半是牌山里时有时无的「暗杠」，算进来窗口会跟着它抖
+    const seen = [closedGroup, ...chosen.keys()].flat();
+    const x1 = missing
+      ? -FAR
+      : Math.min(...seen.map((i) => i.cx - i.w / 2)) - HAND_WINDOW.side * scale.w;
+    const x2 = missing
+      ? FAR
+      : Math.max(...seen.map((i) => i.cx + i.w / 2)) + HAND_WINDOW.side * scale.w;
+    const cys = [handRow.cy, ...[...chosen.keys()].map((g) => rowOf.get(g)!.cy)];
+    const slack = missing * HAND_WINDOW.hop * scale.h;
+    const reach = (HAND_WINDOW.hop + HAND_WINDOW.secondHop + 0.5) * scale.h + slack;
+    const y1 = Math.min(...cys) - reach;
+    // 下方没有指示牌，只留一跳给还没认出来的副露；竖拍分不清上下，两侧对称
+    const y2 = Math.max(...cys) + (swap ? reach : (HAND_WINDOW.hop + 0.5) * scale.h + slack);
+    return swap ? [y1, x1, y2, x2] : [x1, y1, x2, y2];
+  };
+
   if (total !== 14) warn("count", "blocking", `暗牌与副露合计应为 14 张，实际 ${total} 张`);
 
   return {
@@ -526,5 +702,6 @@ export function layoutHand(
       usedDetections: sorted(used),
       rejectedDetections: sorted(rejected),
     },
+    window: closedPick ? windowOf() : null,
   };
 }

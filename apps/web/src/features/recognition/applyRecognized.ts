@@ -65,6 +65,17 @@ function uncertainLocs(
 }
 
 /**
+ * 按房间规则看哪些提示还作数。表里张数不等只在用里宝的规则下才是问题：不用里宝时里宝行会整行丢掉，结果自洽。
+ * 取景页的定格闸门与灌进草稿用同一条，否则这类房间里一条已经不作数的 blocking 会让自动定格永远等下去。
+ */
+export function warningsUnder(
+  warnings: readonly RecognitionWarning[],
+  rules: RoomRules,
+): RecognitionWarning[] {
+  return warnings.filter((w) => rules.hand.uraDora || w.code !== "indicator_mismatch");
+}
+
+/**
  * 把识别结果灌进草稿：切到牌面模式、替换牌与指示牌、清掉旧的评估结果；旗标（立直/一发/自摸…）不动。
  * 规则收口：手牌里的赤五按规则裁（见 capAka）；指示牌不占赤五名额，只在不用赤五时折回；
  * 宝牌指示牌按是否开杠宝截断；里宝只在立直时保留。
@@ -77,7 +88,7 @@ export function applyRecognized(
 ): ValueDraft {
   const { closed, melds, capped } = capAka(result.hand.closed, result.hand.melds, rules);
   const fold = (t: number) => (rules.hand.akaCount === 0 && isAka(t) ? baseTile(t) : t);
-  const warnings = [...result.warnings];
+  const warnings = warningsUnder(result.warnings, rules);
   const maxDora = rules.hand.kanDora ? 5 : 1;
   let doraIndicators = result.hand.doraIndicators.map(fold);
   if (doraIndicators.length > maxDora) {
@@ -91,6 +102,7 @@ export function applyRecognized(
   // 里宝只有立直者才翻：照片里有里宝指示牌就是立直的证据，直接勾上
   let riichi = draft.hand.riichi;
   let riichiAuto = false;
+  // 表宝牌按规则截断后，里宝跟着截到同样张数
   let uraIndicators = result.hand.uraIndicators.map(fold).slice(0, doraIndicators.length);
   if (uraIndicators.length > 0) {
     if (!rules.hand.uraDora) {

@@ -88,6 +88,19 @@ describe("applyRecognized", () => {
     ]);
   });
 
+  it("表里张数不等：用里宝的规则下是 blocking；不用里宝时里宝行整行丢掉，告警一并去掉", () => {
+    const uneven: RecognitionResult = {
+      ...result,
+      warnings: [{ code: "indicator_mismatch", message: "x", severity: "blocking" }],
+    };
+    const draft = createValueDraft(false, "manual");
+    const codes = (rules: RoomRules) =>
+      applyRecognized(draft, uneven, rules, "k").recognition!.warnings.map((w) => w.code);
+    expect(codes(MLEAGUE_RULES)).toContain("indicator_mismatch");
+    const noUra = { ...MLEAGUE_RULES, hand: { ...MLEAGUE_RULES.hand, uraDora: false } };
+    expect(codes(noUra)).not.toContain("indicator_mismatch");
+  });
+
   it("没把握的位置降解成坐标；规则截掉的指示牌不留下悬空记号", () => {
     const next = applyRecognized(createValueDraft(false, "manual"), result, MLEAGUE_RULES, "k4");
     // 置信度 0.42 的暗牌第 2 张、0.44 的副露第 1 张

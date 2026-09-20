@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Images, X } from "lucide-react";
+import { Images, RotateCw, X } from "lucide-react";
 import {
   RECOGNITION_CLASSES,
   type Detection,
@@ -12,21 +12,21 @@ import { HandView } from "@/features/hand/HandView";
 import { RECOGNITION_MODEL } from "../modelUrl";
 import { closeDetector, openDetector, type Detector } from "../worker/client";
 import type { FrameResult } from "../worker/protocol";
-import { BAND_DEFAULT, fitLongEdge, STILL_MAX_EDGE, type Rect } from "./band";
-import { BandOverlay } from "./BandOverlay";
+import { warningsUnder } from "../applyRecognized";
+import { loadPhoto } from "../photoFile";
+import { fitLongEdge, STILL_MAX_EDGE, viewportOf } from "./viewport";
 import { DetectionOverlay } from "./DetectionOverlay";
-import { StillPicker } from "./StillPicker";
-import { EMPTY_CAPTURE, feedFrame, STABLE_FRAMES } from "./autoCapture";
+import { EMPTY_CAPTURE, feedFrame, reasonOf, STABLE_FRAMES, votesOf } from "./autoCapture";
 import { LayoutGuide } from "./LayoutGuide";
+import { useRotation } from "./orientation/useRotation";
+import { useSessionStats } from "./useSessionStats";
+import { RoiOverlay } from "./RoiOverlay";
 import { useCameraStream } from "./useCameraStream";
 import { useCanvasPreview } from "./useCanvasPreview";
-import { useElementHeight } from "./useElementHeight";
 import { useLiveDetect } from "./useLiveDetect";
 
 /** 一直没认出有效牌面就停流，省电防烫（用户拍板 60 秒） */
 const IDLE_STOP_MS = 60_000;
-/** grab 回来的 frameId 要能配上同一帧的识别结果，留最近几帧就够 */
-const FRAME_MEMORY = 4;
 
 export interface Capture {
   blob: Blob;
@@ -34,7 +34,7 @@ export interface Capture {
 }
 
 /**
- * 全屏取景：对准手牌，连续三帧认出同一副牌就自动定格。
+ * 全屏取景：不用框选，识别线程自己在整帧里找到手牌、只识别它周围那一块；最近几帧里认稳了同一副牌就自动定格。
  * 自绘覆盖层而不是 `Dialog`——`DialogContent` 在手机上是 92dvh 的底部抽屉，盖不满屏；
  * 层级取 75（Select 60 / Tooltip 70 / Notice 80 之间）。
  * **由调用方按需挂载 / 卸载**（不是 open 开关）：每次打开都是全新状态，不用在 effect 里重置。
@@ -54,18 +54,16 @@ export function CameraSheet({
   const [detector, setDetector] = useState<Detector | null>(null);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [band, setBand] = useState(BAND_DEFAULT);
   const [live, setLive] = useState<FrameResult | null>(null);
-  const [stable, setStable] = useState(0);
+  const [gate, setGate] = useState(EMPTY_CAPTURE);
+  const { rotation, source: rotationSource, toggle: toggleRotation } = useRotation();
   const [paused, setPaused] = useState(false);
   const [openedAt] = useState(() => Date.now());
 
-  const [file, setFile] = useState<File | null>(null);
   /** 相册那张正在推理：实时循环让开，免得两边抢 Worker 互相把对方的帧挤掉 */
   const [stillBusy, setStillBusy] = useState(false);
   /** 定格的视觉回执：iOS 全系没有 navigator.vibrate，只靠震动等于没有反馈 */
   const [flash, setFlash] = useState(false);
-  const [cropRect, setCropRect] = useState<Rect | null>(null);
   const [picked, setPicked] = useState<Detection | null>(null);
   const [guide, setGuide] = useState(false);
   const onCloseRef = useRef(onClose);
@@ -73,20 +71,23 @@ export function CameraSheet({
     onCloseRef.current = onClose;
   });
   const captureRef = useRef(EMPTY_CAPTURE);
-  const stillRef = useRef(0);
-  /** 已经处理过的相册帧：实时监听若也收到它，不能再当实时帧计数 */
-  const stillDoneRef = useRef(0);
+  const frameRotationRef = useRef<FrameResult["rotation"]>(0);
+  /** 相册那张在途的 frameId；null = 没有 */
+  const stillRef = useRef<number | null>(null);
   const grabbingRef = useRef(false);
   const lastGoodRef = useRef(openedAt);
-  const framesRef = useRef(new Map<number, FrameResult>());
 
   // 看「怎么摆」时停流、停识别：人在读说明，不该对着桌面偷偷定格
-  const active = !paused && file === null && !stillBusy && !guide;
+  const active = !paused && !stillBusy && !guide;
   const lost = useCallback(() => setPaused(true), []);
   const { videoRef, error: camError, ready } = useCameraStream(active, lost);
   const [area, setArea] = useState<HTMLDivElement | null>(null);
-  const [panel, setPanel] = useState<HTMLDivElement | null>(null);
-  const panelHeight = useElementHeight(panel);
+  // 两个回调都是稳定引用：直接进依赖数组，不会让下面的订阅每次渲染都重建
+  const { onFrame: countFrame, finish: finishSession } = useSessionStats(mode, {
+    rotation,
+    rotationSource,
+    viewport: area && { width: area.clientWidth, height: area.clientHeight },
+  });
   const [preview, setPreview] = useState<HTMLCanvasElement | null>(null);
   const painted = useCanvasPreview(videoRef, preview);
 
@@ -139,97 +140,89 @@ export function CameraSheet({
     return () => clearInterval(t);
   }, [active]);
 
-  const capture = useCallback(async () => {
-    if (!detector || grabbingRef.current) return;
-    grabbingRef.current = true;
-    try {
-      const got = await detector.grab();
-      const modelId = RECOGNITION_MODEL?.id;
-      if (!got || !modelId) return;
-      // 只认 Worker 回报的那一帧：照片与检测框必须同源，否则回流出来的训练数据是错位的
-      const frame = framesRef.current.get(got.frameId);
-      if (!frame) return;
-      onCapture({
-        blob: got.blob,
-        result: {
-          modelId,
-          ms: frame.ms,
-          detections: frame.detections,
-          hand: frame.hand,
-          warnings: frame.warnings,
-          provenance: frame.provenance,
-        },
-      });
-    } finally {
-      grabbingRef.current = false;
-    }
-  }, [detector, onCapture]);
+  const capture = useCallback(
+    async (how: "auto" | "manual" | "album") => {
+      if (!detector || grabbingRef.current) return;
+      grabbingRef.current = true;
+      try {
+        // 照片、检测框、识别结果由 Worker 从同一帧里一起给出：分开取就可能错位，回流出来的训练数据也跟着错
+        const got = await detector.grab();
+        const modelId = RECOGNITION_MODEL?.id;
+        if (!got || !modelId) return;
+        const { blob, ms, detections, hand, warnings, provenance } = got;
+        finishSession(how);
+        onCapture({ blob, result: { modelId, ms, detections, hand, warnings, provenance } });
+      } finally {
+        grabbingRef.current = false;
+      }
+    },
+    [detector, onCapture, finishSession],
+  );
 
   const onFrame = useCallback(
     (r: FrameResult) => {
       setLive(r);
-      const map = framesRef.current;
-      map.set(r.frameId, r);
-      for (const id of map.keys()) if (id < r.frameId - FRAME_MEMORY) map.delete(id);
-
-      // 相册那张是一次性的：结果一到就直接定格，不参与连续三帧的稳定判断
-      if (r.frameId === stillDoneRef.current) return;
-      if (r.frameId === stillRef.current) {
-        stillDoneRef.current = r.frameId;
-        stillRef.current = 0;
-        setStillBusy(false);
-        setFlash(true);
-        void capture();
-        return;
+      // 手机一转，之前攒的票是另一个方向下认出来的：作废重数
+      if (r.rotation !== frameRotationRef.current) {
+        frameRotationRef.current = r.rotation;
+        captureRef.current = EMPTY_CAPTURE;
       }
-
-      const out = feedFrame(captureRef.current, r);
+      const out = feedFrame(captureRef.current, {
+        ...r,
+        warnings: warningsUnder(r.warnings, rules),
+      });
       captureRef.current = out.state;
-      setStable(out.state.count);
-      if (out.state.count > 0) lastGoodRef.current = Date.now();
+      countFrame(r, out.state);
+      setGate(out.state);
+      if (votesOf(out.state) > 0) lastGoodRef.current = Date.now();
       if (out.fire) {
         navigator.vibrate?.(30);
         setFlash(true);
-        void capture();
+        void capture("auto");
       }
     },
-    [capture],
+    [capture, countFrame, rules],
   );
 
-  // 相册那张的结果单独收：实时循环此刻是停着的（相机用不了、或正在让路给这一张），它的监听不在
+  // 相册那张是一次性的：结果一到就直接定格，不参与稳定判断。实时循环此刻停着，单独收
   useEffect(() => {
     if (!detector) return;
     return detector.onResult((r) => {
-      if (stillRef.current === 0) return;
+      const still = stillRef.current;
+      if (still === null) return;
       if (r) {
-        if (r.frameId === stillRef.current) onFrame(r);
+        if (r.frameId !== still) return;
+        stillRef.current = null;
+        setStillBusy(false);
+        setLive(r);
+        setFlash(true);
+        void capture("album");
         return;
       }
-      // null = 被背压丢掉了：相册那张不会再有结果，复位让用户重来
-      stillRef.current = 0;
+      // null = 识别线程废了（相册那张不会被背压丢掉，Worker 会排到当前帧后面跑）
+      stillRef.current = null;
       setStillBusy(false);
       setError("这张没识别成功，请重试");
     });
-  }, [detector, onFrame]);
+  }, [detector, capture]);
 
   const runStill = useCallback(
-    async (src: ImageBitmap, rect: Rect) => {
-      if (!detector) return setFile(null);
-      // 紧接着的 setFile(null) 会让相机与实时循环恢复；stillBusy 让它们继续停到静帧结果回来，
-      // 否则这一张会撞上实时帧被背压丢掉，用户点了「用这块识别」却什么也不发生
+    async (file: File) => {
+      if (!detector) return;
       setStillBusy(true);
-      setFile(null);
       try {
-        // 相册原图动辄 4000px：裁出来的一条按实时帧的尺度缩小再送（识别尺度一致，定格照片也不至于太大）
-        const size = fitLongEdge(rect.width, rect.height, STILL_MAX_EDGE);
+        // 相册原图动辄 4000px：按实时帧的尺度缩小再送（识别尺度一致，定格照片也不至于太大）
+        const src = await loadPhoto(file);
+        const size = fitLongEdge(src.width, src.height, STILL_MAX_EDGE);
         const canvas = new OffscreenCanvas(size.width, size.height);
         const ctx = canvas.getContext("2d")!;
         ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(src, rect.x, rect.y, rect.width, rect.height, 0, 0, size.width, size.height);
-        stillRef.current = detector.infer(canvas.transferToImageBitmap());
+        ctx.drawImage(src, 0, 0, size.width, size.height);
+        src.close();
+        stillRef.current = detector.infer(canvas.transferToImageBitmap(), "still");
       } catch (err) {
         // 失败要复位：否则 stillBusy 一直为真，实时取景再也不会恢复
-        stillRef.current = 0;
+        stillRef.current = null;
         setStillBusy(false);
         setError(err instanceof Error ? err.message : "这张照片处理失败");
       }
@@ -240,22 +233,38 @@ export function CameraSheet({
   useLiveDetect({
     detector,
     videoRef,
-    area,
-    band,
-    bottomInset: panelHeight,
+    view: { rotation, known: rotationSource !== "none" },
     active: active && ready,
     onFrame,
-    ...(mode === "calc" ? { onCrop: setCropRect } : {}),
   });
+
+  /** 检测框（整帧像素）画回屏幕要用的摆放；取景区域或画面尺寸还没就绪时不画 */
+  const view = live && area ? viewportOf(live, area) : null;
 
   /** 相机用不了（权限、无设备、占用、非 HTTPS）：快门没有意义，给相册入口 */
   const camBroken = camError !== null;
   const canShoot = detector !== null && ready && painted && live !== null && !camBroken;
   const downloading = !detector && !error && progress < 1;
-  /** 右上角的小字进度：认出几张（副露按 3 张折算）· 连续几帧一致 */
+  /** 右上角的小字进度：认出几张（副露按 3 张折算，多认了照实显示）· 最近几帧里有几帧一致 */
+  const total = live ? live.hand.closed.length + live.hand.melds.length * 3 : 0;
   const progressText = live
-    ? `${Math.min(14, live.hand.closed.length + live.hand.melds.length * 3)}/14 · ${stable}/${STABLE_FRAMES}`
+    ? `${total}/14 · ${Math.min(STABLE_FRAMES, votesOf(gate))}/${STABLE_FRAMES}`
     : null;
+  const reason = reasonOf(gate);
+  /**
+   * 手机横持而页面没跟着转时，把关闭键、进度、底栏这些整体转过去：一个与屏幕同心、宽高互换的容器。
+   * 画面与检测框不转——屏幕本身已经横过来了。
+   */
+  const chromeStyle =
+    rotation !== 0 && area
+      ? {
+          left: "50%",
+          top: "50%",
+          width: area.clientHeight,
+          height: area.clientWidth,
+          transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+        }
+      : { inset: 0 };
 
   // portal 到 body：DialogContent 在 ≥640px 上有 translate，transform 祖先会让 fixed 以它为
   // 包含块，取景框就被压进对话框里不再全屏；顺带让背后的内容退出无障碍树。
@@ -271,7 +280,7 @@ export function CameraSheet({
     >
       <div
         ref={setArea}
-        // 画面铺满整屏，底栏浮在上面（沉浸）：取景带与裁剪都以整屏为准
+        // 画面铺满整屏，底栏浮在上面（沉浸）
         className="absolute inset-0 overflow-hidden"
         data-testid="camera-area"
       >
@@ -290,38 +299,46 @@ export function CameraSheet({
           data-testid="camera-preview"
           data-painted={painted || undefined}
         />
-        {/* 取景带下方的暗色遮罩一直铺到屏幕底部：底栏压在暗区上，颜色连成一片 */}
-        {!paused && (
-          <div
-            className="absolute inset-x-0 bottom-0 bg-black/60"
-            style={{ height: panelHeight }}
+        {live && view && !paused && !stillBusy && (
+          <>
+            <RoiOverlay frame={live} view={view} />
+            {mode === "calc" && (
+              <DetectionOverlay
+                detections={live.detections}
+                rotation={live.rotation}
+                view={view}
+                onPick={setPicked}
+              />
+            )}
+          </>
+        )}
+        {flash && (
+          <span
+            className="pointer-events-none absolute inset-0 bg-white/70"
+            onAnimationEnd={() => setFlash(false)}
+            style={{ animation: "riichi-flash 220ms ease-out forwards" }}
             aria-hidden
           />
         )}
-        {/* 取景带只在底栏以上的可见部分里（画面铺满整屏，底栏浮在下面） */}
-        <div className="absolute inset-x-0 top-0" style={{ bottom: panelHeight }}>
-          {!paused && (
-            <BandOverlay
-              band={band}
-              onBandChange={setBand}
-              hint="把手牌、副露和宝牌指示牌放进框里"
-            />
-          )}
-          {mode === "calc" && live && !paused && (
-            <div
-              className="absolute inset-x-0"
-              style={{ top: `${((1 - band) / 2) * 100}%`, height: `${band * 100}%` }}
-            >
-              {cropRect && (
-                <DetectionOverlay detections={live.detections} crop={cropRect} onPick={setPicked} />
-              )}
-            </div>
-          )}
-        </div>
+      </div>
+
+      <div
+        // 容器自己不接事件（下面的检测框要能点），要接的孩子各自声明
+        className="pointer-events-none absolute"
+        style={chromeStyle}
+        data-testid="camera-chrome"
+        data-rotation={rotation}
+      >
+        {/* 认稳手牌之前一直留着：画面里一有框就撤掉的话只闪一秒，没人来得及读 */}
+        {!paused && !reason && votesOf(gate) === 0 && (
+          <p className="pointer-events-none absolute inset-x-0 top-1/3 text-center text-sm text-white/80 drop-shadow">
+            对准手牌，牌河留在画面上方
+          </p>
+        )}
         {paused && (
           <button
             type="button"
-            className="absolute inset-0 flex items-center justify-center bg-black/70 text-white"
+            className="pointer-events-auto absolute inset-0 flex items-center justify-center bg-black/70 text-white"
             onClick={() => {
               lastGoodRef.current = Date.now();
               setPaused(false);
@@ -334,25 +351,25 @@ export function CameraSheet({
           type="button"
           onClick={onClose}
           aria-label="关闭取景"
-          className="absolute left-3 top-3 rounded-full bg-black/50 p-2 text-white"
+          className="pointer-events-auto absolute left-3 top-3 rounded-full bg-black/50 p-2 text-white"
         >
           <X className="h-5 w-5" />
         </button>
         {progressText && !paused && (
           <span
-            className="pointer-events-none absolute right-3 top-4 text-xs tabular text-white/80 drop-shadow"
+            className={`pointer-events-none absolute right-3 top-4 text-xs tabular drop-shadow ${total > 14 ? "text-neg" : "text-white/80"}`}
             data-testid="camera-progress"
           >
             {progressText}
           </span>
         )}
-        {flash && (
-          <span
-            className="pointer-events-none absolute inset-0 bg-white/70"
-            onAnimationEnd={() => setFlash(false)}
-            style={{ animation: "riichi-flash 220ms ease-out forwards" }}
-            aria-hidden
-          />
+        {reason && !paused && (
+          <p
+            className="pointer-events-none absolute inset-x-12 top-12 rounded-lg bg-black/60 px-3 py-1.5 text-center text-xs text-white"
+            data-testid="camera-reason"
+          >
+            {reason}
+          </p>
         )}
         {guide && (
           <LayoutGuide
@@ -366,108 +383,109 @@ export function CameraSheet({
           <button
             type="button"
             onClick={() => setPicked(null)}
-            className="absolute inset-x-3 top-3 rounded-lg bg-black/70 px-3 py-2 text-sm text-white"
+            className="pointer-events-auto absolute inset-x-3 top-3 rounded-lg bg-black/70 px-3 py-2 text-sm text-white"
           >
             {RECOGNITION_CLASSES[picked.cls] ?? "?"} · 置信度 {Math.round(picked.conf * 100)}%
           </button>
         )}
-      </div>
-
-      <div
-        ref={setPanel}
-        data-testid="camera-panel"
-        className="absolute inset-x-0 bottom-0 space-y-2 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 text-white"
-      >
-        {camError && <p className="text-sm text-neg">{camError}</p>}
-        {error && (
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-neg">{error}</p>
-            {mode === "room" && (
-              <Button variant="outline" size="sm" className="shrink-0 text-fg" onClick={onClose}>
-                返回键盘录入
-              </Button>
+        <div
+          data-testid="camera-panel"
+          // 底栏浮在画面上：自带一层渐变压暗，字才读得清
+          className="pointer-events-auto absolute inset-x-0 bottom-0 space-y-2 bg-gradient-to-t from-black/85 via-black/70 to-transparent px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 text-white"
+        >
+          {camError && <p className="text-sm text-neg">{camError}</p>}
+          {error && (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-neg">{error}</p>
+              {mode === "room" && (
+                <Button variant="outline" size="sm" className="shrink-0 text-fg" onClick={onClose}>
+                  返回键盘录入
+                </Button>
+              )}
+            </div>
+          )}
+          {/* 固定高度（一行手牌 + 一行指示牌）：模型下载进度、认出/没认出来回切换都在这一格里，
+            底栏不能伸缩，否则画面下沿跟着跳 */}
+          <div className="h-[70px] overflow-hidden" data-testid="camera-live">
+            {downloading ? (
+              <div>
+                <p className="text-xs">
+                  模型下载中 {Math.round(progress * 100)}%（约 25 MB，只下一次）
+                </p>
+                <div className="mt-1 h-1 w-full overflow-hidden rounded bg-white/20">
+                  <div
+                    className="h-full bg-accent transition-[width]"
+                    style={{ width: `${Math.round(progress * 100)}%` }}
+                  />
+                </div>
+              </div>
+            ) : (
+              live && (
+                <div className="overflow-x-auto px-1 py-1">
+                  <HandView
+                    hand={live.hand}
+                    size="xs"
+                    showUra={rules.hand.uraDora}
+                    indicatorClassName="text-white/70"
+                    className="w-max"
+                  />
+                </div>
+              )
             )}
           </div>
-        )}
-        {/* 固定高度（一行手牌 + 一行指示牌）：模型下载进度、认出/没认出来回切换都在这一格里，
-            底栏不能伸缩，否则取景带跟着跳 */}
-        <div className="h-[70px] overflow-hidden" data-testid="camera-live">
-          {downloading ? (
-            <div>
-              <p className="text-xs">
-                模型下载中 {Math.round(progress * 100)}%（约 25 MB，只下一次）
-              </p>
-              <div className="mt-1 h-1 w-full overflow-hidden rounded bg-white/20">
-                <div
-                  className="h-full bg-accent transition-[width]"
-                  style={{ width: `${Math.round(progress * 100)}%` }}
-                />
-              </div>
-            </div>
-          ) : (
-            live && (
-              <div className="overflow-x-auto px-1 py-1">
-                <HandView
-                  hand={live.hand}
-                  size="xs"
-                  showUra={rules.hand.uraDora}
-                  indicatorClassName="text-white/70"
-                  className="w-max"
-                />
-              </div>
-            )
-          )}
-        </div>
-        {/* 最后一行：左边说明，右边相册与快门。min-h-8 按按钮高度留位，快门出现/消失时底栏不伸缩 */}
-        <div className="flex min-h-8 items-center justify-between gap-3 text-xs text-white/70">
-          <span className="flex min-w-0 items-center gap-3">
-            <span className="truncate">拍下的牌面照片会用来改进识别</span>
-            <button type="button" className="shrink-0 underline" onClick={() => setGuide(true)}>
-              怎么摆
-            </button>
-          </span>
-          <span className="flex shrink-0 items-center gap-2">
-            {/* 相册：算点数页常驻；房间里就地拍一张成本接近零，只在相机用不了时才给 */}
-            {(mode === "calc" || camBroken) && (
-              <label
-                className="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-lg border border-white/40 px-2.5 text-sm text-white"
-                aria-label="从相册选一张"
+          {/* 最后一行：左边说明，右边相册与快门。min-h-8 按按钮高度留位，快门出现/消失时底栏不伸缩 */}
+          <div className="flex min-h-8 items-center justify-between gap-3 text-xs text-white/70">
+            <span className="flex min-w-0 items-center gap-3">
+              <span className="truncate">拍下的牌面照片会用来改进识别</span>
+              <button type="button" className="shrink-0 underline" onClick={() => setGuide(true)}>
+                怎么摆
+              </button>
+            </span>
+            <span className="flex shrink-0 items-center gap-2">
+              {/* 相册：算点数页常驻；房间里就地拍一张成本接近零，只在相机用不了时才给 */}
+              {(mode === "calc" || camBroken) && (
+                <label
+                  className="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-lg border border-white/40 px-2.5 text-sm text-white"
+                  aria-label="从相册选一张"
+                >
+                  <Images className="h-4 w-4" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    data-testid="camera-album"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
+                      e.target.value = "";
+                      if (f) void runStill(f);
+                    }}
+                  />
+                </label>
+              )}
+              <button
+                type="button"
+                onClick={toggleRotation}
+                aria-label={rotation === 0 ? "切到横屏" : "切回竖屏"}
+                aria-pressed={rotation !== 0}
+                data-testid="camera-rotate"
+                className={`inline-flex h-8 shrink-0 items-center rounded-lg border px-2.5 text-white ${rotation === 0 ? "border-white/40" : "border-accent bg-accent/20"}`}
               >
-                <Images className="h-4 w-4" />
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  data-testid="camera-album"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0] ?? null;
-                    e.target.value = "";
-                    if (f) setFile(f);
-                  }}
-                />
-              </label>
-            )}
-            {canShoot && (
-              <Button
-                variant="accent"
-                size="sm"
-                onClick={() => void capture()}
-                data-testid="camera-shutter"
-              >
-                快门
-              </Button>
-            )}
-          </span>
+                <RotateCw className="h-4 w-4" />
+              </button>
+              {canShoot && (
+                <Button
+                  variant="accent"
+                  size="sm"
+                  onClick={() => void capture("manual")}
+                  data-testid="camera-shutter"
+                >
+                  快门
+                </Button>
+              )}
+            </span>
+          </div>
         </div>
       </div>
-
-      {file && (
-        <StillPicker
-          file={file}
-          onPick={(bitmap, rect) => void runStill(bitmap, rect)}
-          onCancel={() => setFile(null)}
-        />
-      )}
     </div>,
     document.body,
   );

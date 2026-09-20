@@ -240,6 +240,12 @@ test("截图：取景框、确认态与算点数页", async ({ browser }) => {
   await guide.getByRole("button", { name: "怎么摆" }).click();
   await guide.getByText("怎么摆，识别最准").waitFor();
   await guide.screenshot({ path: `${OUT}/phone-layout-guide.png` });
+  // 横屏：界面元素整体转 90°，画面不转
+  await guide.getByRole("button", { name: "知道了" }).click();
+  await guide.getByTestId("camera-rotate").click();
+  await guide.waitForTimeout(150);
+  await guide.screenshot({ path: `${OUT}/phone-viewfinder-landscape.png` });
+  await guide.getByTestId("camera-rotate").click();
   await guideCtx.close();
 
   // 房间里的结算确认态：识别通过时键盘收起，只剩一排牌

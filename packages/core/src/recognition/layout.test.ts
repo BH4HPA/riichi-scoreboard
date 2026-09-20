@@ -202,14 +202,14 @@ describe("layoutHand", () => {
     expect(h.doraIndicators).toHaveLength(5);
   });
 
-  it("副露超过 4 组只取前 4 组并告警", () => {
+  it("一手牌恰 14 张：副露够数后多出来的组当场外牌，由近及远取", () => {
     const closed = row(["2p", "2p~"], 10, 300);
     const melds = ["1z", "2z", "3z", "4z", "5z"].map(
       (t, i) => row([t, t, `${t}~`], 10 + i * 190, 380).dets,
     );
     const { hand: h, warnings } = layoutHand([...closed.dets, ...melds.flat()]);
-    expect(h.melds).toHaveLength(4);
-    expect(warnings.map((w) => w.code)).toEqual(["bad_group"]);
+    expect(h.melds.map((m) => m.tiles[0])).toEqual([TILE.East, TILE.South, TILE.West, TILE.North]);
+    expect(warnings.map((w) => w.code)).toEqual(["extra_rows"]);
   });
 
   it("暗杠中间两张不一致取置信度高的并告警", () => {
@@ -561,8 +561,8 @@ describe("layoutHand", () => {
     expect(last).toEqual({ det: -1, guessed: true });
   });
 
-  it("告警分级：blocking 只有 no_tiles / count / bad_group，其余都是 info", () => {
-    const BLOCKING = new Set(["no_tiles", "count", "bad_group"]);
+  it("告警分级：blocking 只有 no_tiles / count / bad_group / indicator_mismatch，其余都是 info", () => {
+    const BLOCKING = new Set(["no_tiles", "count", "bad_group", "indicator_mismatch"]);
     // 每个 code 都要被下面的场景覆盖到，漏一个就说明清单和实现对不上
     const scenes: Detection[][] = [
       [],
@@ -584,7 +584,7 @@ describe("layoutHand", () => {
           ...row(["1z", "2z"], 30, 330).dets, // 里宝 2 张
           ...row(["6s"], 30, 250).dets, // 表宝 1 张
         ];
-      })(), // too_many_dora
+      })(), // indicator_mismatch
       (() => {
         const c = row(CLOSED13.slice(0, 10).concat("9m~"), 10, 400);
         return [
@@ -614,12 +614,179 @@ describe("layoutHand", () => {
       "bad_group",
       "count",
       "extra_rows",
+      "indicator_mismatch",
       "kan_mismatch",
       "multi_win",
       "no_tiles",
       "no_win_tile",
       "odd_box",
-      "too_many_dora",
     ]);
+  });
+});
+
+describe("layoutHand：照片里带着牌河", () => {
+  const RIVER6 = ["1z", "9p", "2z", "1s", "9m", "3z"];
+
+  it("牌河里 5 张带立直宣言牌的一行抢不走手牌：和张没横放也一样", () => {
+    const hand = row([...CLOSED13, "9m"], 10, 600);
+    const dora = row(["6s"], 30, 500);
+    const river = [
+      ...row(RIVER6, 200, 100).dets,
+      ...row(["4z", "5z", "7z~", "1p", "9s"], 200, 170).dets,
+    ];
+    const { hand: h, warnings } = layoutHand([...hand.dets, ...dora.dets, ...river]);
+    expect(h.closed).toHaveLength(14);
+    expect(h.winTile).toBe(TILE.M9);
+    expect(h.doraIndicators).toEqual([TILE.S6]);
+    expect(warnings.filter((w) => w.severity === "blocking")).toEqual([]);
+  });
+
+  it("窗口外含横置、牌型恰好合法的三张不当副露", () => {
+    const hand = row([...CLOSED13, "9m~"], 10, 600);
+    const far = row(["5z", "5z~", "5z"], 200, 100); // 600 − 100 远超 4H
+    const { hand: h, warnings } = layoutHand([...hand.dets, ...far.dets]);
+    expect(h.melds).toEqual([]);
+    expect(warnings.map((w) => w.code)).toEqual(["extra_rows"]);
+  });
+
+  it("表里张数不等且远行更长：远行是牌河末行，近行是表宝牌", () => {
+    const hand = row([...CLOSED13, "9m~"], 10, 600);
+    const dora = row(["6s"], 30, 500);
+    const tail = row(["1z", "9p", "2z", "1s", "9m"], 30, 380);
+    const r = layoutHand([...hand.dets, ...dora.dets, ...tail.dets]);
+    expect(r.hand.doraIndicators).toEqual([TILE.S6]);
+    expect(r.hand.uraIndicators).toEqual([]);
+    expect(r.warnings.map((w) => w.code)).toEqual(["extra_rows"]);
+    // 牌河那行没被采信：回流不会把它当指示牌标注
+    expect(r.provenance.usedDetections).toHaveLength(15);
+  });
+
+  it("表里张数不等且近行更长：多半漏检了一张表宝牌，blocking、不截断", () => {
+    const hand = row([...CLOSED13, "9m~"], 10, 600);
+    const r = layoutHand([
+      ...hand.dets,
+      ...row(["1z", "2z"], 30, 530).dets,
+      ...row(["6s"], 30, 460).dets,
+    ]);
+    expect(r.warnings).toEqual([
+      expect.objectContaining({ code: "indicator_mismatch", severity: "blocking" }),
+    ]);
+    expect(r.hand.uraIndicators).toHaveLength(2);
+    expect(r.hand.doraIndicators).toHaveLength(1);
+  });
+
+  it("指示牌逐跳：隔着一行牌河的干净行不收，超过一跳的也不收", () => {
+    const hand = row([...CLOSED13, "9m~"], 10, 600);
+    const blocked = layoutHand([
+      ...hand.dets,
+      ...row(RIVER6, 30, 500).dets, // 6 张，不是指示牌行
+      ...row(["6s"], 30, 430).dets,
+    ]);
+    expect(blocked.hand.doraIndicators).toEqual([]);
+    const tooFar = layoutHand([...hand.dets, ...row(["6s"], 30, 600 - 5 * H).dets]);
+    expect(tooFar.hand.doraIndicators).toEqual([]);
+  });
+
+  it("window：横向包住手牌行两侧各 1.5 张，纵向上 6.5 / 下 4.5 个牌高；竖拍换回入参坐标、两侧对称", () => {
+    const hand = row([...CLOSED13, "9m~"], 100, 600);
+    const r = layoutHand(hand.dets);
+    const [x1, y1, x2, y2] = r.window!;
+    const cy = 600 + H / 2;
+    expect(x1).toBeCloseTo(100 - 3 - 1.5 * W, 0);
+    expect(x2).toBeGreaterThan(hand.end);
+    expect(Math.abs(y1 - (cy - 6.5 * H))).toBeLessThan(6);
+    expect(Math.abs(y2 - (cy + 4.5 * H))).toBeLessThan(6);
+
+    const t = layoutHand(rotate(hand.dets, 1)).window!;
+    // 竖拍：手牌是一列，窗口在 x 方向（行的法向）对称展开
+    const xs = rotate(hand.dets, 1).map((d) => (d.box[0] + d.box[2]) / 2);
+    const mid = xs.reduce((a, b) => a + b, 0) / xs.length;
+    expect(Math.abs((t[0] + t[2]) / 2 - mid)).toBeLessThan(6);
+    expect(t[3] - t[1]).toBeGreaterThan(hand.end - 100);
+  });
+
+  it("副露一层层摞在手牌上方、指示牌在最上面：跳距从最外层副露行起算", () => {
+    const closed = row(["2p", "2p~"], 10, 900);
+    const stack = [
+      row(["7z", "7z~", "7z"], 10, 900 - 1.5 * H),
+      row(["2m", "2m~", "2m"], 10, 900 - 3 * H),
+      row(["3p", "4p~", "5p"], 10, 900 - 4.5 * H),
+      row(["5s", "5s~", "5s"], 10, 900 - 6 * H),
+    ];
+    const dora = row(["6s", "4s"], 10, 900 - 9 * H); // 距手牌 9H，距最上层副露 3H
+    const r = layoutHand([...closed.dets, ...stack.flatMap((m) => m.dets), ...dora.dets]);
+    expect(r.warnings).toEqual([]);
+    expect(r.hand.melds).toHaveLength(4);
+    expect(r.hand.doraIndicators).toEqual([TILE.S6, TILE.S4]);
+    expect(r.window![1]).toBeLessThan(900 - 9 * H);
+  });
+
+  it("手牌与指示牌之间零星的牌背不挡路", () => {
+    const hand = row([...CLOSED13, "9m~"], 10, 600);
+    const r = layoutHand([...hand.dets, det("back", 300, 520), ...row(["6s"], 30, 440).dets]);
+    expect(r.hand.doraIndicators).toEqual([TILE.S6]);
+  });
+
+  it("upright：侧着看的牌山全是宽框，已知画面是正的就不投票", () => {
+    const hand = row([...CLOSED13, "9m~"], 10, 600);
+    const wall = Array.from({ length: 20 }, (_, i) =>
+      det("back", 10 + i * 60, 100, { side: true }),
+    );
+    expect(layoutHand([...hand.dets, ...wall]).hand.closed).not.toHaveLength(14);
+    const r = layoutHand([...hand.dets, ...wall], { upright: true });
+    expect(r.hand.closed).toHaveLength(14);
+    expect(r.warnings.filter((w) => w.severity === "blocking")).toEqual([]);
+  });
+
+  it("window：没凑满 14 张就放开——横向不设边，纵向按缺的副露组数多留几跳", () => {
+    // 整帧缩小后漏检了 3 张：认出来的只是 11 张的一段，外加缺一组副露
+    const seg = row([...CLOSED13.slice(0, 10), "9m~"], 300, 600);
+    const [x1, y1, x2, y2] = layoutHand(seg.dets).window!;
+    const cy = 600 + H / 2;
+    expect(x1).toBeLessThan(-1e6);
+    expect(x2).toBeGreaterThan(1e6);
+    expect(Math.abs(y1 - (cy - 10.5 * H))).toBeLessThan(6);
+    expect(Math.abs(y2 - (cy + 8.5 * H))).toBeLessThan(6);
+  });
+
+  it("形状异常按行判：牌山侧面的牌接近方形，不该让手牌里正常的牌变成异常", () => {
+    // 手牌 40×56（0.71）；牌山 30 张 54×56（0.96）——全图中位数会落在 0.96，手牌全被判窄
+    const hand = row([...CLOSED13, "9m~"], 10, 600);
+    const wall = Array.from({ length: 30 }, (_, i) => ({
+      ...det("back", 10 + (i % 15) * 58, 100 + Math.floor(i / 15) * 60),
+      box: [
+        10 + (i % 15) * 58,
+        100 + Math.floor(i / 15) * 60,
+        64 + (i % 15) * 58,
+        156 + Math.floor(i / 15) * 60,
+      ],
+    })) as Detection[];
+    const r = layoutHand([...hand.dets, ...wall], { upright: true });
+    expect(r.hand.closed).toHaveLength(14);
+    expect(r.warnings.map((w) => w.code)).not.toContain("odd_box");
+  });
+
+  it("window 只看选中的副露：同一行远处凑巧成形的一组不会把窗口拉过去", () => {
+    const hand = row([...CLOSED13, "9m~"], 10, 600);
+    const alone = layoutHand(hand.dets).window!;
+    const stray = row(["back", "5z", "5z", "back"], 1500, 600);
+    const r = layoutHand([...hand.dets, ...stray.dets]);
+    expect(r.hand.melds).toEqual([]);
+    // 同一行的行中心会被那一组带偏零点几个像素，横向必须分毫不差
+    r.window!.forEach((v, i) =>
+      expect(Math.abs(v - alone[i]!)).toBeLessThan(i % 2 === 0 ? 1e-9 : 1),
+    );
+  });
+
+  it("同一排里连着 5 组副露：只取 4 组并告警（PATCH 的校验上限就是 4 组）", () => {
+    const names = ["1z", "2z", "3z", "4z", "5z"].flatMap((t) => [t, `${t}~`, t]);
+    const r = layoutHand(row([...names, "2p", "2p~"], 10, 300).dets);
+    expect(r.hand.melds).toHaveLength(4);
+    expect(r.warnings.map((w) => w.code)).toContain("bad_group");
+  });
+
+  it("没有暗牌组时 window 为 null", () => {
+    expect(layoutHand([]).window).toBeNull();
+    expect(layoutHand(row(["5z", "5z~", "5z"], 10, 100).dets).window).toBeNull();
   });
 });

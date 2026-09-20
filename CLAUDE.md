@@ -121,14 +121,27 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   export ONNX with embedded class-agnostic NMS, `[1,300,6]` output → `ci/upload-model.sh` verifies the
   class order against the manifest, uploads to `riichi/models/<uuid>.onnx` and writes `model` back).
   Phone flow (`apps/web/src/features/recognition`): `CameraSheet` opens a full-screen viewfinder
-  (`camera/`); each video frame is cropped to the band (`band.ts`, pure geometry) and transferred to a
-  Web Worker (`worker/detector.worker.ts`) that runs onnxruntime-web (single-thread WASM) +
-  `decodeNmsOutput` + `layoutHand`. **Bytes are downloaded on the main thread** (`worker/bytes.ts`) and
+  (`camera/`) with **no framing box**: every video frame goes whole to a Web Worker
+  (`worker/detector.worker.ts`, onnxruntime-web single-thread WASM + `decodeNmsOutput` + `layoutHand`), and the
+  worker decides what to look at (`worker/runFrame.ts`, pure orchestration with an injected `detect`): detect the
+  locked region (or the whole frame), and if tightening the crop to `layoutHand`'s `window` would still zoom
+  in ≥ 1.2× (long edge, core `SETTLE_GAIN`), detect that region again in the same call — a portrait full frame
+  squeezed into 640 leaves tiles ~23 px wide, enough to locate them (99.3 % on production photos) but not to
+  classify them. A result is `settled` when no such zoom is left; only settled frames count. The region is
+  tracked across frames (core `recognition/roi.ts` `nextTrack`: small moves keep the crop, two unusable frames
+  in a row fall back to the whole frame), so steady state is one inference per frame. **Bytes are downloaded
+  on the main thread** (`worker/bytes.ts`) and
   handed to the worker — the wasm blob is cloned, not transferred, because it is the retry cache;
   `prefetchDetector` warms the download when the phone joins a room but builds no session, and the worker
-  lives only while the sheet is open. `autoCapture.ts` is the shutter gate: three consecutive frames with
-  the same `closed + winTile + melds` and no `blocking` warning → the worker encodes **that same frame**
-  as JPEG (`grab`) so photo and detections stay aligned → `POST /api/recognitions` + `PATCH` the result →
+  lives only while the sheet is open. `autoCapture.ts` is the shutter gate: a sliding vote — the newest
+  settled, non-`blocking` frame's `closed + winTile + melds` must equal the previous frame's and appear ≥ 3
+  times in the last 5 frames (a single bad frame no longer resets the count; A-B-A-B-A never fires). The
+  viewfinder shows the real tile total (red above 14) and, once the same `blocking` warning has held for
+  3 frames, its message. On fire the worker takes the frame it last **finished** (`held` = source bitmap +
+  detections + layout, swapped atomically), tightens the photo to the adopted tiles (`tightenCapture`:
+  bbox + 0.35 tile, re-runs `layoutHand` on what is left and refuses if the hand changes — so the river never
+  enters the photo and the record still aligns on export), encodes it as JPEG and returns photo, detections
+  (in photo pixels) and result **together** (`grab`) → `POST /api/recognitions` + `PATCH` the result →
   `applyRecognized` fills the `ValueDraft`, `ValuePicker` auto-evaluates → after the win command is
   accepted the final hand is `PATCH`ed back as `corrected` (training truth). Warnings are two-tier
   (`severity` set at the emission site, not looked up by code): `blocking` shows in red and forces the
@@ -155,8 +168,10 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   → 「识别正确」 → result (`POST /api/evaluate` with `{hand, rules, roundWind, seatWind}` — the server maps it
   to `dealer: 0, seat: seatWind` — plus core `winPoints` for payments incl. honba, recomputed whenever the
   context changes; 「返回修改」/「继续拍」). The viewfinder in `mode="calc"` adds `DetectionOverlay` (boxes
-  labelled with the tile's own SVG, tap for class + confidence) and an album entry (`StillPicker` reuses
-  the same band); the privacy line shows in both modes. 「识别正确」 PATCHes `corrected` via
+  labelled with the tile's own SVG, tap for class + confidence; room mode only outlines the adopted tiles
+  and the locked region, `RoiOverlay`) and an album entry (the picked photo goes through the same two-pass
+  path as a one-shot `"still"`: no tracked region, no upright assumption, re-sent if back-pressure drops it);
+  the privacy line shows in both modes. 「识别正确」 PATCHes `corrected` via
   `confirmRecognized` (serialized per page, repeat confirmations overwrite). Its rows are stored with
   `source: "calc"` (`recognitions.source`, migration v5, query param on `POST`; default `room`; `label` is
   still accepted and marks rows from the retired developer labeling page — a different trust tier), and the
@@ -166,14 +181,44 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   have two: the added tile is stacked sideways on top; back-X-X-back = closed kan) and may sit
   right/below/above, usually with no gap between groups — `layoutHand` splits a contiguous run by meld
   legality; rows above the hand with no sideways tile and no back are indicators (top row = dora, the
-  row nearer the hand = ura; ura present ⇒ riichi auto-checked). `layoutHand` never throws and is bounded
-  (memoized partition; adversarial 300-box inputs stay under a few ms); it returns warnings the editor
+  row nearer the hand = ura; ura present ⇒ riichi auto-checked). Photos may contain the river and the wall:
+  the hand is the group whose closed segment + nearby melds can make exactly 14 (then no further meld is
+  taken — wall backs that flicker into a "closed kan" were the source of frame-to-frame jitter), melds and
+  indicator rows are walked outward row by row within core `HAND_WINDOW` hops (4 tile heights, 2 between the
+  two indicator rows; measured on production photos), anything else is `extra_rows`. With ura present the two
+  indicator rows must be equally long: a longer far row is the river's last row and is dropped, any other
+  mismatch is `indicator_mismatch` (`blocking`). Known limit: one dora + a one-tile river tail inside the
+  window is indistinguishable — `LayoutGuide` tells users to keep indicators close and the river away.
+  `layoutHand(…, {upright: true})` skips the "most boxes are wide ⇒ photo is rotated" vote (side-on walls are
+  wide boxes); the live path passes it **only once the gyroscope or the user has set the orientation** —
+  until then the vote stays as the safety net for people holding the phone sideways with rotation lock on.
+  While the hand is short of 14 tiles the `window` opens up (full width, one extra hop per missing meld): the
+  downscaled first pass often fragments the hand row, and a window hugging the fragment would never see the
+  rest. `odd_box` (boxes much narrower than their neighbours) is judged per row, not against the whole photo.
+  `recognition/__fixtures__/records.json` holds 50
+  production records (boxes + confirmed hands, no photos) as the regression set for layout changes.
+  `layoutHand` never throws
+  and is bounded (memoized partition; adversarial 300-box inputs stay under a few ms); it returns warnings the editor
   shows. `e2e/recognize.spec.ts` swaps the CDN model for `e2e/fixtures/detector.onnx`
   (`ml/scripts/e2e_detector.py`, a single `Constant` node) so the real camera → ORT → layout → gate →
   grab → evaluate → PATCH chain runs. No video fixture is needed: the detector ignores its input, so
   Chromium's built-in test pattern (`--use-fake-device-for-media-stream`) is enough, and because the
-  output is constant the gate always fires on the third frame — the "frames disagree, reset" branch is
-  covered by `camera/autoCapture.test.ts` instead.
+  output is constant the gate always fires on the third frame and the whole frame is already `settled` — the
+  vote window is covered by `camera/autoCapture.test.ts`, the second pass and tracking by
+  `worker/runFrame.test.ts`, the rotation math by `camera/orientation/*.test.ts`.
+  Landscape (`camera/orientation/`): `rotation` (0/90/270) = how far the chrome is turned relative to the
+  page. The video and the boxes are not rotated (the screen itself is), only the close button / progress /
+  bottom panel; the worker rotates the frame upright before detection, so photos and detections are always
+  upright. Sources: a permanent manual button and the gyroscope (`tilt.ts`: gravity components from β/γ,
+  more than 15° and more than 1.5× the other axis, otherwise keep the last verdict; minus `screen.orientation.angle` so a page
+  that rotates by itself needs nothing) — the gyroscope only speaks when its verdict changes, so whichever
+  happened last wins. Motion permission is asked on open (Android/desktop grant silently, iOS refuses outside
+  a gesture) and again on the button tap (iOS prompts here). Last rotation is kept in `riichi.camera.rotation`.
+  Session telemetry: closing the viewfinder posts one `RecognitionSessionSummary` (no photo) to
+  `POST /api/recognition-sessions` (`recognition_sessions`, migration v6, 120/h per player + 1200/h global;
+  `useSessionStats`, sent once on unmount or `pagehide` with `keepalive`) — frames, settled frames, second
+  passes, per-code `blocking` counts, key changes, max votes, outcome (`auto`/`manual`/`album`/`abandoned`),
+  rotation + source. Stored recognitions only ever show successful captures; this is where failures show up.
 - Riichi music: `RoomView.music` (`{track, seat, at}`) is memory-only room state like `online`; a client
   sends `{type:"music", track: id | null}` (the section lives in the shared `settlement/controls/ControlButtons`, so the console
   can press it for local players with `seat: null`), the TV plays the track from the static bucket

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fitBox } from "./band";
+import { fitBox } from "./viewport";
 
 /** 预览画布的像素密度上限：再高肉眼看不出，白白多画 */
 const MAX_DPR = 2;
