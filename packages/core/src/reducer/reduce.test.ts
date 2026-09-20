@@ -4,7 +4,7 @@ import { DomainError } from "../types/errors";
 import { MLEAGUE_RULES } from "../rules/mleague";
 import type { Command } from "../types/commands";
 import type { RoomEvent } from "../types/events";
-import type { PlayerRef, RoomState } from "../types/state";
+import type { PlayerRef, YonmaRoomState } from "../types/state";
 import { createRoom, reduceRoom, replay } from "./reduce";
 
 const players: PlayerRef[] = [
@@ -39,7 +39,7 @@ function lobbyCommands(force = false): Command[] {
   ];
 }
 
-function startedRoom(): RoomState {
+function startedRoom(): YonmaRoomState {
   return replay(createRoom("ABC123", MLEAGUE_RULES), events(lobbyCommands()));
 }
 
@@ -342,10 +342,10 @@ describe("reduceRoom / 整局回放", () => {
 
 describe("reduceRoom / 立直声明", () => {
   let seq = 100;
-  const apply = (room: RoomState, command: Command): RoomState =>
+  const apply = (room: YonmaRoomState, command: Command): YonmaRoomState =>
     reduceRoom(room, { seq: seq++, at: 0, actor: { playerId: null, clientId: "t" }, command });
   /** 按下时看到的就是当前局面 */
-  const declare = (room: RoomState, seat: 0 | 1 | 2 | 3): Command => {
+  const declare = (room: YonmaRoomState, seat: 0 | 1 | 2 | 3): Command => {
     const g = room.game!.present;
     return {
       type: "declareRiichi",

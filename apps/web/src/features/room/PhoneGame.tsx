@@ -1,17 +1,6 @@
-import { useState } from "react";
-import { Link } from "react-router";
-import { BookOpen, History, ScrollText, User } from "lucide-react";
-import {
-  DEFAULT_REFERENCE_VIEW,
-  presetNameOf,
-  seatNames,
-  seatOfPlayer,
-  type ReferenceView,
-} from "@riichi/core";
-import { Button } from "@/ui/button";
-import { Dialog, DialogContent } from "@/ui/dialog";
-import { ConnectionBadge } from "@/ui/notice";
+import { presetNameOf, seatNames, seatOfPlayer, type YonmaRoomView } from "@riichi/core";
 import { useRoomStore } from "@/ws/store";
+import { PhoneGameShell } from "./PhoneGameShell";
 import { RoundHeader } from "@/features/scoreboard/RoundHeader";
 import { PointsGrid } from "@/features/scoreboard/PointsGrid";
 import { DiffMatrix } from "@/features/scoreboard/DiffMatrix";
@@ -21,44 +10,29 @@ import { FinalPanel } from "@/features/final/FinalPanel";
 import { ControlButtons } from "@/features/settlement/controls/ControlButtons";
 import { ControlHost } from "@/features/settlement/controls/ControlHost";
 import { useControlDialogs } from "@/features/settlement/controls/useControlDialogs";
-import { ReferenceSheet } from "@/features/reference/ReferenceSheet";
 import { RulesEditor } from "@/features/rules/RulesEditor";
-import { ProfileEditor, StatsPanel } from "@/features/profile/ProfileEditor";
-import { useMirror } from "@/features/mirror/useMirror";
-import { CastSwitch } from "@/features/mirror/CastSwitch";
-import { SiteTicker } from "@/features/site/SiteTicker";
 
-type Sheet = "reference" | "rules" | "history" | "me" | null;
-
-const NAV: Array<[Exclude<Sheet, null>, typeof History, string]> = [
-  ["history", History, "记录"],
-  ["reference", BookOpen, "番符表"],
-  ["rules", ScrollText, "规则"],
-  ["me", User, "我的"],
-];
-
-/** 手机对局页：计分卡 + 点差 + 操作栏（第一屏先看局势，操作往下翻），底部工具栏打开记录/番符表/规则/我的。 */
-export function PhoneGame() {
-  const room = useRoomStore((s) => s.room)!;
+/** 四人房的手机对局页：计分卡 + 点差 + 操作栏（第一屏先看局势，操作往下翻）。 */
+export function PhoneGame({ room }: { room: YonmaRoomView }) {
   const playerId = useRoomStore((s) => s.playerId);
-  const [sheet, setSheet] = useState<Sheet>(null);
-  const [refView, setRefView] = useState<ReferenceView>(DEFAULT_REFERENCE_VIEW);
   const controls = useControlDialogs();
-  const [cast, setCast] = useState(false);
-  useMirror(cast && sheet === "reference", { kind: "reference", ...refView }, true);
-  useMirror(cast && sheet === "rules", { kind: "rules" }, true);
   const game = room.game!;
   const names = seatNames(room);
   const mySeat = seatOfPlayer(room.seats, playerId);
   const finished = game.present.status === "finished";
-  const closeSheet = (open: boolean) => {
-    if (open) return;
-    setSheet(null);
-    setCast(false);
-  };
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col gap-3 px-4 pb-28 pt-4">
+    <PhoneGameShell
+      code={room.code}
+      rules={room.rules}
+      history={<HistoryTable history={game.present.history} />}
+      historyCount={game.present.history.length}
+      rulesSheet={{
+        description: `${presetNameOf(room.rules)} · 对局进行中，规则已锁定`,
+        content: <RulesEditor value={room.rules} onChange={() => undefined} editable={false} />,
+        intent: { kind: "rules" },
+      }}
+    >
       <RoundHeader game={game.present} names={names} rules={room.rules} />
       {finished && (
         <div className="rounded-xl border border-pos/40 bg-surface p-3">
@@ -112,70 +86,6 @@ export function PhoneGame() {
         mirror
         mySeat={mySeat}
       />
-
-      <nav
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 pb-[clamp(0.375rem,env(safe-area-inset-bottom),1.125rem)] backdrop-blur"
-        aria-label="功能"
-      >
-        <div className="mx-auto grid max-w-md grid-cols-4">
-          {NAV.map(([key, Icon, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setSheet(key)}
-              aria-pressed={sheet === key}
-              className="flex flex-col items-center gap-0.5 pb-1 pt-2 text-[11px] text-muted hover:text-fg aria-pressed:text-fg"
-            >
-              <Icon className="h-5 w-5" />
-              {label}
-            </button>
-          ))}
-        </div>
-        {/* 信息行借用 Home 指示条上方的安全区（纯文本不可点）：底部留白封顶 18px，高过指示条顶端（约 13px）又不被 34px 的安全区撑满。
-            min-h-5 = 连接徽标的高度：断线重连时这一行不变高，上面的 tab 不跳 */}
-        <div className="mx-auto flex min-h-5 max-w-md items-center gap-2 pl-4 pr-3 text-[11px] text-muted">
-          <span className="shrink-0">
-            房间 <span className="font-semibold tabular text-fg">{room.code}</span>
-          </span>
-          <ConnectionBadge />
-          <SiteTicker className="ml-auto" />
-        </div>
-      </nav>
-
-      <Dialog open={sheet === "history"} onOpenChange={closeSheet}>
-        <DialogContent title="历史记录" description={`共 ${game.present.history.length} 条`}>
-          <HistoryTable history={game.present.history} />
-        </DialogContent>
-      </Dialog>
-      <Dialog open={sheet === "reference"} onOpenChange={closeSheet}>
-        <DialogContent title="番符表" className="h-[92dvh] sm:max-w-2xl">
-          <CastSwitch checked={cast} onCheckedChange={setCast} />
-          <ReferenceSheet rules={room.rules} view={refView} onViewChange={setRefView} />
-        </DialogContent>
-      </Dialog>
-      <Dialog open={sheet === "rules"} onOpenChange={closeSheet}>
-        <DialogContent
-          title="房间规则"
-          description={`${presetNameOf(room.rules)} · 对局进行中，规则已锁定`}
-        >
-          <CastSwitch checked={cast} onCheckedChange={setCast} />
-          <RulesEditor value={room.rules} onChange={() => undefined} editable={false} />
-        </DialogContent>
-      </Dialog>
-      <Dialog open={sheet === "me"} onOpenChange={closeSheet}>
-        <DialogContent title="我的" description="昵称与头像会同步到房间">
-          <ProfileEditor />
-          <h3 className="mb-2 mt-4 text-sm font-medium">战绩</h3>
-          <StatsPanel />
-          {/* 对局中离开只是暂离：座位保留，回首页点「返回房间」或重新扫码即可回来。
-              外面包一层：DialogContent 给最后一个子元素加底部内边距 */}
-          <div className="mt-4">
-            <Button asChild variant="outline" className="w-full">
-              <Link to="/">暂离房间</Link>
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+    </PhoneGameShell>
   );
 }

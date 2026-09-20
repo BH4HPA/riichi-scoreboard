@@ -36,14 +36,19 @@ export function MirrorOverlay({
     );
   }
 
+  if (intent.kind === "none") return null;
+  // 二人房的镜像由二人房的对局页自己渲染（features/ten/mirror），四人房收不到这两种
+  if (intent.kind === "tenSettlement" || intent.kind === "tenGuide") return null;
+  const card: "rules" | "adjust" = intent.kind;
+
   return (
     <div className="rounded-xl border border-accent/60 bg-surface p-4 shadow-lg shadow-accent/10">
       <div className="flex items-center gap-2 text-sm text-muted">
         <Badge tone="accent">{who}</Badge>
-        {intent.kind === "rules" && <span>正在查看规则 · {presetNameOf(rules)}</span>}
-        {intent.kind === "adjust" && <span>正在调整场况</span>}
+        {card === "rules" && <span>正在查看规则 · {presetNameOf(rules)}</span>}
+        {card === "adjust" && <span>正在调整场况</span>}
       </div>
-      {intent.kind === "rules" && (
+      {card === "rules" && (
         <div className="mt-3">
           <RulesSummary rules={rules} />
         </div>

@@ -303,7 +303,7 @@ test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手�
   await tv.goto("/console"); // 新的浏览器上下文没有保存的房间码，会自动新建房间
   const code = (await tv.getByTestId("room-code").textContent())?.trim() ?? "";
 
-  // 开局键旁说明还差什么；「新房间」已并入「解散房间」
+  // 开局键旁说明还差什么；大厅没有「新房间」键（换房间走「返回首页」→「新建」，或解散后回首页再开）
   await expect(tv.getByText("还差 4 人入座")).toBeVisible();
   await expect(tv.getByRole("button", { name: "新房间" })).toHaveCount(0);
 
@@ -387,15 +387,46 @@ test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手�
   await phones[0]!.getByRole("button", { name: "撤销" }).click();
   await expect(phones[0]!.getByRole("button", { name: "自摸", exact: true })).toBeVisible();
 
-  // 对局中解散（入口在「操作」对话框）：手机看到提示，主控台自动开新房，且没有错误提示
+  // 对局中解散（入口在「操作」对话框）：手机看到提示；主控台回首页，不再自动开新房，且没有错误提示
   await tv.getByRole("button", { name: "操作" }).click();
   await tv.getByRole("button", { name: "解散房间" }).click();
+  // 确认框如实说明之后会怎样：回首页，不再说「随即开一个新房间」
+  await expect(tv.getByRole("dialog")).toContainText("本机回到首页");
   await tv.getByRole("button", { name: "解散", exact: true }).click();
   await expect(phones[0]!.getByText(`房间 ${code} 已解散`)).toBeVisible();
-  await expect(tv.getByTestId("room-code")).toBeVisible();
-  expect((await tv.getByTestId("room-code").textContent())?.trim()).not.toBe(code);
+  await expect(tv).toHaveURL(/\/$/);
+  // 解散的房间已经忘掉：首页写的是「创建」而不是「继续」
+  await expect(tv.getByTestId("open-yonma")).toHaveText(/创建四人麻将房间/);
   await expect(tv.getByText("操作失败")).toHaveCount(0);
   await expect(tv.getByText("连接已断开")).toHaveCount(0);
+  await tvCtx.close();
+});
+
+test("两台手机同时开着流局确认：一台确认后另一台自动关闭，不会多记一局", async ({ browser }) => {
+  const tvCtx = await newContext(browser, { viewport: { width: 1600, height: 900 } });
+  const tv = await tvCtx.newPage();
+  await tv.goto("/console");
+  const code = (await tv.getByTestId("room-code").textContent())?.trim() ?? "";
+  const phones: Page[] = [];
+  for (let i = 0; i < 4; i++) {
+    const p = await phone(browser, code);
+    await p.getByTestId(`seat-${i}`).click();
+    await p.getByRole("button", { name: "准备", exact: true }).click();
+    phones.push(p);
+  }
+  await expect(tv.getByTestId("points-0")).toHaveText("25,000");
+  const [a, b] = [phones[0]!, phones[1]!];
+  await a.getByRole("button", { name: "流局", exact: true }).click();
+  await b.getByRole("button", { name: "流局", exact: true }).click();
+  await a.getByRole("dialog").getByRole("button", { name: "确认流局" }).click();
+  // 全员未听：庄家下庄，东2局1本场
+  await expect(tv.getByText("东2局1本场")).toBeVisible();
+  // 乙的弹窗文案看起来仍然成立——不关掉的话再点一次就是东3局2本场
+  await expect(b.getByRole("dialog")).toHaveCount(0);
+  await expect(b.getByText("局面已变化，结算已关闭")).toBeVisible();
+  // 自己提交的那一笔不算「局面变了」
+  await expect(a.getByText("局面已变化，结算已关闭")).toHaveCount(0);
+  await expect(tv.getByText("东2局1本场")).toBeVisible();
   await tvCtx.close();
 });
 

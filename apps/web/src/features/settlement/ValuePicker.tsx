@@ -4,6 +4,7 @@ import { ChipGroup, Label, Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui
 import { useSocket } from "@/ws/useRoom";
 import { CommandError } from "@/ws/socket";
 import { HandEditor } from "./hand/HandEditor";
+import { draftWithRiichi } from "./riichiSync";
 
 /** 拍照识别（相机、推理、布局规则）只在打开牌面页时才加载，主包不带 */
 const CameraButton = lazy(() =>
@@ -30,16 +31,26 @@ export function ValuePicker({
   rules,
   seat,
   dealer,
+  riichiLock,
 }: {
   draft: ValueDraft;
   /** 函数式更新：评估结果异步回来时只改仍然匹配的草稿 */
   onChange: (update: (d: ValueDraft) => ValueDraft) => void;
+  /**
+   * 手牌的立直由外部事实决定时（二人房：本局宣言的是立直还是听牌）给出那个值：开关禁用，
+   * 每次改动后收口到它——拍照识别认出里宝会替人勾立直，听牌宣言的局要改回来（里宝随 `withRiichi` 一并清掉）。
+   */
+  riichiLock?: boolean | undefined;
   rules: RoomRules;
   /** 和牌者；还没选时为 null，牌面照常录入但不送评估 */
   seat: Seat | null;
   dealer: Seat;
 }) {
   const socket = useSocket();
+  const change: typeof onChange =
+    riichiLock === undefined
+      ? onChange
+      : (update) => onChange((d) => draftWithRiichi(update(d), riichiLock));
   const [evaluating, setEvaluating] = useState(false);
   const [evalError, setEvalError] = useState<string | null>(null);
   const tier =
@@ -145,15 +156,16 @@ export function ValuePicker({
       <TabsContent value="hand" className="mt-3 space-y-3">
         <HandEditor
           draft={draft}
-          onChange={onChange}
+          onChange={change}
           rules={rules}
+          riichiLocked={riichiLock !== undefined}
           evaluated={draft.evaluated}
           evaluating={evaluating}
           evalError={seat === null && complete ? "先选和牌者" : evalError}
           isDealer={seat === dealer}
           camera={
             <Suspense fallback={null}>
-              <CameraButton draft={draft} onChange={onChange} rules={rules} />
+              <CameraButton draft={draft} onChange={change} rules={rules} />
             </Suspense>
           }
         />

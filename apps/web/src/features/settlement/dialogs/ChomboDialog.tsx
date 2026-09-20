@@ -3,6 +3,7 @@ import { roundLabel, type Seat } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { DialogFooter } from "@/ui/dialog";
 import { useCommand } from "@/ws/useRoom";
+import { useCloseOnStale } from "../drafts/useCloseOnStale";
 import { useMirror } from "@/features/mirror/useMirror";
 import { SeatSelect } from "../SeatFlags";
 import type { SettlementDialogProps, SettlementFormProps } from "./shared";
@@ -23,6 +24,7 @@ export function ChomboDialog({ open, onOpenChange, game, ...rest }: SettlementDi
 
 function ChomboForm({ names, mirror, mySeat, onDone }: SettlementFormProps) {
   const send = useCommand();
+  const submit = useCloseOnStale(onDone);
   const [offender, setOffender] = useState<Seat | null>(mySeat);
   const [busy, setBusy] = useState(false);
   useMirror(
@@ -41,7 +43,7 @@ function ChomboForm({ names, mirror, mySeat, onDone }: SettlementFormProps) {
   const confirm = async () => {
     if (offender === null) return;
     setBusy(true);
-    const ok = await send({ type: "chombo", offender });
+    const ok = await submit(() => send({ type: "chombo", offender }));
     setBusy(false);
     if (ok) onDone();
   };

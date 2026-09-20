@@ -4,6 +4,7 @@ import { Button } from "@/ui/button";
 import { Label, Select } from "@/ui/controls";
 import { DialogFooter } from "@/ui/dialog";
 import { useCommand } from "@/ws/useRoom";
+import { useCloseOnStale } from "../drafts/useCloseOnStale";
 import { useMirror } from "@/features/mirror/useMirror";
 import { seatsOf } from "../format";
 import { useSeededRiichi } from "../riichiSeed";
@@ -34,6 +35,7 @@ export function AbortiveDialog({ open, onOpenChange, game, ...rest }: Settlement
 
 function AbortiveForm({ game, names, mirror, mySeat, onDone }: SettlementFormProps) {
   const send = useCommand();
+  const submit = useCloseOnStale(onDone);
   const [reason, setReason] = useState<AbortiveReason>("kyuushu");
   const [riichi, setRiichi] = useSeededRiichi(game.riichi);
   const [busy, setBusy] = useState(false);
@@ -53,7 +55,7 @@ function AbortiveForm({ game, names, mirror, mySeat, onDone }: SettlementFormPro
   );
   const confirm = async () => {
     setBusy(true);
-    const ok = await send({ type: "abortive", reason, riichi: seatsOf(riichi) });
+    const ok = await submit(() => send({ type: "abortive", reason, riichi: seatsOf(riichi) }));
     setBusy(false);
     if (ok) onDone();
   };

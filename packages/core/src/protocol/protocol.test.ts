@@ -12,7 +12,7 @@ import { DomainError } from "../types/errors";
 import { RulesError } from "../rules/validate";
 import { createRoom } from "../reducer/reduce";
 import { MLEAGUE_RULES } from "../rules/mleague";
-import type { HandInput, PlayerRef, RoomState } from "../types/state";
+import type { HandInput, PlayerRef, YonmaRoomState } from "../types/state";
 
 const TRACK_A = "43ace007-662f-42eb-bab5-cf1c26fc7598";
 const TRACK_B = "07f0350b-f0ca-428d-9b5f-a86493555471";
@@ -20,7 +20,7 @@ const TRACK_B = "07f0350b-f0ca-428d-9b5f-a86493555471";
 const device = (id: string): PlayerRef => ({ id, name: id, avatar: null, kind: "device" });
 const local = (id: string): PlayerRef => ({ id, name: id, avatar: null, kind: "local" });
 
-function lobby(seats: (PlayerRef | null)[], ready = [true, true, true, true]): RoomState {
+function lobby(seats: (PlayerRef | null)[], ready = [true, true, true, true]): YonmaRoomState {
   return { ...createRoom("X", MLEAGUE_RULES), seats, ready };
 }
 
@@ -56,7 +56,7 @@ describe("toRoomView", () => {
   it("带在线状态与自动开局剩余时间", () => {
     const state = lobby([device("a"), null, null, null], [false, false, false, false]);
     const music = { track: TRACK_A, seat: 0 as const, at: 1 };
-    const view = toRoomView(state, 3, new Set(["a"]), 1234, music);
+    const view = toRoomView(state, 3, new Set(["a"]), 1234, music, 0);
     expect(view.online).toEqual([true, false, false, false]);
     expect(view.autoStartIn).toBe(1234);
     expect(view.music).toBe(music);

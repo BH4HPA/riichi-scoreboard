@@ -1,8 +1,9 @@
-import type { Command, RoomEvent, RoomRules } from "@riichi/core";
+import type { Command, RoomEvent, RoomKind, RoomRules } from "@riichi/core";
 import type { Database } from "./index";
 
 export interface RoomRow {
   code: string;
+  kind: RoomKind;
   rules: RoomRules;
   created_at: number;
   updated_at: number;
@@ -26,16 +27,19 @@ export class RoomsRepo {
     }
   }
 
-  create(code: string, rules: RoomRules, now: number): void {
+  create(code: string, kind: RoomKind, rules: RoomRules, now: number): void {
     this.db
-      .prepare("INSERT INTO rooms (code, rules, created_at, updated_at) VALUES (?, ?, ?, ?)")
-      .run(code, JSON.stringify(rules), now, now);
+      .prepare(
+        "INSERT INTO rooms (code, kind, rules, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+      )
+      .run(code, kind, JSON.stringify(rules), now, now);
   }
 
   get(code: string): RoomRow | null {
     const row = this.db.prepare("SELECT * FROM rooms WHERE code = ?").get(code) as
       | {
           code: string;
+          kind: RoomKind;
           rules: string;
           created_at: number;
           updated_at: number;

@@ -101,7 +101,7 @@ export function ControlButtons({
             className="text-neg"
             onClick={() => onOpen("newGame")}
           >
-            <RefreshCcw className="h-4 w-4" /> 重开一局
+            <RefreshCcw className="h-4 w-4" /> 重开整场
           </Button>
         </div>
       </section>

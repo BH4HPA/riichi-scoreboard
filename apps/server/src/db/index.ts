@@ -109,6 +109,9 @@ CREATE INDEX idx_recognitions_player ON recognitions (player_id, created_at);
   );
   CREATE INDEX idx_recognition_sessions_created ON recognition_sessions (created_at);
   `,
+  // v7：房型（四人麻将 yonma / 《天》二人麻将 ten）。它决定座位数与对局模型，是房间的身份，
+  // 所以是 rooms 的一列而不是 rules 里的字段（规则在大厅可随时整份覆盖）。历史房间都是四人，默认值正好。
+  `ALTER TABLE rooms ADD COLUMN kind TEXT NOT NULL DEFAULT 'yonma';`,
 ];
 
 export type Database = DatabaseSync;

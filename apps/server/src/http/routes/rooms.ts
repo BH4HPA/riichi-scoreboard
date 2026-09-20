@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { defaultRules, validateRules, RulesError } from "@riichi/core";
+import { defaultRules, isRoomKind, validateRules, RulesError } from "@riichi/core";
 import { requirePlayer, type AuthEnv } from "../../auth/deviceToken";
 import type { PlayersRepo } from "../../db/players";
 import { RoomClosed, RoomNotFound, type RoomRegistry } from "../../rooms/registry";
@@ -23,9 +23,11 @@ export function roomRoutes(deps: Deps): Hono<AuthEnv> {
     "建房过于频繁，请稍后再试",
   );
 
-  /** 主控台建房；可带初始规则。 */
+  /** 主控台建房；可带房型（缺省四人麻将，旧前端不传）与初始规则。 */
   app.post("/", createLimit, bodyLimit({ maxSize: 16 * 1024 }), async (c) => {
-    const body = (await c.req.json().catch(() => ({}))) as { rules?: unknown };
+    const body = (await c.req.json().catch(() => ({}))) as { kind?: unknown; rules?: unknown };
+    const kind = body.kind ?? "yonma";
+    if (!isRoomKind(kind)) return c.json({ error: "kind", message: "房型无效" }, 400);
     let rules = defaultRules();
     if (body.rules !== undefined) {
       try {
@@ -37,7 +39,7 @@ export function roomRoutes(deps: Deps): Hono<AuthEnv> {
         );
       }
     }
-    const room = deps.registry.createRoom(rules);
+    const room = deps.registry.createRoom(rules, kind);
     return c.json({ room: deps.registry.view(room) }, 201);
   });
 

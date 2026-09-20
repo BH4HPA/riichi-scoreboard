@@ -1,8 +1,9 @@
 import { DomainError } from "../types/errors";
 import { validateRules } from "../rules/validate";
 import type { ClientCommand, ClientWinValue, RonWin } from "../types/commands";
+import type { TenDrawReason } from "../ten/state";
 import type { AbortiveReason, HandInput } from "../types/state";
-import { MAX_TILE, type Seat } from "../types/tiles";
+import { ALL_TILES, MAX_TILE, type Seat } from "../types/tiles";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -93,6 +94,7 @@ function optionalEnd(v: unknown): { endGame?: boolean } {
 }
 
 const ABORTIVE: readonly AbortiveReason[] = ["kyuushu", "suufon", "suucha", "suukan", "sanchahou"];
+const TEN_DRAWS: readonly TenDrawReason[] = ["noDeclare", "guessed", "exhausted"];
 
 /**
  * 把客户端发来的任意 JSON 规范化为 ClientCommand；结构不对即抛 DomainError("bad_command")。
@@ -189,6 +191,25 @@ export function validateCommand(input: unknown): ClientCommand {
         kyoku: int(input.kyoku, "局序号", 0, 15),
         honba: int(input.honba, "本场数", 0, 99),
       };
+    case "tenDeclare":
+      return {
+        type: "tenDeclare",
+        seat: seat(input.seat, "宣言座位"),
+        riichi: bool(input.riichi, "立直标记"),
+        entries: int(input.entries, "历史条数", 0, 100_000),
+      };
+    case "tenMark":
+      return {
+        type: "tenMark",
+        tile: int(input.tile, "划掉的牌", 1, ALL_TILES.length),
+        on: bool(input.on, "划掉标记"),
+        entries: int(input.entries, "历史条数", 0, 100_000),
+      };
+    case "tenDraw":
+      if (!TEN_DRAWS.includes(input.reason as TenDrawReason)) bad("流局原因无效");
+      return { type: "tenDraw", reason: input.reason as TenDrawReason };
+    case "tenTsumo":
+      return { type: "tenTsumo", value: winValue(input.value) };
     default:
       return bad(`未知命令 ${input.type}`);
   }

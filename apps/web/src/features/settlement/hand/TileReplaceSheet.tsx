@@ -60,7 +60,7 @@ export function TileReplaceSheet({
           disabled={disabled}
           selected={(t) => current !== null && t === current}
           onPick={(t) => loc && onReplace(loc, t)}
-          className="mt-3 grid grid-cols-9 justify-items-center gap-1"
+          className="mt-3"
           testId="replace-grid"
         />
         <DialogFooter>

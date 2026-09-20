@@ -1,46 +1,47 @@
 import { AKA_TILES, ALL_TILES, type Tile } from "@riichi/core";
-import { TileFace } from "./TileFace";
+import { cn } from "@/lib/utils";
+import { TileKey } from "./TileKey";
 
 /**
  * 全部牌面的 9 列网格（万筒索各一行、字牌一行），启用赤五时在末尾补一行三张赤五。
- * 键盘录入与确认态的替换面板共用。
+ * 键盘录入、确认态的替换面板与二人房的全牌型板共用：牌撑满格子（见 `TileKey`），随容器宽度放大。
+ * 不传 `onPick` 即只读。
  */
 export function TileGrid({
   aka,
   disabled,
   selected,
+  struck,
   onPick,
-  buttonClassName,
   className,
   testId,
 }: {
   aka: boolean;
-  disabled: (tile: Tile) => boolean;
+  disabled?: (tile: Tile) => boolean;
   selected?: (tile: Tile) => boolean;
-  onPick: (tile: Tile) => void;
-  /** 点击区样式：键盘把点击区撑到整格，牌图保持原尺寸居中 */
-  buttonClassName?: string;
-  className?: string;
+  /** 划掉（仍可点） */
+  struck?: (tile: Tile) => boolean;
+  onPick?: ((tile: Tile) => void) | undefined;
+  className?: string | undefined;
   testId?: string;
 }) {
-  const face = (t: Tile) => (
-    <TileFace
+  const key = (t: Tile) => (
+    <TileKey
       key={t}
       tile={t}
-      size="sm"
+      dim={disabled?.(t) ?? false}
       selected={selected?.(t) ?? false}
-      dim={disabled(t)}
-      onClick={() => onPick(t)}
-      {...(buttonClassName ? { buttonClassName } : {})}
+      struck={struck?.(t) ?? false}
+      onClick={onPick ? () => onPick(t) : undefined}
     />
   );
   return (
-    <div className={className ?? "grid grid-cols-9 gap-1"} data-testid={testId}>
-      {ALL_TILES.map(face)}
+    <div className={cn("grid grid-cols-9 gap-1", className)} data-testid={testId}>
+      {ALL_TILES.map(key)}
       {aka && (
         <>
           <span className="col-span-2" aria-hidden />
-          {AKA_TILES.map(face)}
+          {AKA_TILES.map(key)}
         </>
       )}
     </div>

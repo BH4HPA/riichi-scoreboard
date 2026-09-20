@@ -4,7 +4,7 @@ import { Button, type ButtonProps } from "@/ui/button";
 import { useCommand } from "@/ws/useRoom";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
 
-/** 解散确认：发命令后服务端断开所有连接，主控台收到断开后自动建新房。 */
+/** 解散确认：发命令后服务端断开所有连接，主控台收到断开后回首页（由人决定接下来开哪种房间）。 */
 export function DissolveDialog({
   code,
   open,
@@ -20,7 +20,7 @@ export function DissolveDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={`解散房间 ${code}？`}
-      description="已加入的玩家会看到房间已解散，进行中的对局不再记录战绩；本机随即开一个新房间。"
+      description="已加入的玩家会看到房间已解散，进行中的对局不再记录战绩；本机回到首页。"
       confirmText="解散"
       danger
       onConfirm={() => send({ type: "dissolve" })}

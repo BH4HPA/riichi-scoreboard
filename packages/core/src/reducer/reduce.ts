@@ -1,30 +1,56 @@
 import { DomainError } from "../types/errors";
 import { validateRules } from "../rules/validate";
-import { isGameCommand, type LobbyCommand } from "../types/commands";
+import {
+  isGameCommand,
+  isTenCommand,
+  type GameCommand,
+  type LobbyCommand,
+  type TenCommand,
+} from "../types/commands";
 import type { RoomEvent } from "../types/events";
 import type { RoomRules } from "../types/rules";
 import {
+  SEAT_COUNT,
   isLocalPlayer,
   seatNames,
-  type GameState,
   type PlayerRef,
+  type RoomKind,
   type RoomState,
-  type Undoable,
+  type TenRoomState,
+  type YonmaRoomState,
 } from "../types/state";
+import type { Seat } from "../types/tiles";
+import { applyTenCommand, createTenGame } from "../ten/reduce";
 import { applyGameCommand, createGame, declareRiichi } from "./game";
 import { createUndoable, push, redo, undo } from "./undoable";
 import { assertSeat } from "./validateCommand";
 
-export function createRoom(code: string, rules: RoomRules): RoomState {
+/** 房型缺省为四人：旧房间（`rooms.kind` 落默认值）与现有调用方得到的状态与从前一致。 */
+export function createRoom(code: string, rules: RoomRules, kind?: "yonma"): YonmaRoomState;
+export function createRoom(code: string, rules: RoomRules, kind: "ten"): TenRoomState;
+export function createRoom(code: string, rules: RoomRules, kind: RoomKind): RoomState;
+export function createRoom(code: string, rules: RoomRules, kind: RoomKind = "yonma"): RoomState {
+  const count = SEAT_COUNT[kind];
   return {
+    kind,
     code,
     phase: "lobby",
     rules,
-    seats: [null, null, null, null],
-    ready: [false, false, false, false],
+    seats: Array.from({ length: count }, () => null),
+    ready: Array.from({ length: count }, () => false),
     game: null,
     gameNo: 0,
   };
+}
+
+/** 形状校验只保证 0–3；座位数随房型而定（二人房只有 0、1），越界在这里挡住 */
+function assertRoomSeat(room: RoomState, seat: Seat): void {
+  assertSeat(seat);
+  if (seat >= room.seats.length) throw new DomainError("bad_seat", "没有这个座位");
+}
+
+function notFull(room: RoomState): DomainError {
+  return new DomainError("not_full", `${room.kind === "ten" ? "两" : "四"}个座位尚未坐满`);
 }
 
 function requireLobby(room: RoomState, what: string): void {
@@ -36,7 +62,7 @@ function requireLobby(room: RoomState, what: string): void {
   }
 }
 
-function applyLobbyCommand(room: RoomState, cmd: LobbyCommand): RoomState {
+function applyLobbyCommand<R extends RoomState>(room: R, cmd: LobbyCommand): R {
   switch (cmd.type) {
     case "setRules": {
       requireLobby(room, "修改规则");
@@ -48,7 +74,7 @@ function applyLobbyCommand(room: RoomState, cmd: LobbyCommand): RoomState {
     }
     case "sit": {
       requireLobby(room, "换座");
-      assertSeat(cmd.seat);
+      assertRoomSeat(room, cmd.seat);
       const seats = [...room.seats];
       const existing = seats.findIndex((p) => p?.id === cmd.player.id);
       if (existing === cmd.seat) return room;
@@ -62,7 +88,7 @@ function applyLobbyCommand(room: RoomState, cmd: LobbyCommand): RoomState {
     }
     case "leave": {
       requireLobby(room, "离座");
-      assertSeat(cmd.seat);
+      assertRoomSeat(room, cmd.seat);
       const seats = [...room.seats];
       const ready = [...room.ready];
       seats[cmd.seat] = null;
@@ -70,14 +96,14 @@ function applyLobbyCommand(room: RoomState, cmd: LobbyCommand): RoomState {
       return { ...room, seats, ready };
     }
     case "setReady": {
-      assertSeat(cmd.seat);
+      assertRoomSeat(room, cmd.seat);
       if (!room.seats[cmd.seat]) throw new DomainError("empty_seat", "座位为空");
       const ready = [...room.ready];
       ready[cmd.seat] = cmd.ready;
       return { ...room, ready };
     }
     case "syncProfile": {
-      assertSeat(cmd.seat);
+      assertRoomSeat(room, cmd.seat);
       const current = room.seats[cmd.seat];
       if (!current || current.id !== cmd.player.id)
         throw new DomainError("empty_seat", "座位与玩家不符");
@@ -87,7 +113,7 @@ function applyLobbyCommand(room: RoomState, cmd: LobbyCommand): RoomState {
     }
     case "start": {
       requireLobby(room, "开局");
-      if (room.seats.some((p) => p === null)) throw new DomainError("not_full", "四个座位尚未坐满");
+      if (room.seats.some((p) => p === null)) throw notFull(room);
       if (!cmd.force && room.ready.some((r) => !r)) {
         throw new DomainError("not_ready", "还有玩家未准备");
       }
@@ -107,18 +133,19 @@ function applyLobbyCommand(room: RoomState, cmd: LobbyCommand): RoomState {
 
 function startGame(room: RoomState, at: number): RoomState {
   const players = room.seats.map((p) => {
-    if (!p) throw new DomainError("not_full", "四个座位尚未坐满");
+    if (!p) throw notFull(room);
     return p;
   }) as PlayerRef[];
-  return {
-    ...room,
-    phase: "playing",
-    game: createUndoable(createGame(room.rules, players, at)),
-    gameNo: room.gameNo + 1,
-  };
+  const started = { phase: "playing", gameNo: room.gameNo + 1 } as const;
+  return room.kind === "ten"
+    ? { ...room, ...started, game: createUndoable(createTenGame(players, at)) }
+    : { ...room, ...started, game: createUndoable(createGame(room.rules, players, at)) };
 }
 
-/** 纯函数：房间状态 + 事件 → 新房间状态。失败抛 DomainError / RulesError。 */
+/** 纯函数：房间状态 + 事件 → 新房间状态（房型不变）。失败抛 DomainError / RulesError。 */
+export function reduceRoom(room: YonmaRoomState, event: RoomEvent): YonmaRoomState;
+export function reduceRoom(room: TenRoomState, event: RoomEvent): TenRoomState;
+export function reduceRoom(room: RoomState, event: RoomEvent): RoomState;
 export function reduceRoom(room: RoomState, event: RoomEvent): RoomState {
   const cmd = event.command;
   if (room.phase === "closed") throw new DomainError("closed", "房间已解散");
@@ -129,43 +156,92 @@ export function reduceRoom(room: RoomState, event: RoomEvent): RoomState {
   }
 
   if (cmd.type === "newGame") {
-    if (room.phase !== "finished")
-      throw new DomainError("not_finished", "对局尚未结束，请先终局结算");
+    // 重开一局 = 放弃眼下这一局、强制从头来：对局中与终局后都可以（终局后等于再来一局）。
+    // 没打完的那一局不落战绩（战绩只在 playing → finished 时写）；撤销栈随新局重建，所以不可撤销。
+    if (room.phase === "lobby") throw new DomainError("no_game", "尚未开局");
     return startGame(room, event.at);
   }
 
   if (!room.game) throw new DomainError("no_game", "尚未开局");
+  // 对局命令按房型分发：两种对局模型互不相通，撤销栈（泛型）共用
+  return room.kind === "ten" ? reduceTenGame(room, cmd, event) : reduceYonmaGame(room, cmd, event);
+}
+
+function reduceYonmaGame(
+  room: YonmaRoomState,
+  cmd: GameCommand | TenCommand,
+  event: RoomEvent,
+): YonmaRoomState {
+  if (isTenCommand(cmd)) throw new DomainError("not_here", "这是二人麻将的操作");
+  const stack = room.game!;
 
   if (cmd.type === "declareRiichi") {
     // 替换 present、不动撤销栈：撤销撤的是结算，声明跟着局面快照走
-    const present = declareRiichi(room.game.present, cmd, room.rules);
-    return present === room.game.present ? room : { ...room, game: { ...room.game, present } };
+    const present = declareRiichi(stack.present, cmd, room.rules);
+    return present === stack.present ? room : { ...room, game: { ...stack, present } };
   }
   if (cmd.type === "undo") {
-    const game = undo(room.game);
+    const game = undo(stack);
     if (!game) throw new DomainError("nothing_to_undo", "暂无可撤销的结算");
-    return withGame(room, game);
+    return { ...room, game, phase: phaseOf(game.present) };
   }
   if (cmd.type === "redo") {
-    const game = redo(room.game);
+    const game = redo(stack);
     if (!game) throw new DomainError("nothing_to_redo", "暂无可重做的结算");
-    return withGame(room, game);
+    return { ...room, game, phase: phaseOf(game.present) };
   }
 
-  const present = applyGameCommand(room.game.present, cmd, {
+  const present = applyGameCommand(stack.present, cmd, {
     seq: event.seq,
     at: event.at,
     names: seatNames(room),
     rules: room.rules,
   });
-  return withGame(room, push(room.game, present));
+  return { ...room, game: push(stack, present), phase: phaseOf(present) };
+}
+
+function reduceTenGame(
+  room: TenRoomState,
+  cmd: GameCommand | TenCommand,
+  event: RoomEvent,
+): TenRoomState {
+  const stack = room.game!;
+
+  if (cmd.type === "undo") {
+    const game = undo(stack);
+    if (!game) throw new DomainError("nothing_to_undo", "暂无可撤销的操作");
+    return { ...room, game, phase: phaseOf(game.present) };
+  }
+  if (cmd.type === "redo") {
+    const game = redo(stack);
+    if (!game) throw new DomainError("nothing_to_redo", "暂无可重做的操作");
+    return { ...room, game, phase: phaseOf(game.present) };
+  }
+  if (!isTenCommand(cmd) && cmd.type !== "endGame") {
+    throw new DomainError("not_here", "这是四人麻将的操作");
+  }
+
+  const present = applyTenCommand(stack.present, cmd, {
+    seq: event.seq,
+    at: event.at,
+    names: seatNames(room),
+    rules: room.rules,
+  });
+  // 没有状态变化（重复的宣言 / 划牌）：原样返回，服务端据此不落库、不推进 seq
+  if (present === stack.present) return room;
+  // 划牌替换 present、不动撤销栈（同四人房的立直声明）：撤销撤的是宣言与结算，记号跟着局面快照走
+  if (cmd.type === "tenMark") return { ...room, game: { ...stack, present } };
+  return { ...room, game: push(stack, present), phase: phaseOf(present) };
 }
 
 /** 房间阶段跟随当前局面：对局结束即 finished，否则 playing。 */
-function withGame(room: RoomState, game: Undoable<GameState>): RoomState {
-  return { ...room, game, phase: game.present.status === "finished" ? "finished" : "playing" };
+function phaseOf(present: { status: "playing" | "finished" }): "playing" | "finished" {
+  return present.status === "finished" ? "finished" : "playing";
 }
 
+export function replay(room: YonmaRoomState, events: readonly RoomEvent[]): YonmaRoomState;
+export function replay(room: TenRoomState, events: readonly RoomEvent[]): TenRoomState;
+export function replay(room: RoomState, events: readonly RoomEvent[]): RoomState;
 export function replay(room: RoomState, events: readonly RoomEvent[]): RoomState {
-  return events.reduce(reduceRoom, room);
+  return events.reduce<RoomState>((state, event) => reduceRoom(state, event), room);
 }

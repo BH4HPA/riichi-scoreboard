@@ -331,7 +331,7 @@ test("算点数页：设场况 → 拍 → 重新拍 → 识别正确出番符�
     if (r.method() === "POST" && /\/api\/recognitions/.test(r.url())) posts.push(r.url());
   });
 
-  await p.goto("/?stay=1");
+  await p.goto("/");
   await p.getByRole("link", { name: /拍照算点数/ }).click();
   await expect(p.getByRole("heading", { name: "拍照算点数" })).toBeVisible();
   await expect(p).toHaveURL(/\/calc$/);
@@ -473,4 +473,76 @@ test("横屏：倾斜过 15° 才自动切、手动按钮随时能改、下次�
   await p.getByRole("button", { name: /开始拍/ }).click();
   await expect(p.getByTestId("camera-chrome")).toHaveAttribute("data-rotation", "90");
   await ctx.close();
+});
+
+test("二人房：宣言 → 拍照识别 → 按立直宣言自动算番 → 自摸和 → 真值回填", async ({ browser }) => {
+  const patches: Record<string, unknown>[] = [];
+  const posts: string[] = [];
+  const tvCtx = await newContext(browser, { viewport: { width: 1600, height: 900 } });
+  const tv = await tvCtx.newPage();
+  await tv.goto("/console?kind=ten");
+  const code = (await tv.getByTestId("room-code").textContent())?.trim() ?? "";
+
+  const sit = async (name: string, seat: number, setup?: Setup) => {
+    const p = await phone(browser, code, setup);
+    const nameInput = p.getByLabel("昵称");
+    await nameInput.fill(name);
+    await nameInput.press("Enter");
+    await p.getByTestId(`seat-${seat}`).click();
+    await expect(p.getByTestId(`seat-${seat}`)).toContainText(name);
+    await p.getByRole("button", { name: "准备", exact: true }).click();
+    return p;
+  };
+  const east = await sit("阿东", 0);
+  // 西家（闲家）立直、拍照：自风要按「西」评估
+  const west = await sit("阿西", 1, async (page) => {
+    await withDetector(patches)(page);
+    page.on("request", (r) => {
+      if (r.method() === "POST" && /\/api\/recognitions/.test(r.url())) posts.push(r.url());
+    });
+  });
+  await expect(west.getByTestId("score-1")).toHaveText("0");
+
+  await west.getByRole("button", { name: "立直", exact: true }).click();
+  await expect(tv.getByTestId("ten-stage")).toHaveText("Stage B · 阿西 立直");
+  await east.getByTestId("guess-tiles").getByRole("button", { name: "東" }).click();
+
+  await west.getByRole("button", { name: "自摸", exact: true }).click();
+  const dialog = west.getByRole("dialog");
+  await dialog.getByRole("tab", { name: "牌面" }).click();
+  await shoot(west, dialog);
+  // 与四人房同一条链路：识别自洽 → 收起键盘；留存记录的来源仍是 room（信任层级相同）
+  const confirm = dialog.getByTestId("hand-confirm");
+  await expect(confirm).toBeVisible();
+  expect(posts.some((u) => /source=room/.test(u))).toBe(true);
+  // 立直来自本局的宣言：识别结果里没有立直，这里已经替人勾上并锁住
+  await expect(confirm.getByRole("button", { name: "立直", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(confirm.getByRole("button", { name: "立直", exact: true })).toBeDisabled();
+  // 立直 + 门前清自摸 + 平和 + 赤宝牌 = 4 番 20 符；闲家自摸 1300 / 2600 → 5200
+  await expect(dialog.getByTestId("settlement-summary")).toContainText(
+    "阿西（立直）自摸 4 番 20 符，得 5,200 点",
+  );
+  // 电视镜像带着牌面
+  await expect(tv.getByTestId("ten-settlement-mirror")).toContainText("4 番 20 符");
+
+  await dialog.getByRole("button", { name: "确认自摸和" }).click();
+  await expect(tv.getByTestId("score-1")).toHaveText("5,200");
+  await expect(tv.getByTestId("score-0")).toHaveText("0");
+  // 命令被接受后回填真值：训练数据与四人房一样产出
+  await expect.poll(() => patches.some((x) => "corrected" in x)).toBe(true);
+  const corrected = patches.find((x) => "corrected" in x)!.corrected as {
+    closed: number[];
+    winTile: number;
+    riichi: boolean;
+    tsumo: boolean;
+  };
+  expect(corrected.closed).toEqual(CLOSED);
+  expect(corrected.winTile).toBe(9);
+  expect(corrected.riichi).toBe(true);
+  expect(corrected.tsumo).toBe(true);
+  // 历史里带着这手牌
+  await expect(tv.getByText(/阿西 立直后自摸 4 番 20 符，得 5,200 点/)).toBeVisible();
 });

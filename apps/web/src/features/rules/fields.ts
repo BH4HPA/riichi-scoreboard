@@ -10,15 +10,27 @@ export interface RuleField {
   label: string;
   hint?: string;
   control: FieldType;
+  /**
+   * 只对四人房有意义：二人房（《天》规则）没有荣和、没有点棒往来、流局不罚符，这些开关在那里不生效，
+   * 所以不显示——摆出来的每一项都应该真的改变计分。
+   */
+  yonmaOnly?: true;
+  /** 二人房里换一种说法（同一个值，含义因房型而异） */
+  tenHint?: string;
 }
 
+export type RuleGroupKey = "scoring" | "hand" | "win" | "progress" | "final";
+
 export interface RuleGroup {
+  /** 与 `RoomRules` 的分段同名：只消费部分规则的场合（二人房）据此筛选 */
+  key: RuleGroupKey;
   title: string;
   fields: RuleField[];
 }
 
 export const RULE_GROUPS: RuleGroup[] = [
   {
+    key: "scoring",
     title: "点数换算",
     fields: [
       {
@@ -44,22 +56,26 @@ export const RULE_GROUPS: RuleGroup[] = [
         path: "scoring.pao",
         label: "包牌",
         hint: "大三元/大四喜/四杠子责任払い",
+        yonmaOnly: true,
         control: { type: "switch" },
       },
       {
         path: "scoring.honbaValue",
         label: "本场点数",
         hint: "300 的倍数，自摸时三家均摊",
+        tenHint: "300 的倍数，每本场加给和牌得分",
         control: { type: "number", min: 0, max: 3000, step: 300 },
       },
       {
         path: "scoring.notenBappu",
         label: "不听罚符总额",
+        yonmaOnly: true,
         control: { type: "number", min: 0, max: 6000, step: 1000 },
       },
     ],
   },
   {
+    key: "hand",
     title: "役与宝牌",
     fields: [
       {
@@ -81,6 +97,7 @@ export const RULE_GROUPS: RuleGroup[] = [
       {
         path: "hand.renhou",
         label: "人和",
+        yonmaOnly: true,
         control: {
           type: "select",
           options: [
@@ -89,11 +106,22 @@ export const RULE_GROUPS: RuleGroup[] = [
           ],
         },
       },
-      { path: "hand.nagashiMangan", label: "流局满贯", control: { type: "switch" } },
-      { path: "hand.kokushiAnkanChankan", label: "国士抢暗杠", control: { type: "switch" } },
+      {
+        path: "hand.nagashiMangan",
+        label: "流局满贯",
+        control: { type: "switch" },
+        yonmaOnly: true,
+      },
+      {
+        path: "hand.kokushiAnkanChankan",
+        label: "国士抢暗杠",
+        control: { type: "switch" },
+        yonmaOnly: true,
+      },
     ],
   },
   {
+    key: "win",
     title: "和了裁定",
     fields: [
       {
@@ -111,6 +139,7 @@ export const RULE_GROUPS: RuleGroup[] = [
     ],
   },
   {
+    key: "progress",
     title: "进行",
     fields: [
       {
@@ -174,6 +203,7 @@ export const RULE_GROUPS: RuleGroup[] = [
     ],
   },
   {
+    key: "final",
     title: "终局",
     fields: [
       {
@@ -230,4 +260,18 @@ export function setPath(rules: RoomRules, path: string, value: unknown): RoomRul
   for (const key of keys.slice(0, -1)) cursor = cursor[key] as Record<string, unknown>;
   cursor[keys[keys.length - 1]!] = value;
   return clone;
+}
+
+/** 二人房消费的分组：得分 = 四麻自摸的总收入，所以只有「点数换算」与「役与宝牌」；组内再去掉 `yonmaOnly` 的字段 */
+const TEN_GROUPS: readonly RuleGroupKey[] = ["scoring", "hand"];
+
+/** 某种房型下要显示的规则分组与字段（说明文字已按房型取好）。`kind` 缺省 = 四人房，全部显示。 */
+export function ruleGroupsFor(kind: "yonma" | "ten" | undefined): RuleGroup[] {
+  if (kind !== "ten") return RULE_GROUPS;
+  return RULE_GROUPS.filter((g) => TEN_GROUPS.includes(g.key)).map((g) => ({
+    ...g,
+    fields: g.fields
+      .filter((f) => !f.yonmaOnly)
+      .map((f) => (f.tenHint ? { ...f, hint: f.tenHint } : f)),
+  }));
 }

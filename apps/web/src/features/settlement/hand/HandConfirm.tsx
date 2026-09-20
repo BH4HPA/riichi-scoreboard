@@ -16,6 +16,7 @@ export function HandConfirm({
   uncertain,
   riichiAuto,
   isDealer,
+  riichiLocked = false,
   evaluated,
   evaluating,
   evalError,
@@ -30,6 +31,8 @@ export function HandConfirm({
   riichiAuto: boolean;
   /** 和牌者是否庄家：决定第一巡自摸叫天和还是地和 */
   isDealer: boolean;
+  /** 立直开关被锁定 */
+  riichiLocked?: boolean;
   evaluated: EvaluatedHand | null;
   evaluating: boolean;
   evalError: string | null;
@@ -57,6 +60,7 @@ export function HandConfirm({
         rules={rules}
         riichiAuto={riichiAuto}
         isDealer={isDealer}
+        riichiLocked={riichiLocked}
         onChange={(next: HandInput) => onHandChange(next)}
       />
       {showValue && (

@@ -1,6 +1,7 @@
 import type { FinalResult, TobiRecord } from "../final/settle";
 import type { HandValue, ScoreTier } from "../scoring/basePoints";
 import type { WinPayment } from "../scoring/payments";
+import type { TenGameState } from "../ten/state";
 import type { RoomRules } from "./rules";
 import type { Meld, Seat, Tile } from "./tiles";
 
@@ -123,22 +124,58 @@ export interface Undoable<T> {
   future: T[];
 }
 
-export interface RoomState {
+/**
+ * 房型：房间的身份，建房时定、之后不变（决定座位数与对局模型），所以不放进可在大厅随时修改的 `RoomRules`。
+ * yonma = 四人麻将；ten = 《天》规则二人麻将（见 `ten/state.ts`）。旧房间没有这个字段，一律是 yonma。
+ */
+export type RoomKind = "yonma" | "ten";
+export const ROOM_KINDS: readonly RoomKind[] = ["yonma", "ten"];
+export const SEAT_COUNT: Record<RoomKind, number> = { yonma: 4, ten: 2 };
+
+export function isRoomKind(value: unknown): value is RoomKind {
+  return ROOM_KINDS.includes(value as RoomKind);
+}
+
+/** 房间壳：座位、准备、阶段、规则与房型无关，两种房型共用 */
+interface RoomShell {
   code: string;
   /** closed = 已解散：任何命令都被拒绝，客户端连接被关闭 */
   phase: "lobby" | "playing" | "finished" | "closed";
+  /** 二人房只消费 `scoring` 与 `hand` 两段（算番算点），其余不读 */
   rules: RoomRules;
   seats: (PlayerRef | null)[];
   ready: boolean[];
-  game: Undoable<GameState> | null;
   /** 本房间第几局（开局/重开一局时递增，用于战绩落库的键） */
   gameNo: number;
 }
 
-export const DEFAULT_SEAT_NAMES = ["东风家", "南风家", "西风家", "北风家"] as const;
+export interface YonmaRoomState extends RoomShell {
+  kind: "yonma";
+  game: Undoable<GameState> | null;
+}
 
-export function seatNames(room: { seats: (PlayerRef | null)[] }): string[] {
-  return room.seats.map((p, i) => p?.name ?? DEFAULT_SEAT_NAMES[i]!);
+export interface TenRoomState extends RoomShell {
+  kind: "ten";
+  game: Undoable<TenGameState> | null;
+}
+
+export type RoomState = YonmaRoomState | TenRoomState;
+
+/** 座位的风位标签：四人房东南西北；二人房只有东（起家）与西 */
+const SEAT_LABELS: Record<RoomKind, readonly string[]> = {
+  yonma: ["东", "南", "西", "北"],
+  ten: ["东", "西"],
+};
+
+/** `kind` 缺省按四人房：旧服务端的房间视图没有这个字段 */
+export function seatLabels(kind: RoomKind | undefined): readonly string[] {
+  return SEAT_LABELS[kind ?? "yonma"];
+}
+
+/** 空座的占位名；`kind` 缺省按四人房（调用方只有座位列表时） */
+export function seatNames(room: { kind?: RoomKind; seats: (PlayerRef | null)[] }): string[] {
+  const labels = SEAT_LABELS[room.kind ?? "yonma"];
+  return room.seats.map((p, i) => p?.name ?? `${labels[i]!}风家`);
 }
 
 export function seatOfPlayer(

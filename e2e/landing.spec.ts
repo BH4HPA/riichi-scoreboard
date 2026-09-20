@@ -1,28 +1,94 @@
 import { devices, expect, test } from "@playwright/test";
 import { newContext } from "./helpers";
 
-test("桌面 UA 打开首页直接进主控台；?stay=1 留在首页", async ({ browser }) => {
+test("桌面 UA 打开首页先选房型：创建四人房；回首页后按钮变成「继续 + 新建」，再创建二人房", async ({
+  browser,
+}) => {
   const ctx = await newContext(browser, { ...devices["Desktop Chrome"] });
   const page = await ctx.newPage();
   await page.goto("/");
-  await expect(page).toHaveURL(/\/console$/);
-  await expect(page.getByTestId("room-code")).toBeVisible();
-  await page.goto("/?stay=1");
-  await expect(page.getByRole("link", { name: /打开主控台/ })).toBeVisible();
+  // 不再自动跳主控台：两种房型都摆在首页
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByTestId("open-yonma")).toHaveText(/创建四人麻将房间/);
+  await expect(page.getByTestId("open-ten")).toHaveText(/创建二人麻将房间/);
+  await page.getByTestId("open-yonma").click();
+  await expect(page).toHaveURL(/\/console\?kind=yonma$/);
+  const first = (await page.getByTestId("room-code").textContent())!.trim();
+  await expect(page.getByText("四人都点「准备」后即可开局")).toBeVisible();
+
+  // 主控台有回首页的出口：房型是在首页选的
+  await page.getByRole("link", { name: "返回首页" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  // 那个房间还开着：文案如实写「继续」，不会点了「创建」却进到旧房间
+  await expect(page.getByTestId("open-yonma")).toHaveText(new RegExp(`继续四人麻将房间 ${first}`));
+  await page.getByTestId("open-yonma").click();
+  await expect(page.getByTestId("room-code")).toHaveText(first);
+
+  // 「新建」失败（这里让建房接口报错）：本机记的旧房间还在，回首页仍然能「继续」
+  await page.getByRole("link", { name: "返回首页" }).click();
+  await page.route("**/api/rooms", (route) =>
+    route.request().method() === "POST"
+      ? route.fulfill({ status: 503, body: "{}" })
+      : route.fallback(),
+  );
+  await page.getByTestId("new-yonma").click();
+  await page.getByRole("link", { name: "返回首页" }).click();
+  await expect(page.getByTestId("open-yonma")).toHaveText(new RegExp(`继续四人麻将房间 ${first}`));
+  await page.unroute("**/api/rooms");
+
+  // 建成了才替换；刷新不会再建一个
+  await page.getByTestId("new-yonma").click();
+  await expect(page.getByTestId("room-code")).not.toHaveText(first);
+  const second = (await page.getByTestId("room-code").textContent())!.trim();
+  await page.reload();
+  await expect(page.getByTestId("room-code")).toHaveText(second);
+
+  // 二人房另记一个码，互不影响
+  await page.getByRole("link", { name: "返回首页" }).click();
+  await page.getByTestId("open-ten").click();
+  await expect(page).toHaveURL(/\/console\?kind=ten$/);
+  await expect(page.getByText("两人都点「准备」后即可开局")).toBeVisible();
+  await expect(page.getByTestId("seat-0")).toBeVisible();
+  await expect(page.getByTestId("seat-2")).toHaveCount(0);
   await ctx.close();
 });
 
-test("平板 UA 二选一：可进主控台，也可作为玩家输码加入", async ({ browser }) => {
+test("首页没法确认上次的房间还在不在（服务端出错）：按钮不写「创建」也不写「继续」", async ({
+  browser,
+}) => {
+  const ctx = await newContext(browser, { ...devices["Desktop Chrome"] });
+  const page = await ctx.newPage();
+  await page.goto("/console");
+  const code = (await page.getByTestId("room-code").textContent())!.trim();
+  await page.route(`**/api/rooms/${code}`, (route) => route.fulfill({ status: 503, body: "{}" }));
+  await page.goto("/");
+  // 点进去其实会回到那个房间：这时写「创建」就是说谎
+  await expect(page.getByTestId("open-yonma")).toHaveText(/^四人麻将房间/);
+  await expect(page.getByTestId("new-yonma")).toHaveCount(0);
+  await expect(page.getByTestId("open-ten")).toHaveText(/创建二人麻将房间/);
+  await ctx.close();
+});
+
+test("旧书签 /console（不带房型）仍然是四人房", async ({ browser }) => {
+  const ctx = await newContext(browser, { ...devices["Desktop Chrome"] });
+  const page = await ctx.newPage();
+  await page.goto("/console");
+  await expect(page.getByTestId("room-code")).toBeVisible();
+  await expect(page.getByTestId("seat-3")).toBeVisible();
+  await ctx.close();
+});
+
+test("平板 UA：可开房间，也可作为玩家输码加入", async ({ browser }) => {
   const ctx = await newContext(browser, { ...devices["iPad Pro 11"] });
   const page = await ctx.newPage();
   await page.goto("/");
-  await expect(page.getByRole("link", { name: /打开主控台/ })).toBeVisible();
+  await expect(page.getByTestId("open-yonma")).toBeVisible();
   await page.getByRole("button", { name: "作为玩家加入房间" }).click();
   await expect(page.getByLabel("房间码")).toBeAttached();
   await page.getByRole("button", { name: "返回选择" }).click();
-  await expect(page.getByRole("link", { name: /打开主控台/ })).toBeVisible();
+  await expect(page.getByTestId("open-ten")).toBeVisible();
   // 窄屏主控台（Pad 竖屏单栏）：版权与备案号在页面底部
-  await page.getByRole("link", { name: /打开主控台/ }).click();
+  await page.getByTestId("open-yonma").click();
   await expect(page.getByTestId("room-code")).toBeVisible();
   await page.keyboard.press("Escape"); // 窄屏首次进大厅自动弹二维码
   await expect(page.locator("footer").getByRole("link", { name: /ICP/ })).toBeInViewport();
@@ -123,7 +189,7 @@ test("输入法组词中输房间码：组词期间不改写 input，输满即�
 });
 
 test("PWA：页面声明的 manifest 可解析，图标都取得到且是图片", async ({ request, page }) => {
-  await page.goto("/?stay=1");
+  await page.goto("/");
   const href = await page.locator('link[rel="manifest"]').getAttribute("href");
   const manifest = (await (await request.get(href!)).json()) as {
     display: string;

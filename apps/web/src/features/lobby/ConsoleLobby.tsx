@@ -1,6 +1,13 @@
 import { useState, type ReactNode } from "react";
-import { Play, Settings2, Users } from "lucide-react";
-import { presetNameOf, type RoomView, type Seat } from "@riichi/core";
+import { BookOpen, Play, Settings2, Users } from "lucide-react";
+import {
+  presetNameOf,
+  seatLabels,
+  seatNames,
+  type RoomView,
+  type Seat,
+  type UiState,
+} from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Badge } from "@/ui/controls";
 import { useRoomStore } from "@/ws/store";
@@ -10,6 +17,8 @@ import { RoomQr, RoomQrDialog } from "@/features/console/RoomQr";
 import { RulesDialog } from "@/features/rules/RulesDialog";
 import { RulesEditor } from "@/features/rules/RulesEditor";
 import { SiteBrand, SiteFooter } from "@/features/site/SiteFooter";
+import { TenGuideDialog } from "@/features/ten/guide/TenGuideDialog";
+import { TenGuideMirror } from "@/features/ten/guide/TenGuideMirror";
 import { LocalPlayerDialog } from "./LocalPlayerDialog";
 import { SeatCards } from "./SeatCards";
 import { startBlocker } from "./startBlocker";
@@ -21,16 +30,22 @@ import { useCountdown } from "./useCountdown";
  */
 export function ConsoleLobby({
   room,
+  intents,
   wide,
   extraActions,
 }: {
   room: RoomView;
+  /** 手机端正在投屏的内容：大厅里只有二人房的规则说明会投上来 */
+  intents: UiState[];
   wide: boolean;
   /** 放在底部操作栏右侧的额外按钮（如解散房间） */
   extraActions?: ReactNode;
 }) {
   const send = useCommand();
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const ten = room.kind === "ten";
+  const labels = seatLabels(room.kind);
   const [localSeat, setLocalSeat] = useState<Seat | null>(null);
   const [localOpen, setLocalOpen] = useState(false);
   // 窄屏首次进入大厅自动展示二维码；房间码变了再弹一次
@@ -52,6 +67,7 @@ export function ConsoleLobby({
   const seats = (
     <SeatCards
       seats={room.seats}
+      labels={labels}
       ready={room.ready}
       online={room.online}
       mySeat={null}
@@ -67,12 +83,30 @@ export function ConsoleLobby({
           房间规则
           <Badge tone="outline">{presetNameOf(room.rules)}</Badge>
         </h2>
-        <Button variant="outline" size="sm" onClick={() => setRulesOpen(true)}>
-          <Settings2 className="h-4 w-4" /> 修改规则
-        </Button>
+        <span className="flex items-center gap-2">
+          {ten && (
+            <Button variant="outline" size="sm" onClick={() => setGuideOpen(true)}>
+              <BookOpen className="h-4 w-4" /> 玩法说明
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => setRulesOpen(true)}>
+            <Settings2 className="h-4 w-4" /> 修改规则
+          </Button>
+        </span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <RulesEditor value={room.rules} onChange={() => undefined} editable={false} columns={2} />
+        {ten && (
+          <p className="mb-3 text-xs text-muted">
+            《天》二人麻将：得分按四人麻将的自摸收入计算，这里只列对它生效的规则。
+          </p>
+        )}
+        <RulesEditor
+          value={room.rules}
+          onChange={() => undefined}
+          editable={false}
+          columns={2}
+          kind={room.kind}
+        />
       </div>
     </div>
   );
@@ -122,7 +156,7 @@ export function ConsoleLobby({
           <div className="flex flex-1 flex-col items-center justify-center gap-6">
             <RoomQr code={room.code} size={240} />
             <p className="text-center text-sm text-muted">
-              手机扫码加入，四人都点「准备」后即可开局。
+              手机扫码加入，{ten ? "两" : "四"}人都点「准备」后即可开局。
             </p>
           </div>
           <div className="flex items-center justify-between gap-4">
@@ -153,6 +187,7 @@ export function ConsoleLobby({
 
       <LocalPlayerDialog
         seat={localSeat}
+        labels={labels}
         open={localOpen}
         onOpenChange={setLocalOpen}
         seatedIds={room.seats.flatMap((s) => (s ? [s.id] : []))}
@@ -165,8 +200,15 @@ export function ConsoleLobby({
         rules={room.rules}
         description="开局前可修改；开局后锁定。"
         className="sm:max-w-2xl"
+        kind={room.kind}
         onApply={(rules) => send({ type: "setRules", rules })}
       />
+      {ten && (
+        <>
+          <TenGuideDialog open={guideOpen} onOpenChange={setGuideOpen} castable={false} />
+          <TenGuideMirror intents={intents} names={seatNames(room)} />
+        </>
+      )}
     </div>
   );
 }

@@ -1,16 +1,15 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { ArrowLeft, Settings2 } from "lucide-react";
-import { presetNameOf, type RoomView, type Seat } from "@riichi/core";
+import { ArrowLeft, BookOpen, Settings2 } from "lucide-react";
+import { presetNameOf, seatLabels, type RoomView, type Seat } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { useRoomStore } from "@/ws/store";
 import { useCommand } from "@/ws/useRoom";
 import { ProfileEditor } from "@/features/profile/ProfileEditor";
 import { RulesDialog } from "@/features/rules/RulesDialog";
 import { RulesSummary } from "@/features/rules/RulesEditor";
-import { useMirror } from "@/features/mirror/useMirror";
-import { CastSwitch } from "@/features/mirror/CastSwitch";
 import { SiteFooter } from "@/features/site/SiteFooter";
+import { TenGuideDialog } from "@/features/ten/guide/TenGuideDialog";
 import { SeatCards } from "./SeatCards";
 import { useCountdown } from "./useCountdown";
 import { useRulesChangedNotice } from "./useRulesChangedNotice";
@@ -19,8 +18,8 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
   const send = useCommand();
   const navigate = useNavigate();
   const [rulesOpen, setRulesOpen] = useState(false);
-  const [cast, setCast] = useState(false);
-  useMirror(cast && rulesOpen, { kind: "rules" }, true);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const ten = room.kind === "ten";
   const ready = mySeat !== null && room.ready[mySeat] === true;
   const full = room.seats.every((s) => s !== null);
   const countdown = useCountdown(useRoomStore((s) => s.autoStartDeadline));
@@ -43,14 +42,7 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
             <div className="text-2xl font-semibold tabular tracking-[0.2em]">{room.code}</div>
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            setCast(false);
-            setRulesOpen(true);
-          }}
-        >
+        <Button variant="outline" size="sm" onClick={() => setRulesOpen(true)}>
           <Settings2 className="h-4 w-4" /> 修改规则
         </Button>
       </div>
@@ -62,6 +54,7 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
       <div>
         <SeatCards
           seats={room.seats}
+          labels={seatLabels(room.kind)}
           ready={room.ready}
           online={room.online}
           mySeat={mySeat}
@@ -76,8 +69,17 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
       </div>
 
       <div className="rounded-xl border border-border bg-surface p-3">
-        <div className="mb-1.5 text-xs text-muted">房间规则 · {presetNameOf(room.rules)}</div>
-        <RulesSummary rules={room.rules} />
+        <div className="mb-1.5 flex items-center justify-between gap-2 text-xs text-muted">
+          <span>
+            {ten ? "《天》二人麻将" : "房间规则"} · {presetNameOf(room.rules)}
+          </span>
+          {ten && (
+            <Button variant="outline" size="sm" onClick={() => setGuideOpen(true)}>
+              <BookOpen className="h-4 w-4" /> 玩法说明
+            </Button>
+          )}
+        </div>
+        <RulesSummary rules={room.rules} kind={room.kind} />
       </div>
 
       <SiteFooter className="mt-auto justify-center" />
@@ -108,9 +110,10 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
         onOpenChange={setRulesOpen}
         rules={room.rules}
         description="开局前所有人都可修改；开局后锁定。"
-        header={<CastSwitch checked={cast} onCheckedChange={setCast} />}
+        kind={room.kind}
         onApply={(rules) => ownRulesChange(() => send({ type: "setRules", rules }))}
       />
+      {ten && <TenGuideDialog open={guideOpen} onOpenChange={setGuideOpen} castable />}
     </div>
   );
 }

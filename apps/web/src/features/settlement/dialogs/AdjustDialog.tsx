@@ -4,6 +4,7 @@ import { Button } from "@/ui/button";
 import { Input, Label, Select } from "@/ui/controls";
 import { DialogFooter } from "@/ui/dialog";
 import { useCommand } from "@/ws/useRoom";
+import { useCloseOnStale } from "../drafts/useCloseOnStale";
 import { useMirror } from "@/features/mirror/useMirror";
 import type { SettlementDialogProps, SettlementFormProps } from "./shared";
 import { SettlementDialog } from "./SettlementDialog";
@@ -23,6 +24,7 @@ export function AdjustDialog({ open, onOpenChange, ...rest }: SettlementDialogPr
 
 function AdjustForm({ game, names, rules, mirror, onDone }: SettlementFormProps) {
   const send = useCommand();
+  const submit = useCloseOnStale(onDone);
   const [wind, setWind] = useState(kyokuWind(game.kyoku));
   const [number, setNumber] = useState(kyokuNumber(game.kyoku));
   const [honba, setHonba] = useState(game.honba);
@@ -32,7 +34,7 @@ function AdjustForm({ game, names, rules, mirror, onDone }: SettlementFormProps)
   const kyoku = wind * 4 + (number - 1);
   const confirm = async () => {
     setBusy(true);
-    const ok = await send({ type: "adjust", kyoku, honba });
+    const ok = await submit(() => send({ type: "adjust", kyoku, honba }));
     setBusy(false);
     if (ok) onDone();
   };

@@ -5,8 +5,10 @@ import {
   findPreset,
   RulesError,
   rulesSummary,
+  tenRulesSummary,
   umaDescription,
   validateRules,
+  type RoomKind,
   type RoomRules,
 } from "@riichi/core";
 import { ApiError } from "@/api/client";
@@ -15,7 +17,7 @@ import { Button } from "@/ui/button";
 import { Input, Label, Select, Switch } from "@/ui/controls";
 import { useRoomStore } from "@/ws/store";
 import { cn } from "@/lib/utils";
-import { getPath, RULE_GROUPS, setPath, type RuleField } from "./fields";
+import { getPath, ruleGroupsFor, setPath, type RuleField } from "./fields";
 
 function FieldControl({
   field,
@@ -74,13 +76,19 @@ export function RulesEditor({
   onChange,
   editable,
   columns = 1,
+  kind,
 }: {
   value: RoomRules;
   onChange: (r: RoomRules) => void;
   editable: boolean;
+  /** 房型：二人房只显示它实际消费的分组与字段（见 `ruleGroupsFor`）；不传 = 四人房，全部显示 */
+  kind?: RoomKind | undefined;
   /** 分组多列排版（电视大厅用） */
   columns?: 1 | 2;
 }) {
+  const shown = ruleGroupsFor(kind);
+  // 马点说明属于「终局」一节：那一节不显示时它也没有意义
+  const showUma = shown.some((g) => g.key === "final");
   const { presets, loadPresets, savePreset, deletePreset } = useSession();
   const notify = useRoomStore((s) => s.notify);
   const [presetName, setPresetName] = useState("");
@@ -161,13 +169,13 @@ export function RulesEditor({
             </Button>
           </div>
           {matched?.note && <p className="mt-2 text-xs text-muted">{matched.note}</p>}
-          <p className="mt-2 text-xs text-muted">{umaDescription(value)}</p>
+          {showUma && <p className="mt-2 text-xs text-muted">{umaDescription(value)}</p>}
         </div>
       ) : (
-        <p className="text-xs text-muted">{umaDescription(value)}</p>
+        showUma && <p className="text-xs text-muted">{umaDescription(value)}</p>
       )}
       <div className={cn(columns === 2 ? "columns-2 gap-4 [&>section]:mb-4" : "space-y-4")}>
-        {RULE_GROUPS.map((group) => (
+        {shown.map((group) => (
           <section key={group.title} className="break-inside-avoid">
             <h4 className="mb-1 text-xs font-medium text-muted">{group.title}</h4>
             <div className="divide-y divide-border rounded-lg border border-border">
@@ -194,11 +202,12 @@ export function RulesEditor({
   );
 }
 
-/** 关键规则摘要（电视镜像与大厅用） */
-export function RulesSummary({ rules }: { rules: RoomRules }) {
+/** 关键规则摘要（电视镜像与大厅用）；二人房只列它实际消费的规则 */
+export function RulesSummary({ rules, kind }: { rules: RoomRules; kind?: RoomKind | undefined }) {
+  const tags = kind === "ten" ? tenRulesSummary(rules) : rulesSummary(rules);
   return (
     <div className="flex flex-wrap gap-1">
-      {rulesSummary(rules).map((t) => (
+      {tags.map((t) => (
         <span key={t} className="rounded-md bg-surface-2 px-1.5 py-0.5 text-xs">
           {t}
         </span>

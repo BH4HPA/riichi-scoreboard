@@ -52,7 +52,8 @@ function handValue(value: WinValue): HandValue {
   return { han: value.result.han, fu: value.result.fu, yakuman: value.result.yakuman };
 }
 
-function assertValue(value: WinValue): HandValue {
+/** 和牌价值的业务校验：牌面形态必须成和，番符在合法范围内。两种房型共用。 */
+export function assertValue(value: WinValue): HandValue {
   const v = handValue(value);
   if (value.kind === "hand" && !value.result.isAgari) {
     throw new DomainError(
