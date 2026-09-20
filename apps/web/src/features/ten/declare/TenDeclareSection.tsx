@@ -30,9 +30,9 @@ export function TenDeclareSection({
 
   return (
     <section>
-      <h3 className="mb-1.5 text-xs font-medium text-muted">Stage A · 听牌了就宣言</h3>
+      <h3 className="mb-1.5 text-xs font-medium text-muted">对局中</h3>
       {mine.length === 0 ? (
-        <p className="text-sm text-muted">由听牌的一方在自己的手机上宣言。</p>
+        <p className="text-sm text-muted">听牌的一方在自己的手机上宣言。</p>
       ) : (
         <div className="space-y-2">
           {mine.map((seat) => {
@@ -50,11 +50,9 @@ export function TenDeclareSection({
                     听牌宣言
                   </Button>
                 </RiichiMusicRow>
-                <p className="mt-1 text-xs text-muted">
-                  {sticks > 0
-                    ? `立直用掉 1 根立直棒（还剩 ${sticks} 根），多一番并可算一发、里宝。`
-                    : "立直棒已用完，只能听牌宣言。"}
-                </p>
+                {sticks <= 0 && (
+                  <p className="mt-1 text-xs text-muted">立直棒已用完，只能听牌宣言。</p>
+                )}
               </div>
             );
           })}

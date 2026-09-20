@@ -18,14 +18,12 @@ import type { TenDialog } from "./useTenDialogs";
 const DRAWS: readonly TenDrawReason[] = ["noDeclare", "guessed", "exhausted"];
 
 function drawDescription(reason: TenDrawReason, game: TenGameState, names: string[]): string {
-  const after = "庄家不变，本场 +1；得分不变。此操作可撤销。";
+  const after = "庄家不变，本场 +1。";
   const { stage } = game;
   if (reason === "noDeclare" || stage.kind !== "B") return `18 巡内没有人宣言。${after}`;
   const who = `${names[stage.attacker]}（${tenDeclareLabel(stage.riichi)}）`;
-  // 全牌型板是便利不是必经步骤：一轮都没记（口头指定）时不写轮数
-  const rounds = stage.guesses.length;
   return reason === "guessed"
-    ? `防守方${rounds > 0 ? `第 ${rounds} 轮` : ""}猜中了 ${who}的待牌。${after}`
+    ? `防守方猜中了 ${who}的待牌。${after}`
     : `${who} 摸到王牌仍未和牌，也没有被猜中。${after}`;
 }
 
@@ -154,8 +152,8 @@ export function TenControlHost({
         title="现在终局？"
         description={
           midRound
-            ? "这一局还没有记结果：终局后它不计入，按当前得分定胜负。此操作可撤销，撤销后回到这一局接着打。"
-            : "按当前得分定胜负，得分高的一方获胜。此操作可撤销。"
+            ? "这一局还没有记结果，不计入；按当前得分定胜负。此操作可撤销。"
+            : "按当前得分定胜负。此操作可撤销。"
         }
         confirmText="确认终局"
         onConfirm={() => send({ type: "endGame" })}
@@ -163,7 +161,7 @@ export function TenControlHost({
       <ConfirmDialog
         {...openOf("newGame")}
         title="重开一局？"
-        description="开一局新的：得分、立直棒、局数与历史记录从头开始，1 小时重新计；座位与规则保持不变。此操作不可撤销。"
+        description={`${game.status === "finished" ? "" : "放弃眼下这一场。"}得分、立直棒与历史记录从头开始，1 小时重新计；座位与规则不变。此操作不可撤销。`}
         confirmText="确认重开"
         danger
         onConfirm={() => send({ type: "newGame" })}

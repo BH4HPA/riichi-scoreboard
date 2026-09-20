@@ -1,17 +1,8 @@
 import type { Tile } from "@riichi/core";
 import { cn } from "@/lib/utils";
-import { tileAssetName, tileLabel } from "./tileLabel";
+import { tileUrl } from "./tileAsset";
+import { tileLabel } from "./tileLabel";
 import { TILE_PX, type TileSize } from "./tileSize";
-
-const ASSETS = import.meta.glob("../../assets/tiles/*.svg", {
-  eager: true,
-  query: "?url",
-  import: "default",
-}) as Record<string, string>;
-
-function tileUrl(tile: Tile): string {
-  return ASSETS[`../../assets/tiles/${tileAssetName(tile)}.svg`] ?? "";
-}
 
 export type { TileSize } from "./tileSize";
 
@@ -19,7 +10,6 @@ export type { TileSize } from "./tileSize";
  * 单张牌：`<img>` 引用扁平风格 SVG。
  * - `back`：牌背（暗杠首尾）；`rotated`：横置（副露叫牌）；`selected`：和张/当前选中；`dim`：不可选。
  * - `mark`：识别没把握，建议核对。用强调色角标而不是错误色 —— 它不是错误，只是提醒眼睛往这儿看。
- * - `struck`：划掉（二人房全牌型板上已经排除的牌）。只变暗的话白板几乎看不见，像缺了一张牌。
  */
 export function TileFace({
   tile,
@@ -29,10 +19,8 @@ export function TileFace({
   rotated = false,
   back = false,
   mark = false,
-  struck = false,
   onClick,
   className,
-  buttonClassName,
 }: {
   tile: Tile;
   size?: TileSize;
@@ -41,23 +29,14 @@ export function TileFace({
   rotated?: boolean;
   back?: boolean;
   mark?: boolean;
-  struck?: boolean;
   onClick?: (() => void) | undefined;
   className?: string;
-  /** 可点时按钮本身的额外样式（如键盘把点击区撑满格子，牌图居中） */
-  buttonClassName?: string;
 }) {
   const { w, h } = TILE_PX[size];
   const label = back ? "牌背" : tileLabel(tile);
   const badge = mark ? (
     <span
       className="pointer-events-none absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-accent ring-1 ring-surface"
-      aria-hidden
-    />
-  ) : null;
-  const strike = struck ? (
-    <span
-      className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top_right,transparent_46%,currentColor_46%,currentColor_54%,transparent_54%)] text-fg"
       aria-hidden
     />
   ) : null;
@@ -96,7 +75,6 @@ export function TileFace({
     return (
       <span className={box} role="img" aria-label={label} data-mark={mark || undefined}>
         {body}
-        {strike}
         {badge}
       </span>
     );
@@ -106,10 +84,7 @@ export function TileFace({
       type="button"
       onClick={onClick}
       // inline-flex：按钮不再生成行盒，图片底边与不可点击的牌（span）严格同基线
-      className={cn(
-        "inline-flex rounded-[3px] transition-transform active:scale-95",
-        buttonClassName,
-      )}
+      className="inline-flex rounded-[3px] transition-transform active:scale-95"
       aria-label={label}
       aria-pressed={selected}
       disabled={dim}
@@ -117,7 +92,6 @@ export function TileFace({
     >
       <span className={box}>
         {body}
-        {strike}
         {badge}
       </span>
     </button>

@@ -19,7 +19,7 @@ export function TenHeader({
   const finished = game.status === "finished";
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-      <h1 className={cn("font-semibold tabular", tv ? "text-3xl" : "text-xl")}>
+      <h1 className={cn("font-semibold tabular", tv ? "text-xl" : "text-lg")}>
         {finished ? "对局结束" : tenRoundLabel(game.round, game.honba)}
       </h1>
       {!finished && (
@@ -29,7 +29,7 @@ export function TenHeader({
           data-testid="ten-stage"
         >
           {stage.kind === "A"
-            ? "Stage A · 比谁先听牌"
+            ? "Stage A"
             : `Stage B · ${names[stage.attacker]} ${tenDeclareLabel(stage.riichi)}`}
         </Badge>
       )}

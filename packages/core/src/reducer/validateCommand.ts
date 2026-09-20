@@ -198,15 +198,13 @@ export function validateCommand(input: unknown): ClientCommand {
         riichi: bool(input.riichi, "立直标记"),
         entries: int(input.entries, "历史条数", 0, 100_000),
       };
-    case "tenGuess": {
-      const picked = input.tiles;
-      if (!Array.isArray(picked) || picked.length !== 2) bad("指定的牌必须是两张");
-      const max = ALL_TILES.length;
+    case "tenMark":
       return {
-        type: "tenGuess",
-        tiles: [int(picked[0], "指定的牌", 1, max), int(picked[1], "指定的牌", 1, max)],
+        type: "tenMark",
+        tile: int(input.tile, "划掉的牌", 1, ALL_TILES.length),
+        on: bool(input.on, "划掉标记"),
+        entries: int(input.entries, "历史条数", 0, 100_000),
       };
-    }
     case "tenDraw":
       if (!TEN_DRAWS.includes(input.reason as TenDrawReason)) bad("流局原因无效");
       return { type: "tenDraw", reason: input.reason as TenDrawReason };

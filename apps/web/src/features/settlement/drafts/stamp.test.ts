@@ -7,17 +7,17 @@ const players = [
   { id: "b", name: "阿西", avatar: null },
 ];
 const game = (stage: TenStage): TenGameState => ({ ...createTenGame(players, 0), stage });
-const stageB = (attacker: 0 | 1, riichi: boolean, rounds = 0): TenStage => ({
+const stageB = (attacker: 0 | 1, riichi: boolean, marked: number[] = []): TenStage => ({
   kind: "B",
   attacker,
   riichi,
-  guesses: Array.from({ length: rounds }, (_, i): [number, number] => [i * 2 + 1, i * 2 + 2]),
+  marked,
 });
 
 describe("二人房的草稿局面戳", () => {
-  it("防守方逐轮指定不改变它：进攻方录手牌时弹窗不会被一轮轮关掉", () => {
-    expect(tenDraftStamp(1, game(stageB(0, true, 0)))).toBe(
-      tenDraftStamp(1, game(stageB(0, true, 5))),
+  it("防守方在全牌型板上划牌不改变它：进攻方录手牌时弹窗不会被一下下关掉", () => {
+    expect(tenDraftStamp(1, game(stageB(0, true)))).toBe(
+      tenDraftStamp(1, game(stageB(0, true, [1, 9, 31]))),
     );
   });
 
@@ -38,7 +38,6 @@ describe("二人房的草稿局面戳", () => {
       reason: "noDeclare" as const,
       attacker: null,
       riichi: false,
-      rounds: 0,
       seq: 9,
       at: 0,
       round: 1,

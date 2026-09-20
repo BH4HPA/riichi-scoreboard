@@ -173,6 +173,41 @@ describe("RoomRegistry：在线状态、离线座位回收、自动开局", () =
     ]);
   });
 
+  it("重开一局：对局中强制重开，放弃的那一场不写战绩；终局后重开不动已写的战绩", () => {
+    const tv = fakeClient(device("主控台").id);
+    registry.join(room, tv);
+    const locals = ["甲", "乙", "丙", "丁"].map((n) => players.createLocal(n, tv.playerId, now));
+    locals.forEach((l, i) =>
+      registry.apply(
+        room,
+        room.seq,
+        { type: "sitLocal", seat: i as 0 | 1 | 2 | 3, playerId: l.id },
+        actorOf(tv),
+      ),
+    );
+    registry.apply(room, room.seq, { type: "start", force: false }, actorOf(tv));
+    const manual = { kind: "manual" as const, han: 3, fu: 30, yakuman: 0 };
+    registry.apply(
+      room,
+      room.seq,
+      { type: "tsumo", winner: 0, value: manual, riichi: [] },
+      actorOf(tv),
+    );
+    const results = () => db.prepare("SELECT COUNT(*) AS n FROM game_results").get();
+
+    registry.apply(room, room.seq, { type: "newGame" }, actorOf(tv));
+    expect(last(tv)).toMatchObject({ phase: "playing", gameNo: 2 });
+    expect(yonma(last(tv)).game?.present.points).toEqual([25000, 25000, 25000, 25000]);
+    expect(yonma(last(tv)).game).toMatchObject({ undoDepth: 0 });
+    expect(results()).toEqual({ n: 0 });
+
+    registry.apply(room, room.seq, { type: "endGame" }, actorOf(tv));
+    expect(results()).toEqual({ n: 4 });
+    registry.apply(room, room.seq, { type: "newGame" }, actorOf(tv));
+    expect(last(tv)).toMatchObject({ phase: "playing", gameNo: 3 });
+    expect(results()).toEqual({ n: 4 });
+  });
+
   it("撤销/重做后向全房间广播谁撤了哪一笔（在座用座位昵称，未入座且默认名的是主控台）", () => {
     // 主控台没改过昵称：连接名是注册默认名
     const tv = { ...fakeClient(players.create("玩家", now).id), name: "玩家" };

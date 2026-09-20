@@ -44,7 +44,12 @@ const declare = (room: TenRoomState, seat: 0 | 1, riichi: boolean): Command => (
   riichi,
   entries: present(room).history.length,
 });
-const guess = (a: number, b: number): Command => ({ type: "tenGuess", tiles: [a, b] });
+const mark = (room: TenRoomState, tile: number, on = true): Command => ({
+  type: "tenMark",
+  tile,
+  on,
+  entries: present(room).history.length,
+});
 
 function handValue(patch: Partial<HandInput>): WinValue {
   const hand: HandInput = {
@@ -101,7 +106,9 @@ describe("二人房 / 大厅", () => {
       ...four.map((player, i) => event({ type: "sit", seat: i as 0 | 1 | 2 | 3, player }, i + 1)),
       event({ type: "start", force: true }, 9),
     ]);
-    expect(() => reduceRoom(playing, event(guess(1, 2), 10))).toThrow(/二人麻将/);
+    expect(() =>
+      reduceRoom(playing, event({ type: "tenMark", tile: 1, on: true, entries: 0 }, 10)),
+    ).toThrow(/二人麻将/);
   });
 });
 
@@ -110,7 +117,7 @@ describe("二人房 / Stage A → B", () => {
     const room = started();
     const riichi = apply(room, declare(room, 0, true));
     expect(present(riichi).sticks).toEqual([9, 10]);
-    expect(present(riichi).stage).toEqual({ kind: "B", attacker: 0, riichi: true, guesses: [] });
+    expect(present(riichi).stage).toEqual({ kind: "B", attacker: 0, riichi: true, marked: [] });
     const tenpai = apply(room, declare(room, 1, false));
     expect(present(tenpai).sticks).toEqual([10, 10]);
     expect(present(tenpai).stage).toMatchObject({ attacker: 1, riichi: false });
@@ -143,21 +150,23 @@ describe("二人房 / Stage A → B", () => {
 });
 
 describe("二人房 / Stage B", () => {
-  it("指定两张不同的牌，逐轮累计；Stage A 不能指定", () => {
+  it("全牌型板：点一下划掉、再点一下恢复；幂等；不入撤销栈；Stage A 没有板", () => {
     const room = started();
-    expect(() => apply(room, guess(1, 2))).toThrow(/还没有人宣言/);
+    expect(() => apply(room, mark(room, 1))).toThrow(/还没有人宣言/);
     const b = apply(room, declare(room, 0, false));
-    expect(() => apply(b, guess(5, 5))).toThrow(/两张不同/);
-    expect(() => apply(b, guess(1, 35))).toThrow(/两张不同/);
-    // 指定过的牌不再接受（任意一张重复都算）
-    expect(() => apply(b, guess(1, 2), guess(2, 3))).toThrow(/已经指定过/);
-    const two = apply(b, guess(1, 2), guess(31, 9));
-    expect(present(two).stage).toMatchObject({
-      guesses: [
-        [1, 2],
-        [31, 9],
-      ],
-    });
+    expect(() => apply(b, mark(b, 35))).toThrow(/没有这张牌/);
+    const two = apply(b, mark(b, 31), mark(b, 1));
+    expect(present(two).stage).toMatchObject({ marked: [1, 31] });
+    // 重复的划牌没有状态变化（同一个对象）：服务端据此不落库
+    expect(apply(two, mark(two, 1))).toBe(two);
+    expect(present(apply(two, mark(two, 1, false))).stage).toMatchObject({ marked: [31] });
+    // 记号不占撤销栈：撤销一步就是撤掉宣言
+    expect(two.game!.past).toHaveLength(1);
+    expect(present(apply(two, { type: "undo" })).stage).toEqual({ kind: "A" });
+    // 上一局按下的划牌落不到下一局
+    const next = apply(two, { type: "tenDraw", reason: "guessed" });
+    const again = apply(next, declare(next, 1, false));
+    expect(() => apply(again, mark(two, 5))).toThrow(/局面已变化/);
   });
 
   it("和牌只发生在 Stage B，和牌者就是进攻方", () => {
@@ -167,10 +176,8 @@ describe("二人房 / Stage B", () => {
 
   it("庄家自摸 3 番 30 符得 6000，连庄本场 +1；闲家和牌按闲家自摸算并含本场，换庄本场清零", () => {
     let room = started();
-    room = apply(room, declare(room, 0, true), guess(1, 2), {
-      type: "tenTsumo",
-      value: manual(3, 30),
-    });
+    room = apply(room, declare(room, 0, true));
+    room = apply(room, mark(room, 1), { type: "tenTsumo", value: manual(3, 30) });
     expect(present(room)).toMatchObject({
       scores: [6000, 0],
       dealer: 0,
@@ -182,7 +189,6 @@ describe("二人房 / Stage B", () => {
       kind: "tenTsumo",
       winner: 0,
       riichi: true,
-      rounds: 1,
       gain: 6000,
       round: 1,
     });
@@ -196,7 +202,7 @@ describe("二人房 / Stage B", () => {
     expect(() => apply(room, { type: "tenDraw", reason: "guessed" })).toThrow(/还没有人宣言/);
     const a = apply(room, { type: "tenDraw", reason: "noDeclare" });
     expect(present(a)).toMatchObject({ dealer: 0, honba: 1, round: 2, scores: [0, 0] });
-    const b = apply(a, declare(a, 1, true), guess(1, 2));
+    const b = apply(a, declare(a, 1, true));
     expect(() => apply(b, { type: "tenDraw", reason: "noDeclare" })).toThrow(/已有人宣言/);
     const guessed = apply(b, { type: "tenDraw", reason: "guessed" });
     expect(present(guessed)).toMatchObject({ dealer: 0, honba: 2, round: 3, stage: { kind: "A" } });
@@ -205,7 +211,6 @@ describe("二人房 / Stage B", () => {
       reason: "guessed",
       attacker: 1,
       riichi: true,
-      rounds: 1,
     });
   });
 
@@ -241,35 +246,32 @@ describe("二人房 / Stage B", () => {
 });
 
 describe("二人房 / 撤销与终局", () => {
-  it("宣言与指定都能一步步撤回，立直棒随快照恢复", () => {
+  it("宣言能撤回，立直棒随快照恢复；重做把记号一起带回来", () => {
     const room = started();
-    const b = apply(room, declare(room, 0, true), guess(1, 2), guess(3, 4));
-    const one = apply(b, { type: "undo" });
-    expect(present(one).stage).toMatchObject({ guesses: [[1, 2]] });
-    const back = apply(one, { type: "undo" }, { type: "undo" });
+    const declared = apply(room, declare(room, 0, true));
+    const b = apply(declared, mark(declared, 1), mark(declared, 2));
+    const back = apply(b, { type: "undo" });
     expect(present(back).stage).toEqual({ kind: "A" });
     expect(present(back).sticks).toEqual([10, 10]);
-    expect(present(apply(back, { type: "redo" })).sticks).toEqual([9, 10]);
+    const again = apply(back, { type: "redo" });
+    expect(present(again).sticks).toEqual([9, 10]);
+    expect(present(again).stage).toMatchObject({ marked: [1, 2] });
   });
 
   it("Stage B 中途可以终局：未记完的一局不进历史，撤销终局回到 B 接着打", () => {
     let room = started();
     room = apply(room, declare(room, 0, false), { type: "tenTsumo", value: manual(3, 30) });
-    room = apply(room, declare(room, 1, true), guess(1, 2));
+    room = apply(room, declare(room, 1, true));
+    room = apply(room, mark(room, 1));
     const ended = apply(room, { type: "endGame" });
     expect(ended.phase).toBe("finished");
     expect(present(ended).final).toEqual({ scores: [6000, 0], winner: 0 });
     expect(present(ended).history).toHaveLength(1);
     expect(present(ended).stage.kind).toBe("B");
-    expect(() => apply(ended, guess(3, 4))).toThrow(/对局已结束/);
+    expect(() => apply(ended, mark(ended, 3))).toThrow(/对局已结束/);
     const resumed = apply(ended, { type: "undo" });
     expect(resumed.phase).toBe("playing");
-    expect(present(apply(resumed, guess(3, 4))).stage).toMatchObject({
-      guesses: [
-        [1, 2],
-        [3, 4],
-      ],
-    });
+    expect(present(apply(resumed, mark(resumed, 3))).stage).toMatchObject({ marked: [1, 3] });
   });
 
   it("同分为平局；重开一局回到初始状态", () => {
@@ -278,5 +280,25 @@ describe("二人房 / 撤销与终局", () => {
     const again = apply(ended, { type: "newGame" });
     expect(again.gameNo).toBe(2);
     expect(present(again)).toMatchObject({ scores: [0, 0], sticks: [10, 10], round: 1 });
+  });
+
+  it("重开一局 = 放弃眼下这一局强制从头来：对局中（哪怕在 Stage B）也可以，且不可撤销", () => {
+    let room = started();
+    room = apply(room, declare(room, 0, true), { type: "tenTsumo", value: manual(3, 30) });
+    room = apply(room, declare(room, 1, true));
+    const fresh = apply(room, { type: "newGame" });
+    expect(fresh.phase).toBe("playing");
+    expect(fresh.gameNo).toBe(2);
+    expect(present(fresh)).toMatchObject({
+      scores: [0, 0],
+      sticks: [10, 10],
+      round: 1,
+      stage: { kind: "A" },
+      history: [],
+    });
+    expect(() => apply(fresh, { type: "undo" })).toThrow(/暂无可撤销/);
+    expect(() => apply(createRoom("L", MLEAGUE_RULES, "ten"), { type: "newGame" })).toThrow(
+      /尚未开局/,
+    );
   });
 });

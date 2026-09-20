@@ -22,10 +22,10 @@ export type TenStage =
       /** true = 立直，false = 听牌宣言 */
       riichi: boolean;
       /**
-       * 防守方逐轮指定的两张（基础牌码 1–34，不重复）；是否命中由牌桌口头裁定，不进模型。
-       * 全牌型板是给防守方的便利而不是必经步骤：口头指定、一轮都不记，也可以直接记这一局的结果。
+       * 全牌型板上被划掉的牌（基础牌码 1–34，升序）：防守方排除用的记号，点一下划掉、再点一下恢复。
+       * 它只是便利，不管猜牌的流程——第几轮、每轮几张、是否命中都在牌桌上口头进行，不进模型。
        */
-      guesses: [Tile, Tile][];
+      marked: Tile[];
     };
 
 export type TenDrawReason =
@@ -53,8 +53,6 @@ export type TenEntry = TenEntryBase &
         kind: "tenTsumo";
         winner: TenSeat;
         riichi: boolean;
-        /** 和牌前防守方指定了几轮 */
-        rounds: number;
         value: HandValue;
         tier: ScoreTier;
         /** 本笔得分（含本场） */
@@ -67,7 +65,6 @@ export type TenEntry = TenEntryBase &
         reason: TenDrawReason;
         attacker: TenSeat | null;
         riichi: boolean;
-        rounds: number;
       }
   );
 

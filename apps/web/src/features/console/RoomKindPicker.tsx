@@ -18,6 +18,8 @@ const KIND_INFO: Record<RoomKind, { name: string; hint: string; icon: typeof Use
 export function RoomKindPicker() {
   const saved = useSavedConsoleRooms();
   const navigate = useNavigate();
+  // 有房间可回（或可能可回）时，「创建」退成描边：高亮只留给最可能要点的那一个（同手机首页的「返回房间」与扫码）
+  const resumable = ROOM_KINDS.some((kind) => saved[kind].state !== "none");
   return (
     <div className="grid gap-3">
       {ROOM_KINDS.map((kind) => {
@@ -29,7 +31,7 @@ export function RoomKindPicker() {
             <Button
               asChild
               size="lg"
-              variant="accent"
+              variant={room.state === "none" && resumable ? "outline" : "accent"}
               className="h-16 min-w-0 flex-1 justify-start"
               data-testid={`open-${kind}`}
             >

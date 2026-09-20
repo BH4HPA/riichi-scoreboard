@@ -116,7 +116,7 @@ describe("二人房（《天》规则）", () => {
     expect(last(a).game?.present).toMatchObject({ scores: [0, 0], sticks: [10, 10], dealer: 0 });
   });
 
-  it("宣言只能替自己的座位按；指定与记结果人人可做；和牌按进攻方的场况评估（闲家自风西）", () => {
+  it("宣言只能替自己的座位按；划牌与记结果人人可做；和牌按进攻方的场况评估（闲家自风西）", () => {
     const [a, b] = start();
     const declare = { type: "tenDeclare", seat: 1, riichi: false, entries: entries() } as const;
     expect(() => registry.apply(room, room.seq, declare, actorOf(a))).toThrow(/自己的座位/);
@@ -126,8 +126,16 @@ describe("二人房（《天》规则）", () => {
     registry.apply(room, seq - 1, declare, actorOf(b));
     expect(room.seq).toBe(seq);
 
-    registry.apply(room, room.seq, { type: "tenGuess", tiles: [1, 9] }, actorOf(a));
-    expect(last(a).game?.present.stage).toMatchObject({ attacker: 1, guesses: [[1, 9]] });
+    // 划牌是连续的点按：带着落后的 seq 也照样执行；重复的一下不落库
+    const mark = (tile: number, on = true) =>
+      ({ type: "tenMark", tile, on, entries: entries() }) as const;
+    const before = room.seq;
+    registry.apply(room, before, mark(1), actorOf(a));
+    registry.apply(room, before, mark(9), actorOf(a));
+    registry.apply(room, before, mark(9), actorOf(a));
+    expect(room.seq).toBe(before + 2);
+    registry.apply(room, room.seq, mark(1, false), actorOf(a));
+    expect(last(a).game?.present.stage).toMatchObject({ attacker: 1, marked: [9] });
 
     // 西家的副露手：自风西是唯一的役。按四人座位的算法 1 号位是南家，会被判无役
     registry.apply(
@@ -170,7 +178,7 @@ describe("二人房（《天》规则）", () => {
     ).toThrow(/还没有人宣言/);
   });
 
-  it("撤销宣言 / 指定会广播是哪一步；终局不写个人战绩", () => {
+  it("撤销宣言会广播是哪一步（划牌不占撤销栈）；终局不写个人战绩", () => {
     const [a, b] = start();
     registry.apply(
       room,
@@ -178,11 +186,15 @@ describe("二人房（《天》规则）", () => {
       { type: "tenDeclare", seat: 0, riichi: true, entries: entries() },
       actorOf(a),
     );
-    registry.apply(room, room.seq, { type: "tenGuess", tiles: [1, 2] }, actorOf(b));
-    registry.apply(room, room.seq, { type: "undo" }, actorOf(b));
+    registry.apply(
+      room,
+      room.seq,
+      { type: "tenMark", tile: 1, on: true, entries: entries() },
+      actorOf(b),
+    );
     registry.apply(room, room.seq, { type: "undo" }, actorOf(b));
     const reverted = a.messages.filter((m) => m.type === "reverted").map((m) => m.what);
-    expect(reverted).toEqual(["第 1 轮指定", "甲的立直"]);
+    expect(reverted).toEqual(["甲的立直"]);
     expect(last(a).game?.present).toMatchObject({ sticks: [10, 10], stage: { kind: "A" } });
 
     registry.apply(room, room.seq, { type: "endGame" }, actorOf(a));
@@ -221,9 +233,9 @@ describe("二人房（《天》规则）", () => {
     advance(5 * MIN);
     expect(last(a).timeMark).toBe(3);
 
-    registry.apply(room, room.seq, { type: "endGame" }, actorOf(a));
+    // 对局中直接重开（放弃眼下这一场）：1 小时从头计
     registry.apply(room, room.seq, { type: "newGame" }, actorOf(a));
-    expect(last(a).timeMark).toBe(0);
+    expect(last(a)).toMatchObject({ phase: "playing", timeMark: 0 });
     advance(50 * MIN);
     expect(last(a).timeMark).toBe(1);
   });

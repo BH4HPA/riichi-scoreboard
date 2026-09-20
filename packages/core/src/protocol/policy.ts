@@ -34,9 +34,9 @@ export const STOPS_MUSIC: Record<Command["type"], boolean> = {
   syncProfile: false,
   undo: false,
   redo: true,
-  // 二人房：宣言就是放曲的同一下点击，指定时曲子接着放；记下一局的结果才停
+  // 二人房：宣言就是放曲的同一下点击，划牌时曲子接着放；记下一局的结果才停
   tenDeclare: false,
-  tenGuess: false,
+  tenMark: false,
   tenDraw: true,
   tenTsumo: true,
 };
@@ -74,9 +74,10 @@ export const TOLERATES_STALE: Record<ClientCommand["type"], boolean> = {
   redo: false,
   endGame: false,
   newGame: false,
-  // 与 declareRiichi 同理：自带按下时的历史条数，且幂等；两人同时按，后到的得到「对方已宣言」而不是 stale
+  // 与 declareRiichi 同理：自带按下时的历史条数，且幂等；两人同时按，后到的得到「对方已宣言」而不是 stale。
+  // 划牌是连续的点按：上一下的广播还在路上，下一下就带着旧 seq 到了——目标是绝对的（哪张牌、划不划），照样执行
   tenDeclare: true,
-  tenGuess: false,
+  tenMark: true,
   tenDraw: false,
   tenTsumo: false,
 };

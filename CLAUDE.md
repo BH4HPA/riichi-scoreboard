@@ -78,7 +78,7 @@ Yarn workspaces monorepo:
   console game centers them at the page bottom under `SiteBrand`, the wide console pins them
   left-aligned at the bottom of its left column with `SiteBrand` right-aligned on the same row (lobby and game), `/calc` stacks `SiteBrand` over them at the page bottom; the phone game nav puts a row below its tabs, inside the bottom safe area (padding clamped to 6–18px): room code + connection badge on the left, `SiteTicker` on the right (ICP number ⇄ logo + site name every 10 s, pure CSS — two anti-phase layers, fade out then in; plain text, not a link; brand only when no ICP is configured). PWA = `public/manifest.json` + icons only, deliberately no Service Worker (the app is useless
   without its WebSocket, and caching index would pin stale versions); logo master in `docs/brand/`. Tile images are flat SVGs from mahjong_graphic (`src/assets/tiles`, see NOTICE.md), rendered by
-  `features/hand/TileFace`.
+  `features/hand/TileFace` (fixed pixel sizes, baseline-aligned with sideways meld tiles) and `features/hand/TileKey` (fills its grid cell — the tile _is_ the hit area; used by `TileGrid` for the tile keyboard, the replace sheet and the ten all-tiles board).
 
 Layering rule: entry files only assemble; data/state/render responsibilities are split into directories
 named by role (see `features/*`). Server DTOs are passed through whole; conversion only at boundaries.
@@ -117,11 +117,11 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   Seats 0 = 东 (first dealer), 1 = 西; round wind is always 东. Commands: `tenDeclare {seat, riichi, entries}`
   (A → B; riichi spends one of the 10 sticks, never refunded, 0 left ⇒ tenpai declaration only; stale-tolerant
   with a history-length guard and idempotent — a repeat returns the same object so the registry persists
-  nothing; only the seat's owner or a local seat, like `setReady`), `tenGuess {tiles:[a,b]}` (B only, two distinct base tiles, none guessed before — so a round has at most 17 turns; whether it hit is answered verbally, the app only records; the board is a convenience, not a required step: a result may be recorded with zero turns and the wording then drops the turn count), `tenDraw {reason:
+  nothing; only the seat's owner or a local seat, like `setReady`), `tenMark {tile, on, entries}` (B only: strike / restore one tile on the all-tiles board — explicit `on`, so idempotent; stale-tolerant because taps come faster than broadcasts; replaces `present` without touching the undo stack, like `declareRiichi`, so 34 taps cannot push settlements out of it and tapping again is the undo. The board is only the defender's elimination aid: turns, tiles per turn and whether a guess hit all happen verbally at the table and are not modelled), `tenDraw {reason:
 noDeclare | guessed | exhausted}` (honba +1, dealer stays), `tenTsumo {value}` (B only; the winner is always
   the attacker, so the server takes the seat from the snapshot, never from the client; gain =
   `winPoints(…, tsumo).total` incl. honba; dealer win ⇒ honba +1, child win ⇒ dealer swaps, honba 0; a `hand`
-  value must be tsumo and its riichi flag must equal the declaration). Declarations and guesses are ordinary undoable steps (no cancel command), so Stage B can occur more than once in a round: the draft stamp (`tenDraftStamp`) carries the declaration's identity (attacker + riichi) but not the guesses, and every dialog that records a round result — the tsumo form and the draw confirmations — closes itself when the stamp changes under it; `endGame` works in either stage, keeps `stage` in the snapshot (undo
+  value must be tsumo and its riichi flag must equal the declaration). Declarations are ordinary undoable steps (no cancel command), so Stage B can occur more than once in a round: the draft stamp (`tenDraftStamp`) carries the declaration's identity (attacker + riichi) but not the board marks, and every dialog that records a round result — the tsumo form and the draw confirmations — closes itself when the stamp changes under it; `endGame` works in either stage, keeps `stage` in the snapshot (undo
   resumes Stage B) and leaves the unfinished round out of history. Hands are evaluated through
   `roomHandContext(room, seat)` — the only server entry for hand context: dealer = 东, child = 西
   (`handContextAt` would make seat 1 南). A ten room still carries a full `RoomRules` but only reads `scoring`
@@ -129,15 +129,13 @@ noDeclare | guessed | exhausted}` (honba +1, dealer stays), `tenTsumo {value}` (
   are four-player zero-sum). Hidden clock: `TenRoomView.timeMark` 0–3 (≤10 min / ≤5 min / time up) is derived from `startedAt` at broadcast time — no countdown is sent or shown (anyone can read a watch, and `startedAt` is in the state; "hidden" means the app does not read out the clock); `registry.reconcileClock` arms one timer
   for the next mark (re-armed whenever the target changes: new game, end, undo of end; not in `get()`, not
   while nobody is connected) and only re-broadcasts, it never ends the game. Web: `TenDeclareSection` (「▶ 立直」
-  also plays music via `RiichiMusicRow`, 「听牌宣言」), `GuessBoard` (all 34 tiles; earlier guesses dimmed +
-  struck, the latest pair marked, the current pick selected; replaces the history column on the wide console
-  during Stage B; who may pick is `stageB/canPick.ts`, the same rule as declaring: a device player's own phone only, anyone for a local player),
+  also plays music via `RiichiMusicRow`, 「听牌宣言」), `GuessBoard` (all 34 tiles through the shared `TileGrid`; tap to strike, tap again to restore; replaces the history column on the wide console during Stage B; who may tap is `stageB/canPick.ts`, the same rule as declaring: a device player's own phone only, anyone for a local player),
   `TenTsumoDialog` (same `ValuePicker` / camera chain as yonma with `riichiLock` from the declaration;
   recognitions keep `source: "room"`), `TenStageHint` (what to do in this stage, always on the TV),
-  `TenGuide` (rule explainer pages from core `ten/guide.ts`; castable from the phone lobby and the in-game 规则
+  `TenGuide` (rule explainer from core `ten/guide.ts`: on phones all five sections are stacked and an IntersectionObserver reports the one being read, so a cast TV follows the reader; the TV shows one section under a tab strip; castable from the phone lobby and the in-game 规则
   sheet via the `tenGuide` intent — the console lobby mounts a mirror layer only for it), settlement mirror via
   the `tenSettlement` intent.
-- Room phases: `lobby` → `playing` → `finished` (→ `lobby` via `toLobby`), plus `closed` after `dissolve`
+- Room phases: `lobby` → `playing` → `finished` (→ `lobby` via `toLobby`; `newGame` = abandon the current game and start over, allowed while `playing` as well as `finished`, never undoable, and an abandoned game writes no results), plus `closed` after `dissolve`
   (any phase; `rooms.closed_at` short-circuits replay; WS close code 4010).
 - Players: `device` (has a token, joins from a phone) or `local` (no token, created and seated by the console
   via `sitLocal`, auto-ready; anyone may leave/ready a local seat). Everyone in a room is an admin.

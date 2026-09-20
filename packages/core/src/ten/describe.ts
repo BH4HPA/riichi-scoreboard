@@ -12,9 +12,9 @@ export function tenDeclareLabel(riichi: boolean): string {
   return riichi ? "立直" : "听牌宣言";
 }
 
-/** 「第 3 局 1 本场」 */
+/** 「第 3 局 1 本场」；0 本场也写出来（与四人房的「东1局0本场」一致） */
 export function tenRoundLabel(round: number, honba: number): string {
-  return honba > 0 ? `第 ${round} 局 ${honba} 本场` : `第 ${round} 局`;
+  return `第 ${round} 局 ${honba} 本场`;
 }
 
 function role(seat: TenSeat, dealer: TenSeat): string {
@@ -27,22 +27,12 @@ export function describeTenEntry(entry: TenEntry): string {
   if (entry.kind === "tenTsumo") {
     const name = entry.names[entry.winner]!;
     const honba = entry.honba > 0 ? `（含 ${entry.honba} 本场）` : "";
-    return `${head}：${role(entry.winner, entry.dealer)} ${name} ${tenDeclareLabel(entry.riichi)}后，${missed(entry.rounds)}，自摸 ${describeValue(entry.value, entry.tier)}，得 ${formatPoints(entry.gain)} 点${honba}。`;
+    return `${head}：${role(entry.winner, entry.dealer)} ${name} ${tenDeclareLabel(entry.riichi)}后自摸 ${describeValue(entry.value, entry.tier)}，得 ${formatPoints(entry.gain)} 点${honba}。`;
   }
   if (entry.attacker === null) return `${head}：18 巡内无人宣言，流局。`;
   const name = entry.names[entry.attacker]!;
-  const how =
-    entry.reason === "guessed"
-      ? entry.rounds > 0
-        ? `第 ${entry.rounds} 轮被猜中待牌`
-        : "被猜中待牌"
-      : `${missed(entry.rounds)}，摸到王牌仍未和`;
+  const how = entry.reason === "guessed" ? "被猜中待牌" : "摸到王牌仍未和";
   return `${head}：${role(entry.attacker, entry.dealer)} ${name} ${tenDeclareLabel(entry.riichi)}，${how}，流局。`;
-}
-
-/** 指定没有记在全牌型板上（口头进行）时不写轮数 */
-function missed(rounds: number): string {
-  return rounds > 0 ? `防守方指定 ${rounds} 轮未中` : "防守方未猜中";
 }
 
 function shortEntry(entry: TenEntry): string {
@@ -54,7 +44,7 @@ function shortEntry(entry: TenEntry): string {
 
 /**
  * 撤销/重做前后的局面差异 → 被撤掉（或重做回来）的是哪一步。
- * 二人房的宣言与指定也是可撤销的步骤，所以除了历史条目还要看阶段。
+ * 二人房的宣言也是可撤销的步骤，所以除了历史条目还要看阶段。
  */
 export function describeTenRevert(
   before: TenGameState,
@@ -74,9 +64,6 @@ export function describeTenRevert(
     if (declared) {
       return `${names[declared.attacker]}的${tenDeclareLabel(declared.riichi)}`;
     }
-  }
-  if (b.kind === "B" && a.kind === "B" && b.guesses.length !== a.guesses.length) {
-    return `第 ${Math.max(b.guesses.length, a.guesses.length)} 轮指定`;
   }
   return "上一步操作";
 }

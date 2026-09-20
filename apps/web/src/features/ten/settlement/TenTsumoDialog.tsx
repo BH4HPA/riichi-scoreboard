@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import {
   describeValue,
   formatPoints,
@@ -52,6 +52,8 @@ export function TenTsumoDialog({
   ...rest
 }: Props & { open: boolean; onOpenChange: (open: boolean) => void }) {
   const { stage } = game;
+  // 自己提交的那一笔会让阶段回到 A，而状态广播先于 ack 到达：那不是「局面被别人改了」，关闭器不该提示
+  const submitting = useRef(false);
   const round = `${tenRoundLabel(game.round, game.honba)}，庄家：${rest.names[game.dealer]}`;
   // 弹窗开着时别人撤销了宣言：阶段回到 A。表单不能跟着消失了事——这里的开关状态还留着，下次再有人宣言它会自己
   // 弹回来——所以照常渲染一个关闭器，走与「局面已变化」同样的提示与关闭。
@@ -68,26 +70,40 @@ export function TenTsumoDialog({
     >
       {(onDone) =>
         stage.kind === "B" ? (
-          <TenTsumoForm game={game} stage={stage} {...rest} onDone={onDone} />
+          <TenTsumoForm
+            game={game}
+            stage={stage}
+            {...rest}
+            onSubmitting={(flag) => {
+              submitting.current = flag;
+            }}
+            onDone={onDone}
+          />
         ) : (
-          <StaleCloser onDone={onDone} />
+          <StaleCloser submitting={submitting} onDone={onDone} />
         )
       }
     </SettlementDialog>
   );
 }
 
-/** 它的出现本身就意味着要关：挂载时提示一次并关闭弹窗 */
-function StaleCloser({ onDone }: { onDone: () => void }) {
+/** 它的出现本身就意味着要关：挂载时关闭弹窗；不是自己提交造成的才提示 */
+function StaleCloser({
+  submitting,
+  onDone,
+}: {
+  submitting: RefObject<boolean>;
+  onDone: () => void;
+}) {
   const notify = useRoomStore((s) => s.notify);
   const done = useRef(onDone);
   useEffect(() => {
     done.current = onDone;
   });
   useEffect(() => {
-    notify("info", "局面已变化，结算已关闭");
+    if (!submitting.current) notify("info", "局面已变化，结算已关闭");
     done.current();
-  }, [notify]);
+  }, [notify, submitting]);
   return null;
 }
 
@@ -97,8 +113,9 @@ function TenTsumoForm({
   names,
   rules,
   mirror,
+  onSubmitting,
   onDone,
-}: Props & { stage: StageB; onDone: () => void }) {
+}: Props & { stage: StageB; onSubmitting: (flag: boolean) => void; onDone: () => void }) {
   const send = useCommand();
   const winner = stage.attacker;
   const form = useDraft<{ draft: ValueDraft }>(
@@ -133,9 +150,10 @@ function TenTsumoForm({
 
   const confirm = async () => {
     setBusy(true);
-    const ok = await form.submit(() =>
-      send({ type: "tenTsumo", value: draftToClientValue(draft) }),
-    );
+    onSubmitting(true);
+    const ok = await form
+      .submit(() => send({ type: "tenTsumo", value: draftToClientValue(draft) }))
+      .finally(() => onSubmitting(false));
     setBusy(false);
     if (ok) {
       void confirmRecognized(draft);

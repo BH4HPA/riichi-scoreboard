@@ -110,9 +110,22 @@ describe("reduceRoom 阶段与不变量", () => {
     );
   });
 
-  it("newGame 仅终局后可用；start 仅大厅可用", () => {
+  it("newGame 放弃眼下这一局强制重开：对局中与终局后都可用，大厅不行；start 仅大厅可用", () => {
     const room = playingRoom();
-    expect(() => reduceRoom(room, ev({ type: "newGame" }, 9))).toThrow(/尚未结束/);
+    const settled = reduceRoom(
+      room,
+      ev({ type: "tsumo", winner: 0, value: manual, riichi: [] }, 9),
+    );
+    const restarted = reduceRoom(settled, ev({ type: "newGame" }, 10));
+    expect(restarted.phase).toBe("playing");
+    expect(restarted.gameNo).toBe(room.gameNo + 1);
+    expect(restarted.game!.present.history).toEqual([]);
+    expect(restarted.game!.present.points).toEqual([25000, 25000, 25000, 25000]);
+    // 撤销栈随新局重建：放弃的那一局撤不回来
+    expect(() => reduceRoom(restarted, ev({ type: "undo" }, 11))).toThrow(/暂无可撤销/);
+    expect(() => reduceRoom(createRoom("L", MLEAGUE_RULES), ev({ type: "newGame" }, 1))).toThrow(
+      /尚未开局/,
+    );
     expect(() => reduceRoom(room, ev({ type: "start", force: true }, 9))).toThrow(/开局后/);
     const finished = reduceRoom(room, ev({ type: "endGame" }, 9));
     const fresh = reduceRoom(finished, ev({ type: "newGame" }, 10));

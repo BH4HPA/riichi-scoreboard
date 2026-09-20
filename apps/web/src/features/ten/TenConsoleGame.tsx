@@ -44,7 +44,7 @@ export function TenConsoleGame({
         header={<TenHeader game={present} names={names} timeMark={room.timeMark} tv={wide} />}
         aside={
           stageB ? (
-            <GuessBoard stage={stageB} names={names} pickable={pickable} size="lg" />
+            <GuessBoard stage={stageB} entries={present.history.length} pickable={pickable} tv />
           ) : (
             <TenHistoryTable history={present.history} tv />
           )
@@ -77,7 +77,7 @@ export function TenConsoleGame({
         {!finished && <TenStageHint stage={present.stage} tv={wide} />}
         {stageB && !wide && (
           <div className="rounded-xl border border-border bg-surface p-3">
-            <GuessBoard stage={stageB} names={names} pickable={pickable} size="md" />
+            <GuessBoard stage={stageB} entries={present.history.length} pickable={pickable} tv />
           </div>
         )}
       </ConsoleGameShell>

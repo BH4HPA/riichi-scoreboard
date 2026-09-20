@@ -6,7 +6,7 @@ import { CastSwitch } from "@/features/mirror/CastSwitch";
 import { TenGuide } from "./TenGuide";
 
 /**
- * 大厅里的规则说明弹层。手机端带「投到电视」开关：电视大厅平时看不到规则说明，打开后全屏跟着讲解者翻页；
+ * 大厅里的规则说明弹层。手机端带「投到电视」开关：电视大厅平时看不到规则说明，打开后全屏跟着讲解者读到的那一节；
  * 关掉弹层即复位。主控台自己打开时直接在本机看（`castable=false`）。
  */
 export function TenGuideDialog({

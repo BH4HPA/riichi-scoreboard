@@ -305,7 +305,11 @@ test("截图：首页选房型与二人房（《天》规则）", async ({ brows
 
   await east.getByRole("button", { name: "规则说明" }).click();
   await east.getByRole("dialog").getByRole("switch", { name: "投到电视" }).click();
-  await east.getByRole("dialog").getByRole("tab", { name: "3" }).click();
+  await east
+    .getByRole("dialog")
+    .locator('[data-page="stageB"]')
+    .evaluate((el) => el.scrollIntoView({ block: "start" }));
+  await tv.getByTestId("ten-guide-mirror").getByText("防守方每轮猜 2 张").waitFor();
   await tv.getByTestId("ten-guide-mirror").waitFor();
   await east.screenshot({ path: `${OUT}/ten-phone-guide.png` });
   await tv.screenshot({ path: `${OUT}/ten-tv-guide-mirror.png` });
@@ -318,22 +322,15 @@ test("截图：首页选房型与二人房（《天》规则）", async ({ brows
 
   await east.getByRole("button", { name: "立直", exact: true }).click();
   const pick = west.getByTestId("guess-tiles");
-  for (const [a, b] of [
-    ["1萬", "9萬"],
-    ["東", "白"],
-    ["3筒", "6筒"],
-  ]) {
-    await pick.getByRole("button", { name: a! }).click();
-    await pick.getByRole("button", { name: b! }).click();
-    await west.getByRole("button", { name: "指定这两张" }).click();
-    await west.getByRole("button", { name: "指定这两张" }).waitFor();
+  for (const n of ["1萬", "9萬", "東", "白", "3筒", "6筒"]) {
+    await pick.getByRole("button", { name: n }).click();
   }
-  await pick.getByRole("button", { name: "2索" }).click();
+  await tv.getByTestId("guess-board").getByText("已划掉 6 种").waitFor();
   await tv.screenshot({ path: `${OUT}/ten-tv-stage-b.png` });
   await west.screenshot({ path: `${OUT}/ten-phone-stage-b-defender.png`, fullPage: true });
   await east.screenshot({ path: `${OUT}/ten-phone-stage-b-attacker.png`, fullPage: true });
 
-  await east.getByRole("button", { name: "自摸和" }).click();
+  await east.getByRole("button", { name: "自摸", exact: true }).click();
   const dialog = east.getByRole("dialog");
   await dialog.getByRole("tab", { name: "牌面" }).click();
   await east.screenshot({ path: `${OUT}/ten-phone-tsumo-hand.png` });

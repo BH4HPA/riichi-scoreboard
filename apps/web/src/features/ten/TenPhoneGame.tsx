@@ -66,7 +66,7 @@ export function TenPhoneGame({ room }: { room: TenRoomView }) {
         <div className="rounded-xl border border-border bg-surface p-3">
           <GuessBoard
             stage={stageB}
-            names={names}
+            entries={present.history.length}
             pickable={canPickFor(stageB, room.seats, mySeat)}
           />
         </div>

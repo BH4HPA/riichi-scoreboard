@@ -156,8 +156,9 @@ export function reduceRoom(room: RoomState, event: RoomEvent): RoomState {
   }
 
   if (cmd.type === "newGame") {
-    if (room.phase !== "finished")
-      throw new DomainError("not_finished", "对局尚未结束，请先终局结算");
+    // 重开一局 = 放弃眼下这一局、强制从头来：对局中与终局后都可以（终局后等于再来一局）。
+    // 没打完的那一局不落战绩（战绩只在 playing → finished 时写）；撤销栈随新局重建，所以不可撤销。
+    if (room.phase === "lobby") throw new DomainError("no_game", "尚未开局");
     return startGame(room, event.at);
   }
 
@@ -226,10 +227,11 @@ function reduceTenGame(
     names: seatNames(room),
     rules: room.rules,
   });
-  // 没有状态变化（重复的宣言）：原样返回，服务端据此不落库、不推进 seq
-  return present === stack.present
-    ? room
-    : { ...room, game: push(stack, present), phase: phaseOf(present) };
+  // 没有状态变化（重复的宣言 / 划牌）：原样返回，服务端据此不落库、不推进 seq
+  if (present === stack.present) return room;
+  // 划牌替换 present、不动撤销栈（同四人房的立直声明）：撤销撤的是宣言与结算，记号跟着局面快照走
+  if (cmd.type === "tenMark") return { ...room, game: { ...stack, present } };
+  return { ...room, game: push(stack, present), phase: phaseOf(present) };
 }
 
 /** 房间阶段跟随当前局面：对局结束即 finished，否则 playing。 */

@@ -98,27 +98,29 @@ describe("二人房 / 命令形状与策略", () => {
       riichi: true,
       entries: 3,
     });
-    expect(validateCommand({ type: "tenGuess", tiles: [1, 34], extra: 1 })).toEqual({
-      type: "tenGuess",
-      tiles: [1, 34],
+    expect(validateCommand({ type: "tenMark", tile: 34, on: true, entries: 0, extra: 1 })).toEqual({
+      type: "tenMark",
+      tile: 34,
+      on: true,
+      entries: 0,
     });
     expect(validateCommand({ type: "tenDraw", reason: "guessed" })).toEqual({
       type: "tenDraw",
       reason: "guessed",
     });
-    expect(() => validateCommand({ type: "tenGuess", tiles: [1] })).toThrow(/两张/);
-    expect(() => validateCommand({ type: "tenGuess", tiles: [1, 35] })).toThrow(/指定的牌/);
+    expect(() => validateCommand({ type: "tenMark", tile: 35, on: true, entries: 0 })).toThrow(
+      /划掉的牌/,
+    );
+    expect(() => validateCommand({ type: "tenMark", tile: 1, on: "yes", entries: 0 })).toThrow(
+      /划掉标记/,
+    );
     expect(() => validateCommand({ type: "tenDraw", reason: "ryuukyoku" })).toThrow(/流局原因/);
     expect(() => validateCommand({ type: "tenTsumo", value: null })).toThrow(/和牌价值/);
   });
 
-  it("宣言不看 baseSeq（自带历史条数且幂等），其余都要最新局面", () => {
-    expect(TOLERATES_STALE.tenDeclare).toBe(true);
-    expect([TOLERATES_STALE.tenGuess, TOLERATES_STALE.tenDraw, TOLERATES_STALE.tenTsumo]).toEqual([
-      false,
-      false,
-      false,
-    ]);
+  it("宣言与划牌不看 baseSeq（自带历史条数且幂等），记结果要最新局面", () => {
+    expect([TOLERATES_STALE.tenDeclare, TOLERATES_STALE.tenMark]).toEqual([true, true]);
+    expect([TOLERATES_STALE.tenDraw, TOLERATES_STALE.tenTsumo]).toEqual([false, false]);
   });
 });
 
@@ -154,37 +156,27 @@ describe("二人房 / 描述", () => {
   it("历史条目与撤销提示", () => {
     const room = playing();
     const declared = apply(room, { type: "tenDeclare", seat: 0, riichi: true, entries: 0 });
-    const guessed = apply(declared, { type: "tenGuess", tiles: [1, 2] });
-    const won = apply(guessed, {
+    const won = apply(declared, {
       type: "tenTsumo",
       value: { kind: "manual", han: 3, fu: 30, yakuman: 0 },
     });
     const g = (r: TenRoomState) => r.game!.present;
     expect(describeTenEntry(g(won).history[0]!)).toBe(
-      "第 1 局：庄家 阿东 立直后，防守方指定 1 轮未中，自摸 3 番 30 符，得 6,000 点。",
+      "第 1 局 0 本场：庄家 阿东 立直后自摸 3 番 30 符，得 6,000 点。",
     );
     const drawn = apply(won, { type: "tenDraw", reason: "noDeclare" });
     expect(describeTenEntry(g(drawn).history[0]!)).toBe("第 2 局 1 本场：18 巡内无人宣言，流局。");
-
-    // 撤销提示用当前的座位昵称：对局中改过名，开局快照里的是旧名字
-    const names = ["东哥", "阿西"];
-    expect(describeTenRevert(g(declared), g(room), names)).toBe("东哥的立直");
-    expect(describeTenRevert(g(guessed), g(declared), names)).toBe("第 1 轮指定");
-    expect(describeTenRevert(g(won), g(guessed), names)).toBe("第 1 局 阿东自摸和");
-    const ended = apply(won, { type: "endGame" });
-    expect(describeTenRevert(g(ended), g(won), names)).toBe("终局");
-
-    // 全牌型板是便利不是必经步骤：一轮都没记时不写「第 0 轮」
     const verbal = apply(drawn, { type: "tenDeclare", seat: 1, riichi: false, entries: 2 });
     const hit = apply(verbal, { type: "tenDraw", reason: "guessed" });
     expect(describeTenEntry(g(hit).history[0]!)).toBe(
       "第 3 局 2 本场：闲家 阿西 听牌宣言，被猜中待牌，流局。",
     );
-    const again = apply(hit, { type: "tenDeclare", seat: 1, riichi: false, entries: 3 });
-    const tsumo = apply(again, {
-      type: "tenTsumo",
-      value: { kind: "manual", han: 1, fu: 30, yakuman: 0 },
-    });
-    expect(describeTenEntry(g(tsumo).history[0]!)).toContain("听牌宣言后，防守方未猜中，自摸");
+
+    // 撤销提示用当前的座位昵称：对局中改过名，开局快照里的是旧名字
+    const names = ["东哥", "阿西"];
+    expect(describeTenRevert(g(declared), g(room), names)).toBe("东哥的立直");
+    expect(describeTenRevert(g(won), g(declared), names)).toBe("第 1 局 0 本场 阿东自摸和");
+    const ended = apply(won, { type: "endGame" });
+    expect(describeTenRevert(g(ended), g(won), names)).toBe("终局");
   });
 });

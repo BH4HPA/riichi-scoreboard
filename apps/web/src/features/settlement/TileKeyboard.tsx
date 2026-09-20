@@ -36,9 +36,6 @@ const TARGET_LABELS: Record<Target, string> = {
   ankan: "暗杠",
 };
 
-/** 键盘牌键的点击区撑满整格（约 36×44），牌图保持原尺寸居中：单手录入不用对准 26px 宽的牌 */
-const KEY_HIT = "min-h-11 w-full items-center justify-center";
-
 export function TileKeyboard({
   hand,
   onChange,
@@ -246,7 +243,6 @@ export function TileKeyboard({
         aka={akaEnabled}
         disabled={disabledOnKeyboard}
         onPick={tap}
-        buttonClassName={KEY_HIT}
         testId="tile-keyboard"
       />
 

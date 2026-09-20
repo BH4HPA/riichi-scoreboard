@@ -63,8 +63,9 @@ function nextRound(
 }
 
 /**
- * 二人房的对局命令。宣言与指定都是普通的可撤销步骤（由房间层入撤销栈）：点错了撤销即可，不另设取消。
- * 返回同一个对象表示没有状态变化（重复的宣言），房间层据此不落库、不广播。
+ * 二人房的对局命令。宣言是普通的可撤销步骤（由房间层入撤销栈）：点错了撤销即可，不另设取消；
+ * 划牌（`tenMark`）由房间层替换 present、不入撤销栈。
+ * 返回同一个对象表示没有状态变化（重复的宣言 / 划牌），房间层据此不落库、不广播。
  */
 export function applyTenCommand(
   game: TenGameState,
@@ -88,7 +89,7 @@ export function applyTenCommand(
         throw new DomainError("stale_round", "局面已变化，宣言没有记上，请确认后重按");
       }
       if (!cmd.riichi) {
-        return { ...game, stage: { kind: "B", attacker: cmd.seat, riichi: false, guesses: [] } };
+        return { ...game, stage: { kind: "B", attacker: cmd.seat, riichi: false, marked: [] } };
       }
       if (game.sticks[cmd.seat]! <= 0) {
         throw new DomainError("no_sticks", "立直棒已用完，只能听牌宣言");
@@ -96,21 +97,21 @@ export function applyTenCommand(
       return {
         ...game,
         sticks: game.sticks.map((n, s) => (s === cmd.seat ? n - 1 : n)),
-        stage: { kind: "B", attacker: cmd.seat, riichi: true, guesses: [] },
+        stage: { kind: "B", attacker: cmd.seat, riichi: true, marked: [] },
       };
     }
 
-    case "tenGuess": {
-      if (stage.kind !== "B") throw new DomainError("not_stage", "还没有人宣言，不能指定");
-      const [a, b] = cmd.tiles;
-      if (!ALL_TILES.includes(a) || !ALL_TILES.includes(b) || a === b) {
-        throw new DomainError("bad_tiles", "请指定两张不同的牌");
+    case "tenMark": {
+      if (stage.kind !== "B") throw new DomainError("not_stage", "还没有人宣言");
+      if (cmd.entries !== game.history.length) {
+        throw new DomainError("stale_round", "局面已变化，请重试");
       }
-      // 指定过的牌不再接受：再猜一次没有意义（进攻方宣言后不换牌），也让一局的轮数有界（34 种牌，至多 17 轮）
-      if (stage.guesses.some((g) => g.includes(a) || g.includes(b))) {
-        throw new DomainError("guessed_already", "这张牌已经指定过了");
-      }
-      return { ...game, stage: { ...stage, guesses: [...stage.guesses, [a, b]] } };
+      if (!ALL_TILES.includes(cmd.tile)) throw new DomainError("bad_tiles", "没有这张牌");
+      if (stage.marked.includes(cmd.tile) === cmd.on) return game;
+      const marked = cmd.on
+        ? [...stage.marked, cmd.tile].sort((x, y) => x - y)
+        : stage.marked.filter((t) => t !== cmd.tile);
+      return { ...game, stage: { ...stage, marked } };
     }
 
     case "tenDraw": {
@@ -126,7 +127,6 @@ export function applyTenCommand(
         reason: cmd.reason,
         attacker: stage.kind === "B" ? stage.attacker : null,
         riichi: stage.kind === "B" && stage.riichi,
-        rounds: stage.kind === "B" ? stage.guesses.length : 0,
       };
       // 流局：庄家不变，积棒 +1
       return nextRound(game, entry, { dealer: game.dealer, honba: game.honba + 1 });
@@ -159,7 +159,6 @@ export function applyTenCommand(
         kind: "tenTsumo",
         winner,
         riichi: stage.riichi,
-        rounds: stage.guesses.length,
         value: { ...value, yakuman: effectiveYakuman(value, ctx.rules) },
         tier: scoreTier(value, ctx.rules),
         gain,

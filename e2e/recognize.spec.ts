@@ -475,9 +475,7 @@ test("横屏：倾斜过 15° 才自动切、手动按钮随时能改、下次�
   await ctx.close();
 });
 
-test("二人房：宣言 → 指定 → 拍照识别 → 按立直宣言自动算番 → 自摸和 → 真值回填", async ({
-  browser,
-}) => {
+test("二人房：宣言 → 拍照识别 → 按立直宣言自动算番 → 自摸和 → 真值回填", async ({ browser }) => {
   const patches: Record<string, unknown>[] = [];
   const posts: string[] = [];
   const tvCtx = await newContext(browser, { viewport: { width: 1600, height: 900 } });
@@ -507,12 +505,9 @@ test("二人房：宣言 → 指定 → 拍照识别 → 按立直宣言自动�
 
   await west.getByRole("button", { name: "立直", exact: true }).click();
   await expect(tv.getByTestId("ten-stage")).toHaveText("Stage B · 阿西 立直");
-  const pick = east.getByTestId("guess-tiles");
-  await pick.getByRole("button", { name: "東" }).click();
-  await pick.getByRole("button", { name: "南" }).click();
-  await east.getByRole("button", { name: "指定这两张" }).click();
+  await east.getByTestId("guess-tiles").getByRole("button", { name: "東" }).click();
 
-  await west.getByRole("button", { name: "自摸和" }).click();
+  await west.getByRole("button", { name: "自摸", exact: true }).click();
   const dialog = west.getByRole("dialog");
   await dialog.getByRole("tab", { name: "牌面" }).click();
   await shoot(west, dialog);
@@ -549,7 +544,5 @@ test("二人房：宣言 → 指定 → 拍照识别 → 按立直宣言自动�
   expect(corrected.riichi).toBe(true);
   expect(corrected.tsumo).toBe(true);
   // 历史里带着这手牌
-  await expect(
-    tv.getByText(/阿西 立直后，防守方指定 1 轮未中，自摸 4 番 20 符，得 5,200 点/),
-  ).toBeVisible();
+  await expect(tv.getByText(/阿西 立直后自摸 4 番 20 符，得 5,200 点/)).toBeVisible();
 });

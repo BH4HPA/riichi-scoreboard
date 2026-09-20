@@ -55,13 +55,16 @@ export type GameCommand<V = WinValue> =
 
 /**
  * 《天》二人麻将的对局命令（见 `ten/reduce.ts`）。撤销 / 重做 / 终局 / 重开沿用 `GameCommand` 里的同名命令。
- * 宣言与指定也进撤销栈；和牌者恒为进攻方，所以 `tenTsumo` 不带座位。
+ * 宣言也进撤销栈；和牌者恒为进攻方，所以 `tenTsumo` 不带座位。
  */
 export type TenCommand<V = WinValue> =
   /** 仅 Stage A。立直扣 1 根立直棒；`entries` = 按下时看到的历史条数，对不上即拒绝（不看 baseSeq） */
   | { type: "tenDeclare"; seat: Seat; riichi: boolean; entries: number }
-  /** 仅 Stage B：防守方本轮指定的两张（基础牌码 1–34） */
-  | { type: "tenGuess"; tiles: [Tile, Tile] }
+  /**
+   * 仅 Stage B：在全牌型板上划掉 / 恢复一张牌（基础牌码 1–34）。带明确的 `on` 而不是「切换」，所以幂等；
+   * 不入撤销栈（再点一下就恢复了，34 张牌的点按也不该把结算挤出撤销栈）；`entries` 同 `tenDeclare`。
+   */
+  | { type: "tenMark"; tile: Tile; on: boolean; entries: number }
   | { type: "tenDraw"; reason: TenDrawReason }
   | { type: "tenTsumo"; value: V };
 
@@ -78,7 +81,7 @@ export type ClientCommand =
 
 const TEN_COMMAND_TYPES: ReadonlySet<string> = new Set([
   "tenDeclare",
-  "tenGuess",
+  "tenMark",
   "tenDraw",
   "tenTsumo",
 ]);
