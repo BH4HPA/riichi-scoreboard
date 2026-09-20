@@ -46,7 +46,7 @@ export function TileKeyboard({
   uncertain = [],
   showValue = true,
   isDealer,
-  riichiLocked,
+  riichiLocked = false,
 }: {
   hand: HandInput;
   onChange: (next: HandInput) => void;
@@ -61,8 +61,8 @@ export function TileKeyboard({
   uncertain?: readonly TileLoc[];
   /** 算点数页核对阶段不算番，不显示番符与役种 */
   showValue?: boolean;
-  /** 立直开关被锁定时的原因文案；不传 = 可自由勾选 */
-  riichiLocked?: string | undefined;
+  /** 立直开关被锁定 */
+  riichiLocked?: boolean;
 }) {
   const marked = (loc: TileLoc) => hasLoc(uncertain, loc);
   const [target, setTarget] = useState<Target>("closed");
@@ -302,7 +302,7 @@ export function TileKeyboard({
       <div className="grid grid-cols-2 gap-1.5">
         <CheckRow
           checked={hand.riichi}
-          disabled={riichiLocked !== undefined}
+          disabled={riichiLocked}
           onCheckedChange={(v) => onChange(withRiichi(hand, v))}
         >
           立直
@@ -333,8 +333,6 @@ export function TileKeyboard({
           {firstTakeLabel(hand.tsumo, isDealer)}
         </CheckRow>
       </div>
-
-      {riichiLocked !== undefined && <p className="text-xs text-muted">{riichiLocked}</p>}
 
       {showValue && (
         <ValueResult

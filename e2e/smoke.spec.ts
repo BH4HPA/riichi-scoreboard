@@ -399,6 +399,34 @@ test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手�
   await tvCtx.close();
 });
 
+test("两台手机同时开着流局确认：一台确认后另一台自动关闭，不会多记一局", async ({ browser }) => {
+  const tvCtx = await newContext(browser, { viewport: { width: 1600, height: 900 } });
+  const tv = await tvCtx.newPage();
+  await tv.goto("/console");
+  const code = (await tv.getByTestId("room-code").textContent())?.trim() ?? "";
+  const phones: Page[] = [];
+  for (let i = 0; i < 4; i++) {
+    const p = await phone(browser, code);
+    await p.getByTestId(`seat-${i}`).click();
+    await p.getByRole("button", { name: "准备", exact: true }).click();
+    phones.push(p);
+  }
+  await expect(tv.getByTestId("points-0")).toHaveText("25,000");
+  const [a, b] = [phones[0]!, phones[1]!];
+  await a.getByRole("button", { name: "流局", exact: true }).click();
+  await b.getByRole("button", { name: "流局", exact: true }).click();
+  await a.getByRole("dialog").getByRole("button", { name: "确认流局" }).click();
+  // 全员未听：庄家下庄，东2局1本场
+  await expect(tv.getByText("东2局1本场")).toBeVisible();
+  // 乙的弹窗文案看起来仍然成立——不关掉的话再点一次就是东3局2本场
+  await expect(b.getByRole("dialog")).toHaveCount(0);
+  await expect(b.getByText("局面已变化，结算已关闭")).toBeVisible();
+  // 自己提交的那一笔不算「局面变了」
+  await expect(a.getByText("局面已变化，结算已关闭")).toHaveCount(0);
+  await expect(tv.getByText("东2局1本场")).toBeVisible();
+  await tvCtx.close();
+});
+
 test("离线的设备玩家座位可被他人回收；手机可退出房间回首页", async ({ browser }) => {
   const tvCtx = await newContext(browser, { viewport: { width: 1600, height: 900 } });
   const tv = await tvCtx.newPage();

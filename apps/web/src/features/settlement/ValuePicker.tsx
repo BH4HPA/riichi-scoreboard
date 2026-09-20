@@ -37,19 +37,20 @@ export function ValuePicker({
   /** 函数式更新：评估结果异步回来时只改仍然匹配的草稿 */
   onChange: (update: (d: ValueDraft) => ValueDraft) => void;
   /**
-   * 手牌的立直由外部事实决定时（二人房：本局宣言的是立直还是听牌）：开关禁用并写明原因，
-   * 每次改动后收口到 `on`——拍照识别认出里宝会替人勾立直，听牌宣言的局要改回来（里宝随 `withRiichi` 一并清掉）。
+   * 手牌的立直由外部事实决定时（二人房：本局宣言的是立直还是听牌）给出那个值：开关禁用，
+   * 每次改动后收口到它——拍照识别认出里宝会替人勾立直，听牌宣言的局要改回来（里宝随 `withRiichi` 一并清掉）。
    */
-  riichiLock?: { on: boolean; note: string };
+  riichiLock?: boolean | undefined;
   rules: RoomRules;
   /** 和牌者；还没选时为 null，牌面照常录入但不送评估 */
   seat: Seat | null;
   dealer: Seat;
 }) {
   const socket = useSocket();
-  const change: typeof onChange = riichiLock
-    ? (update) => onChange((d) => draftWithRiichi(update(d), riichiLock.on))
-    : onChange;
+  const change: typeof onChange =
+    riichiLock === undefined
+      ? onChange
+      : (update) => onChange((d) => draftWithRiichi(update(d), riichiLock));
   const [evaluating, setEvaluating] = useState(false);
   const [evalError, setEvalError] = useState<string | null>(null);
   const tier =
@@ -157,7 +158,7 @@ export function ValuePicker({
           draft={draft}
           onChange={change}
           rules={rules}
-          riichiLocked={riichiLock?.note}
+          riichiLocked={riichiLock !== undefined}
           evaluated={draft.evaluated}
           evaluating={evaluating}
           evalError={seat === null && complete ? "先选和牌者" : evalError}

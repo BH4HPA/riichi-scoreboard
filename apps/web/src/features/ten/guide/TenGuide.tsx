@@ -33,7 +33,16 @@ export function TenGuide({
   useEffect(() => {
     const el = container.current;
     if (tv || !el) return;
+    const root = scrollParent(el);
+    const last = TEN_GUIDE_PAGES[TEN_GUIDE_PAGES.length - 1]!.key;
     const visible = new Set<string>();
+    // 滚到底了就是最后一节：它排在末尾、往往不够长，永远够不着上面那条判定带，不补这一条它就投不上电视
+    const atBottom = () =>
+      root !== null && root.scrollTop + root.clientHeight >= root.scrollHeight - 8;
+    const update = () => {
+      const current = atBottom() ? last : TEN_GUIDE_PAGES.find((p) => visible.has(p.key))?.key;
+      if (current) report.current?.(current);
+    };
     const observer = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
@@ -42,15 +51,18 @@ export function TenGuide({
           else visible.delete(key);
         }
         // 视线落在内容区上部的那一节；两节同时压线时取靠前的
-        const current = TEN_GUIDE_PAGES.find((p) => visible.has(p.key));
-        if (current) report.current?.(current.key);
+        update();
       },
-      { root: scrollParent(el), rootMargin: "-15% 0px -55% 0px" },
+      { root, rootMargin: "-15% 0px -55% 0px" },
     );
     for (const section of el.querySelectorAll<HTMLElement>("[data-page]")) {
       observer.observe(section);
     }
-    return () => observer.disconnect();
+    root?.addEventListener("scroll", update, { passive: true });
+    return () => {
+      observer.disconnect();
+      root?.removeEventListener("scroll", update);
+    };
   }, [tv]);
 
   if (tv) {

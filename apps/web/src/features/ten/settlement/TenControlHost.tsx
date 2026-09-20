@@ -5,13 +5,11 @@ import {
   type TenDrawReason,
   type TenGameState,
 } from "@riichi/core";
-import { useEffect, useRef } from "react";
 import { ConfirmDialog } from "@/ui/confirm-dialog";
-import { useRoomStore } from "@/ws/store";
 import { useCommand } from "@/ws/useRoom";
 import { DissolveDialog } from "@/features/console/DissolveButton";
 import { useMirror } from "@/features/mirror/useMirror";
-import { tenDraftStamp } from "@/features/settlement/drafts/stamp";
+import { useCloseOnStale } from "@/features/settlement/drafts/useCloseOnStale";
 import { TenTsumoDialog } from "./TenTsumoDialog";
 import type { TenDialog } from "./useTenDialogs";
 
@@ -29,14 +27,12 @@ function drawDescription(reason: TenDrawReason, game: TenGameState, names: strin
 
 /**
  * 流局确认：打开期间把「正在记哪种流局」镜像到电视。
- * 它写入一局的结果，所以和自摸和表单一样盯着局面戳：两台手机同时开着「无人宣言流局」，一台确认后另一台的
- * 弹窗文案看起来仍然成立，再点一次就多记一局——戳变了就关掉并提示。
+ * 它写入一局的结果，所以盯着局面戳（见 `useCloseOnStale`）。
  */
 function TenDrawConfirm({
   reason,
   open,
   onOpenChange,
-  gameNo,
   game,
   names,
   mirror,
@@ -44,31 +40,12 @@ function TenDrawConfirm({
   reason: TenDrawReason;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  gameNo: number;
   game: TenGameState;
   names: string[];
   mirror: boolean;
 }) {
   const send = useCommand();
-  const notify = useRoomStore((s) => s.notify);
-  const stamp = tenDraftStamp(gameNo, game);
-  const opened = useRef<string | null>(null);
-  const submitting = useRef(false);
-  const close = useRef(onOpenChange);
-  useEffect(() => {
-    close.current = onOpenChange;
-  });
-  useEffect(() => {
-    if (!open) {
-      opened.current = null;
-      return;
-    }
-    if (opened.current === null) opened.current = stamp;
-    // 自己提交期间到达的变化正是自己这一笔，不算
-    if (opened.current === stamp || submitting.current) return;
-    notify("info", "局面已变化，结算已关闭");
-    close.current(false);
-  }, [open, stamp, notify]);
+  const submit = useCloseOnStale(() => onOpenChange(false), open);
   const description = drawDescription(reason, game, names);
   useMirror(
     open,
@@ -88,12 +65,7 @@ function TenDrawConfirm({
       title={`记为「${TEN_DRAW_LABELS[reason]}」？`}
       description={description}
       confirmText="确认流局"
-      onConfirm={async () => {
-        submitting.current = true;
-        return send({ type: "tenDraw", reason }).finally(() => {
-          submitting.current = false;
-        });
-      }}
+      onConfirm={() => submit(() => send({ type: "tenDraw", reason }))}
     />
   );
 }
@@ -102,7 +74,6 @@ function TenDrawConfirm({
 export function TenControlHost({
   dialog,
   onClose,
-  gameNo,
   game,
   names,
   rules,
@@ -111,7 +82,6 @@ export function TenControlHost({
 }: {
   dialog: TenDialog | null;
   onClose: () => void;
-  gameNo: number;
   game: TenGameState;
   names: string[];
   rules: RoomRules;
@@ -141,7 +111,6 @@ export function TenControlHost({
           key={reason}
           reason={reason}
           {...openOf(reason)}
-          gameNo={gameNo}
           game={game}
           names={names}
           mirror={mirror}

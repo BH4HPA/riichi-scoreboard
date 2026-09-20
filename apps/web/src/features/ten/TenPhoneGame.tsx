@@ -84,7 +84,6 @@ export function TenPhoneGame({ room }: { room: TenRoomView }) {
       <TenControlHost
         dialog={controls.dialog}
         onClose={controls.close}
-        gameNo={room.gameNo}
         game={present}
         names={names}
         rules={room.rules}

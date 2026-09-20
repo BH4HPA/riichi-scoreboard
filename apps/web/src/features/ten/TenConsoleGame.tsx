@@ -15,7 +15,7 @@ import { GuessBoard } from "./stageB/GuessBoard";
 
 /**
  * 二人房的主控台对局页。Stage B 时宽屏右栏从历史换成全牌型板（结算后自动换回）；
- * 窄屏没有右栏，全牌型板放在得分卡下面。主控台能否替防守方指定见 `canPickFor`。
+ * 窄屏没有右栏，全牌型板放在最前面（首屏可见）。主控台能否替防守方指定见 `canPickFor`。
  */
 export function TenConsoleGame({
   room,
@@ -66,6 +66,12 @@ export function TenConsoleGame({
           />
         )}
       >
+        {/* 窄屏（Pad）没有右栏：Stage B 时全牌型板是这一刻最要紧的东西，放在最前、首屏可见 */}
+        {stageB && !wide && (
+          <div className="rounded-xl border border-border bg-surface p-3">
+            <GuessBoard stage={stageB} entries={present.history.length} pickable={pickable} tv />
+          </div>
+        )}
         {finished && (
           <div className="rounded-xl border border-pos/40 bg-surface p-4">
             <h2 className="mb-2 text-lg font-semibold">终局</h2>
@@ -75,16 +81,10 @@ export function TenConsoleGame({
         <TenScoreGrid game={present} seats={room.seats} names={names} size={wide ? "tv" : "pad"} />
         <TenMirrorOverlay intents={intents} names={names} rules={room.rules} />
         {!finished && <TenStageHint stage={present.stage} tv={wide} />}
-        {stageB && !wide && (
-          <div className="rounded-xl border border-border bg-surface p-3">
-            <GuessBoard stage={stageB} entries={present.history.length} pickable={pickable} tv />
-          </div>
-        )}
       </ConsoleGameShell>
       <TenControlHost
         dialog={controls.dialog}
         onClose={controls.close}
-        gameNo={room.gameNo}
         game={present}
         names={names}
         rules={room.rules}

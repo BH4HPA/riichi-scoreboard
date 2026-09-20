@@ -52,6 +52,14 @@ test("二人房：首页选房型 → 投屏规则说明 → 宣言 → 全牌�
     .evaluate((el) => el.scrollIntoView({ block: "start" }));
   await expect(tv.getByTestId("ten-guide-mirror")).toContainText("防守方每轮猜 2 张");
   await expect(tv.getByTestId("ten-guide-mirror")).not.toContainText("比的是谁的听牌更难猜");
+  // 最后一节排在末尾、够不着判定带：滚到底就算读到它
+  await guide.getByTestId("ten-guide").evaluate((el) => {
+    let node = el.parentElement;
+    while (node && !/(auto|scroll)/.test(getComputedStyle(node).overflowY))
+      node = node.parentElement;
+    node?.scrollTo(0, node.scrollHeight);
+  });
+  await expect(tv.getByTestId("ten-guide-mirror")).toContainText("宣言和记结果在手机上点");
   await east.keyboard.press("Escape");
   await expect(tv.getByTestId("ten-guide-mirror")).toHaveCount(0);
   // 手机大厅的规则弹窗里不再有投屏开关（电视大厅本就常驻规则表，那个开关没有效果）
@@ -98,8 +106,9 @@ test("二人房：首页选房型 → 投屏规则说明 → 宣言 → 全牌�
     "false",
   );
   await redo.getByRole("tab", { name: "牌面" }).click();
+  // 立直由本局的宣言决定：听牌宣言的局不勾、也勾不上
   await expect(redo.getByRole("checkbox", { name: "立直", exact: true })).not.toBeChecked();
-  await expect(redo.getByText("本局是听牌宣言：不算立直，也没有一发和里宝。")).toBeVisible();
+  await expect(redo.getByRole("checkbox", { name: "立直", exact: true })).toBeDisabled();
   await redo.getByRole("tab", { name: "番符" }).click();
   await redo.getByRole("button", { name: "取消" }).click();
   await east.getByRole("button", { name: "撤销" }).click();
@@ -155,7 +164,6 @@ test("二人房：首页选房型 → 投屏规则说明 → 宣言 → 全牌�
   await dialog.getByRole("tab", { name: "牌面" }).click();
   await expect(dialog.getByRole("checkbox", { name: "立直", exact: true })).toBeChecked();
   await expect(dialog.getByRole("checkbox", { name: "立直", exact: true })).toBeDisabled();
-  await expect(dialog.getByText("本局是立直宣言：立直已勾上，不能取消。")).toBeVisible();
   await dialog.getByRole("tab", { name: "番符" }).click();
   await dialog.getByRole("button", { name: "3", exact: true }).click();
   await dialog.getByRole("button", { name: "30", exact: true }).click();

@@ -4,6 +4,7 @@ import { Button } from "@/ui/button";
 import { Label } from "@/ui/controls";
 import { DialogFooter } from "@/ui/dialog";
 import { useCommand } from "@/ws/useRoom";
+import { useCloseOnStale } from "../drafts/useCloseOnStale";
 import { useMirror } from "@/features/mirror/useMirror";
 import { drawKyotakuText, NO_FLAGS, seatsOf } from "../format";
 import { previewDraw } from "../preview";
@@ -28,6 +29,7 @@ export function DrawDialog({ open, onOpenChange, game, names, ...rest }: Settlem
 
 function DrawForm({ game, names, rules, mirror, mySeat, onDone }: SettlementFormProps) {
   const send = useCommand();
+  const submit = useCloseOnStale(onDone);
   const [tenpai, setTenpai] = useState(NO_FLAGS);
   const [riichi, setRiichi] = useSeededRiichi(game.riichi);
   const [nagashi, setNagashi] = useState(NO_FLAGS);
@@ -54,12 +56,14 @@ function DrawForm({ game, names, rules, mirror, mySeat, onDone }: SettlementForm
 
   const confirm = async () => {
     setBusy(true);
-    const ok = await send({
-      type: "draw",
-      tenpai,
-      riichi: seatsOf(riichi),
-      nagashi: seatsOf(nagashi),
-    });
+    const ok = await submit(() =>
+      send({
+        type: "draw",
+        tenpai,
+        riichi: seatsOf(riichi),
+        nagashi: seatsOf(nagashi),
+      }),
+    );
     setBusy(false);
     if (ok) onDone();
   };

@@ -170,12 +170,7 @@ function TenTsumoForm({
           rules={rules}
           seat={winner}
           dealer={game.dealer}
-          riichiLock={{
-            on: stage.riichi,
-            note: stage.riichi
-              ? "本局是立直宣言：立直已勾上，不能取消。"
-              : "本局是听牌宣言：不算立直，也没有一发和里宝。",
-          }}
+          riichiLock={stage.riichi}
         />
         {draft.mode === "manual" && stage.riichi && (
           <p className="text-xs text-muted">手填番数时记得把立直的一番（和一发、里宝）算进去。</p>
