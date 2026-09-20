@@ -15,7 +15,7 @@ import type { FrameResult } from "../worker/protocol";
 import { loadPhoto } from "../photoFile";
 import { fitLongEdge, STILL_MAX_EDGE, type Viewport } from "./viewport";
 import { DetectionOverlay } from "./DetectionOverlay";
-import { EMPTY_CAPTURE, feedFrame, STABLE_FRAMES } from "./autoCapture";
+import { EMPTY_CAPTURE, feedFrame, reasonOf, STABLE_FRAMES, votesOf } from "./autoCapture";
 import { LayoutGuide } from "./LayoutGuide";
 import { RoiOverlay } from "./RoiOverlay";
 import { useCameraStream } from "./useCameraStream";
@@ -54,7 +54,7 @@ export function CameraSheet({
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState<FrameResult | null>(null);
-  const [stable, setStable] = useState(0);
+  const [gate, setGate] = useState(EMPTY_CAPTURE);
   const [paused, setPaused] = useState(false);
   const [openedAt] = useState(() => Date.now());
 
@@ -151,13 +151,10 @@ export function CameraSheet({
   const onFrame = useCallback(
     (r: FrameResult) => {
       setLive(r);
-      // 还没收紧到手牌周围的那一遍只认得准位置、认不准花色：不计入稳定判断
-      const out = r.settled
-        ? feedFrame(captureRef.current, r)
-        : { state: EMPTY_CAPTURE, fire: false };
+      const out = feedFrame(captureRef.current, r);
       captureRef.current = out.state;
-      setStable(out.state.count);
-      if (out.state.count > 0) lastGoodRef.current = Date.now();
+      setGate(out.state);
+      if (votesOf(out.state) > 0) lastGoodRef.current = Date.now();
       if (out.fire) {
         navigator.vibrate?.(30);
         setFlash(true);
@@ -240,10 +237,12 @@ export function CameraSheet({
   const camBroken = camError !== null;
   const canShoot = detector !== null && ready && painted && live !== null && !camBroken;
   const downloading = !detector && !error && progress < 1;
-  /** 右上角的小字进度：认出几张（副露按 3 张折算）· 连续几帧一致 */
+  /** 右上角的小字进度：认出几张（副露按 3 张折算，多认了照实显示）· 最近几帧里有几帧一致 */
+  const total = live ? live.hand.closed.length + live.hand.melds.length * 3 : 0;
   const progressText = live
-    ? `${Math.min(14, live.hand.closed.length + live.hand.melds.length * 3)}/14 · ${stable}/${STABLE_FRAMES}`
+    ? `${total}/14 · ${Math.min(STABLE_FRAMES, votesOf(gate))}/${STABLE_FRAMES}`
     : null;
+  const reason = reasonOf(gate);
 
   // portal 到 body：DialogContent 在 ≥640px 上有 translate，transform 祖先会让 fixed 以它为
   // 包含块，取景框就被压进对话框里不再全屏；顺带让背后的内容退出无障碍树。
@@ -313,11 +312,19 @@ export function CameraSheet({
         </button>
         {progressText && !paused && (
           <span
-            className="pointer-events-none absolute right-3 top-4 text-xs tabular text-white/80 drop-shadow"
+            className={`pointer-events-none absolute right-3 top-4 text-xs tabular drop-shadow ${total > 14 ? "text-neg" : "text-white/80"}`}
             data-testid="camera-progress"
           >
             {progressText}
           </span>
+        )}
+        {reason && !paused && (
+          <p
+            className="pointer-events-none absolute inset-x-12 top-12 rounded-lg bg-black/60 px-3 py-1.5 text-center text-xs text-white"
+            data-testid="camera-reason"
+          >
+            {reason}
+          </p>
         )}
         {flash && (
           <span

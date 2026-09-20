@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { RecognitionWarning, RecognizedHand } from "@riichi/core";
-import { EMPTY_CAPTURE, feedFrame, handKey, STABLE_FRAMES, type CaptureState } from "./autoCapture";
+import {
+  EMPTY_CAPTURE,
+  feedFrame,
+  handKey,
+  reasonOf,
+  REASON_FRAMES,
+  votesOf,
+  type CaptureState,
+} from "./autoCapture";
 
 const hand = (over: Partial<RecognizedHand> = {}): RecognizedHand => ({
   closed: [1, 2, 3, 13, 14, 15, 25, 26, 27, 7, 8, 11, 11, 9],
@@ -11,16 +19,25 @@ const hand = (over: Partial<RecognizedHand> = {}): RecognizedHand => ({
   ...over,
 });
 
-const frame = (h: RecognizedHand, warnings: RecognitionWarning[] = []) => ({ hand: h, warnings });
+type Frame = Parameters<typeof feedFrame>[1];
+const frame = (h: RecognizedHand, warnings: RecognitionWarning[] = [], settled = true): Frame => ({
+  hand: h,
+  warnings,
+  settled,
+});
+const A = frame(hand());
+const B = frame(hand({ winTile: 1 }));
+const BAD = frame(hand(), [{ code: "count", message: "合计 17 张", severity: "blocking" }]);
+const COARSE = frame(hand(), [], false);
 
-/** 连喂 n 帧同一副牌，返回每帧的 fire */
-function run(frames: Array<ReturnType<typeof frame>>): boolean[] {
+function run(frames: Frame[]): { fires: boolean[]; state: CaptureState } {
   let state: CaptureState = EMPTY_CAPTURE;
-  return frames.map((f) => {
+  const fires = frames.map((f) => {
     const out = feedFrame(state, f);
     state = out.state;
     return out.fire;
   });
+  return { fires, state };
 }
 
 describe("handKey", () => {
@@ -52,35 +69,48 @@ describe("handKey", () => {
 });
 
 describe("feedFrame", () => {
-  it("连续三帧一致才触发", () => {
-    expect(run(Array.from({ length: 4 }, () => frame(hand())))).toEqual([false, false, true, true]);
-    expect(STABLE_FRAMES).toBe(3);
+  it("一路一致：第三帧定格", () => {
+    expect(run([A, A, A, A]).fires).toEqual([false, false, true, true]);
   });
 
-  it("中间抖一帧就重来，且重置为 1 不是 0（当前这帧算新的第一帧）", () => {
-    const fires = run([frame(hand()), frame(hand({ winTile: 1 })), frame(hand()), frame(hand())]);
-    expect(fires).toEqual([false, false, false, false]);
-    // 抖动那帧之后重新数：第 3、4 帧是 1、2，要到第 5 帧才够 3
-    const state = [frame(hand()), frame(hand({ winTile: 1 }))].reduce(
-      (s: CaptureState, f) => feedFrame(s, f).state,
-      EMPTY_CAPTURE,
-    );
-    expect(state.count).toBe(1);
+  it("中间抖一帧不清零：最近 5 帧里凑够 3 帧、且最新两帧一致就定格", () => {
+    expect(run([A, B, A, A]).fires).toEqual([false, false, false, true]);
+    expect(run([A, BAD, A, A]).fires).toEqual([false, false, false, true]);
   });
 
-  it("有 blocking 提示时一律不触发，并把计数清空", () => {
-    const bad = frame(hand(), [{ code: "count", message: "x", severity: "blocking" }]);
-    let state: CaptureState = EMPTY_CAPTURE;
-    state = feedFrame(state, frame(hand())).state;
-    state = feedFrame(state, frame(hand())).state;
-    expect(state.count).toBe(2);
-    const out = feedFrame(state, bad);
-    expect(out.fire).toBe(false);
-    expect(out.state).toEqual(EMPTY_CAPTURE);
+  it("A B A B A：A 攒够了 3 票，但牌面一半时间在跳，不定格", () => {
+    const { fires, state } = run([A, B, A, B, A]);
+    expect(fires).toEqual([false, false, false, false, false]);
+    expect(votesOf(state)).toBe(3);
+  });
+
+  it("太久以前的票滑出窗口", () => {
+    expect(run([A, A, B, B, BAD, A]).fires.at(-1)).toBe(false);
+  });
+
+  it("有 blocking、或还没收紧到手牌周围的那一遍：这一帧不计票，也不触发", () => {
+    expect(run([A, A, BAD]).fires).toEqual([false, false, false]);
+    expect(run([A, A, COARSE]).fires).toEqual([false, false, false]);
+    expect(votesOf(run([A, A, COARSE]).state)).toBe(0);
   });
 
   it("info 提示不挡定格（结果已经自洽，模型只是在汇报内务）", () => {
     const info = frame(hand(), [{ code: "odd_box", message: "x", severity: "info" }]);
-    expect(run([info, info, info])).toEqual([false, false, true]);
+    expect(run([info, info, info]).fires).toEqual([false, false, true]);
+  });
+});
+
+describe("reasonOf", () => {
+  it("同一条 blocking 连着挡了几帧才告诉用户；一帧好的就收回", () => {
+    const few = run(Array.from({ length: REASON_FRAMES - 1 }, () => BAD)).state;
+    expect(reasonOf(few)).toBeNull();
+    const stuck = run(Array.from({ length: REASON_FRAMES }, () => BAD)).state;
+    expect(reasonOf(stuck)).toBe("合计 17 张");
+    expect(reasonOf(feedFrame(stuck, A).state)).toBeNull();
+  });
+
+  it("粗检那一遍夹在中间不打断计数：它的提示不作数", () => {
+    const state = run([BAD, BAD, COARSE, BAD]).state;
+    expect(reasonOf(state)).toBe("合计 17 张");
   });
 });
