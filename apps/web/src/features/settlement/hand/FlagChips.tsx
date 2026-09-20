@@ -20,12 +20,15 @@ export function FlagChips({
   rules,
   riichiAuto,
   isDealer,
+  riichiLocked,
   onChange,
 }: {
   hand: HandInput;
   rules: RoomRules;
   riichiAuto: boolean;
   isDealer: boolean;
+  /** 立直开关被锁定时的原因文案；不传 = 可自由勾选 */
+  riichiLocked?: string | undefined;
   onChange: (next: HandInput) => void;
 }) {
   const flags: Flag[] = [
@@ -50,7 +53,9 @@ export function FlagChips({
           <Chip
             key={String(f.key)}
             pressed={Boolean(hand[f.key])}
-            disabled={f.needsRiichi && !hand.riichi}
+            disabled={
+              (f.needsRiichi && !hand.riichi) || (f.key === "riichi" && riichiLocked !== undefined)
+            }
             onClick={() => toggle(f)}
             className={cn("relative", auto && "pr-3.5")}
           >
@@ -64,6 +69,9 @@ export function FlagChips({
           </Chip>
         );
       })}
+      {riichiLocked !== undefined && (
+        <p className="basis-full text-xs text-muted">{riichiLocked}</p>
+      )}
     </div>
   );
 }

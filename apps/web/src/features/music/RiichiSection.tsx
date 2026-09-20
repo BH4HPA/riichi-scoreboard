@@ -1,14 +1,6 @@
-import { useMemo, useState } from "react";
-import { Play } from "lucide-react";
-import { canRiichi, seatNames, type GameState, type RoomRules, type Seat } from "@riichi/core";
-import { Button } from "@/ui/button";
-import { useRoomStore } from "@/ws/store";
-import { useCommand, useSocket } from "@/ws/useRoom";
-import { useMusicCatalog } from "./catalog";
-import { musicLabel } from "./label";
-import { defaultTrack, orderTracks, withLast, withPick } from "./prefs";
-import { TrackPicker } from "./TrackPicker";
-import { useMusicPrefs } from "./useMusicPrefs";
+import { canRiichi, type GameState, type RoomRules, type Seat } from "@riichi/core";
+import { useCommand } from "@/ws/useRoom";
+import { RiichiMusicRow } from "./RiichiMusicRow";
 
 /**
  * 操作栏「对局中」一节：选曲 + 「▶ 立直」。在座的手机按下 = 声明本局立直（结算表单据此预勾）+ 电视放曲；
@@ -25,59 +17,30 @@ export function RiichiSection({
   mySeat: Seat | null;
   size: "sm" | "md" | "lg";
 }) {
-  const socket = useSocket();
   const send = useCommand();
-  const notify = useRoomStore((s) => s.notify);
-  const room = useRoomStore((s) => s.room);
-  const [prefs, update] = useMusicPrefs();
-  const tracks = useMusicCatalog();
-  const ordered = useMemo(() => orderTracks(tracks, prefs), [tracks, prefs]);
-  const [picked, setPicked] = useState<string | null>(null);
-  // 清单是异步到的：没手动选过就跟着清单取默认曲
-  const value = picked ?? defaultTrack(ordered, prefs);
-
-  const select = (id: string) => {
-    setPicked(id);
-    update((p) => withLast(p, id));
-  };
   const blocked =
     game.status === "finished" || (mySeat !== null && !canRiichi(game, rules, mySeat));
-  // 记分优先：在座的声明立直不依赖选曲；没选到曲目只是不放音乐
-  const riichi = () => {
-    if (mySeat !== null && !game.riichi[mySeat]) {
-      void send({
-        type: "declareRiichi",
-        seat: mySeat,
-        kyoku: game.kyoku,
-        honba: game.honba,
-        entries: game.history.length,
-      });
-    }
-    if (!value) return;
-    if (!socket.music(value)) return notify("error", "连接已断开");
-    update((p) => withPick(p, value));
+  // 记分优先：在座的声明立直不依赖选曲
+  const declare = () => {
+    if (mySeat === null || game.riichi[mySeat]) return;
+    void send({
+      type: "declareRiichi",
+      seat: mySeat,
+      kyoku: game.kyoku,
+      honba: game.honba,
+      entries: game.history.length,
+    });
   };
-  const music = room?.music ?? null;
 
   return (
     <section>
       <h3 className="mb-1.5 text-xs font-medium text-muted">对局中</h3>
-      <div className="flex items-center gap-1.5">
-        {ordered.length > 0 && (
-          <TrackPicker tracks={ordered} value={value} onChange={select} size={size} />
-        )}
-        <Button
-          size={size}
-          variant="accent"
-          disabled={blocked || (mySeat === null && !value)}
-          onClick={riichi}
-        >
-          <Play className="h-4 w-4" fill="currentColor" /> 立直
-        </Button>
-      </div>
-      {music && room && (
-        <p className="mt-1.5 text-xs text-muted">▶ {musicLabel(music, seatNames(room), tracks)}</p>
-      )}
+      <RiichiMusicRow
+        size={size}
+        blocked={blocked}
+        needsTrack={mySeat === null}
+        onPress={declare}
+      />
     </section>
   );
 }

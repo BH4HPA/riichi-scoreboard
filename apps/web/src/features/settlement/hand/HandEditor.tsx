@@ -21,6 +21,7 @@ export function HandEditor({
   camera,
   showValue = true,
   isDealer,
+  riichiLocked,
 }: {
   draft: ValueDraft;
   onChange: (update: (d: ValueDraft) => ValueDraft) => void;
@@ -33,6 +34,8 @@ export function HandEditor({
   showValue?: boolean;
   /** 和牌者是否庄家：决定第一巡自摸叫天和还是地和 */
   isDealer: boolean;
+  /** 立直开关被外部事实锁定时的原因文案（见 ValuePicker `riichiLock`）；不传 = 可自由勾选 */
+  riichiLocked?: string | undefined;
 }) {
   const [picking, setPicking] = useState<TileLoc | null>(null);
 
@@ -68,6 +71,7 @@ export function HandEditor({
           uncertain={draft.recognition?.uncertain ?? []}
           showValue={showValue}
           isDealer={isDealer}
+          riichiLocked={riichiLocked}
         />
       </>
     );
@@ -82,6 +86,7 @@ export function HandEditor({
         uncertain={draft.recognition?.uncertain ?? []}
         riichiAuto={draft.riichiAuto}
         isDealer={isDealer}
+        riichiLocked={riichiLocked}
         evaluated={evaluated}
         evaluating={evaluating}
         evalError={evalError}
