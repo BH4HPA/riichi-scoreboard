@@ -1,6 +1,6 @@
 import { RECOGNITION_CLASSES, tileOfClassId, type Detection } from "@riichi/core";
 import { TileFace } from "@/features/hand/TileFace";
-import { boxStyle, type Rect } from "./band";
+import { boxStyle, type Rect } from "./viewport";
 
 /**
  * 算点数页的检测框叠加。**标签画牌图不画文字**：38 类的 `1m`/`0p` 小字在手机上糊成一团，

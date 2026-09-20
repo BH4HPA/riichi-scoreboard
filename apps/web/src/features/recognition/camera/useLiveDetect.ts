@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { Detector } from "../worker/client";
 import type { FrameResult } from "../worker/protocol";
-import { bandRect, type Rect, type Viewport } from "./band";
+import { bandRect, type Rect, type Viewport } from "./viewport";
 
 interface Options {
   detector: Detector | null;

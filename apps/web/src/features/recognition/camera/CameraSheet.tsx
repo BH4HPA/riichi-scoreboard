@@ -12,7 +12,7 @@ import { HandView } from "@/features/hand/HandView";
 import { RECOGNITION_MODEL } from "../modelUrl";
 import { closeDetector, openDetector, type Detector } from "../worker/client";
 import type { FrameResult } from "../worker/protocol";
-import { BAND_DEFAULT, fitLongEdge, STILL_MAX_EDGE, type Rect } from "./band";
+import { BAND_DEFAULT, fitLongEdge, STILL_MAX_EDGE, type Rect } from "./viewport";
 import { BandOverlay } from "./BandOverlay";
 import { DetectionOverlay } from "./DetectionOverlay";
 import { StillPicker } from "./StillPicker";

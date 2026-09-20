@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { BAND_MAX, BAND_MIN, clampBand, clampCenter, GUIDE_RATIO } from "./band";
+import { BAND_MAX, BAND_MIN, clampBand, clampCenter, GUIDE_RATIO } from "./viewport";
 
 /**
  * 取景带：带外压暗，牌河自然落进暗区 —— 「看着它变灰」，而不是盲裁一刀再祈祷。

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/ui/button";
 import { loadPhoto } from "../photoFile";
-import { BAND_DEFAULT, bandRect, clampCenter, type Rect } from "./band";
+import { BAND_DEFAULT, bandRect, clampCenter, type Rect } from "./viewport";
 import { BandOverlay } from "./BandOverlay";
 
 /**

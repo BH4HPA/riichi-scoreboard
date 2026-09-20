@@ -9,7 +9,7 @@ import {
   fitLongEdge,
   fitBox,
   type Viewport,
-} from "./band";
+} from "./viewport";
 
 /** 横向视频（1920×1080）放进竖屏手机（390×780）：object-cover 会把左右各裁掉一大块 */
 const portrait: Viewport = {
