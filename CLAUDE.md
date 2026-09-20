@@ -7,7 +7,8 @@ Guidance for Claude Code when working in this repository.
 Riichi Mahjong (日本麻将) scoreboard, v2: a TV "console" page shows a room QR code, phones join and
 remote-control the scoreboard, all clients stay in sync through a single Node server. The console can also
 seat "local players" (no phone needed) and dissolve a room at any time. UI is entirely in Chinese. Room
-rules (村规) are configurable per room; the built-in preset is M-League.
+rules (村规) are configurable per room; the built-in preset is M-League. Two room kinds: four-player riichi
+(`yonma`) and the two-player rules from Fukumoto's manga 《天》 (`ten`, see Domain Concepts).
 
 ## Commands
 
@@ -18,7 +19,8 @@ Package manager is **Yarn 4** (via corepack). Node >= 22.13 (node:sqlite); use 2
 - `yarn test` — Vitest across `packages/core`, `apps/server`, `apps/web` (pure-function tests only)
 - `yarn typecheck` / `yarn lint` / `yarn format:check`
 - `yarn e2e` — Playwright (builds web, starts server on :8799): `smoke.spec.ts` (TV + phones + local players +
-  dissolve), `landing.spec.ts` (device routing). `SHOTS_DIR=/tmp/x yarn e2e e2e/shots.spec.ts` dumps
+  dissolve), `landing.spec.ts` (device routing, room-kind picker), `ten.spec.ts` (two-player room end to end),
+  `recognize.spec.ts` (camera → detector → evaluate → PATCH, in both room kinds and `/calc`). `SHOTS_DIR=/tmp/x yarn e2e e2e/shots.spec.ts` dumps
   screenshots for visual review (skipped otherwise).
 - `docker compose up -d --build` — single container (server + built web), data volume at `/data`
 - CI/CD: `.github/workflows/cicd.yml` runs the gates above (plus e2e) on every push/PR; pushes to `main`
@@ -58,8 +60,12 @@ Yarn workspaces monorepo:
   - global; the ws server's `maxPayload` equals the 16 KB application message cap. Serves the built web app
     with SPA fallback.
 - `apps/web` — Vite + React 19 + Tailwind v4 + radix primitives. Routes: `/` landing (device routing:
-  desktop → `/console`, tablet chooses, phone gets QR scan + six-cell code input, plus 「返回房间」 when the room in `riichi.room.last` still
-  exists), `/console` (TV: two
+  desktop and tablet pick a room kind — `features/console/RoomKindPicker`, one button per kind that reads
+  「继续 … 房间码」 + 「新建」 while this device's last console room of that kind is still open
+  (`useSavedConsoleRooms`, one saved code per kind in `consoleRooms.ts`) and 「创建」 otherwise, so the label
+  never lies about resuming; tablet can also join as a player; phone gets QR scan + six-cell code input, plus 「返回房间」 when the room in `riichi.room.last` still
+  exists), `/console?kind=yonma|ten` (no param = yonma; the lobby has 「返回首页」 because the kind is picked on the
+  landing page; TV: two
   columns ≥ 1280px with a draggable split — `features/console/split`, default scores 0.6, clamped by
   per-column minimum widths, remembered in `riichi.console.split` — otherwise single column with history
   drawer + QR dialog), `/r/:code` (phone), `/calc` (拍照算点数, see Photo recognition).
@@ -98,6 +104,43 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   `generation` so late async writes cannot land in a newer draft): closing the dialog keeps it; the dialog
   closes itself with a notice when `draftStamp` (gameNo/kyoku/honba/status/history) changes under it, except
   while its own submit is in flight.
+- Room kinds (`RoomKind`, `rooms.kind`, migration v7, default `yonma`): the kind is the room's identity — it
+  fixes the seat count (`SEAT_COUNT`) and the game model — so it is a column, not a field of `RoomRules` (rules
+  can be overwritten wholesale in the lobby). `RoomState` / `RoomView` are unions discriminated by `kind`
+  (`YonmaRoomState` / `TenRoomState`, same for views); the room shell (seats, ready, phases, auto-start, local
+  players, undo stack, music, mirror transport, dissolve) is shared and only iterates `room.seats`. `reduceRoom`
+  dispatches game commands by kind; the two command sets reject each other with `not_here`. Web entry files
+  branch on `room.kind === "ten"` (a missing kind from a rolled-back server falls to yonma) and fill
+  `ConsoleGameShell` / `PhoneGameShell` with per-kind content (`features/ten/*` vs the yonma features).
+- 《天》 two-player rooms (`packages/core/src/ten/`, `apps/web/src/features/ten/`): non-zero-sum (each side
+  accumulates its own score, nothing is transferred), time-limited (60 min, `TEN_DURATION_MS`), each round has
+  Stage A (race to tenpai) and Stage B (the defender names 2 tiles per turn; on a miss the attacker draws 5).
+  Seats 0 = 东 (first dealer), 1 = 西; round wind is always 东. Commands: `tenDeclare {seat, riichi, entries}`
+  (A → B; riichi spends one of the 10 sticks, never refunded, 0 left ⇒ tenpai declaration only; stale-tolerant
+  with a history-length guard and idempotent — a repeat returns the same object so the registry persists
+  nothing; only the seat's owner or a local seat, like `setReady`), `tenGuess {tiles:[a,b]}` (B only, two
+  distinct base tiles; whether it hit is answered verbally, the app only records), `tenDraw {reason:
+noDeclare | guessed | exhausted}` (honba +1, dealer stays), `tenTsumo {value}` (B only; the winner is always
+  the attacker, so the server takes the seat from the snapshot, never from the client; gain =
+  `winPoints(…, tsumo).total` incl. honba; dealer win ⇒ honba +1, child win ⇒ dealer swaps, honba 0; a `hand`
+  value must be tsumo and its riichi flag must equal the declaration). Declarations and guesses are ordinary
+  undoable steps (no cancel command); `endGame` works in either stage, keeps `stage` in the snapshot (undo
+  resumes Stage B) and leaves the unfinished round out of history. Hands are evaluated through
+  `roomHandContext(room, seat)` — the only server entry for hand context: dealer = 东, child = 西
+  (`handContextAt` would make seat 1 南). A ten room still carries a full `RoomRules` but only reads `scoring`
+  and `hand` (`TEN_RULE_GROUPS` filters the editor); results are not written to `game_results` (personal stats
+  are four-player zero-sum). Hidden clock: `TenRoomView.timeMark` 0–3 (≤10 min / ≤5 min / time up) is derived
+  from `startedAt` at broadcast time — remaining time is never sent; `registry.reconcileClock` arms one timer
+  for the next mark (re-armed whenever the target changes: new game, end, undo of end; not in `get()`, not
+  while nobody is connected) and only re-broadcasts, it never ends the game. Web: `TenDeclareSection` (「▶ 立直」
+  also plays music via `RiichiMusicRow`, 「听牌宣言」), `GuessBoard` (all 34 tiles; earlier guesses dimmed +
+  struck, the latest pair marked, the current pick selected; replaces the history column on the wide console
+  during Stage B; pickable on the defender's phone, on the console only when the defender is a local player),
+  `TenTsumoDialog` (same `ValuePicker` / camera chain as yonma with `riichiLock` from the declaration;
+  recognitions keep `source: "room"`), `TenStageHint` (what to do in this stage, always on the TV),
+  `TenGuide` (rule explainer pages from core `ten/guide.ts`; castable from the phone lobby and the in-game 规则
+  sheet via the `tenGuide` intent — the console lobby mounts a mirror layer only for it), settlement mirror via
+  the `tenSettlement` intent.
 - Room phases: `lobby` → `playing` → `finished` (→ `lobby` via `toLobby`), plus `closed` after `dissolve`
   (any phase; `rooms.closed_at` short-circuits replay; WS close code 4010).
 - Players: `device` (has a token, joins from a phone) or `local` (no token, created and seated by the console
@@ -107,7 +150,7 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   a phone that lost its token reclaims its old seat. Keepalive constants live in core `WS_KEEPALIVE`: client
   pings every 5 s and reconnects after 8 s of silence; the server drops a connection idle for 20 s.
 - Auto-start: when the lobby is full, everyone is ready, every device player is online and at least one
-  device player is seated, the server starts a 3 s countdown (`RoomView.autoStartAt`) and commits `start` as
+  device player is seated, the server starts a 3 s countdown (`RoomView.autoStartIn`, remaining ms) and commits `start` as
   the system actor; any change that breaks the condition cancels it. Four locals never auto-start.
   A `setRules` that actually changes the rules (canonical `rulesKey`) is enriched with `resetReady` and
   clears device players' ready (locals keep it); the flag lives only in new events, so replay of old
