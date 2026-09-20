@@ -78,6 +78,7 @@ async function infer(
   frameId: number,
   bitmap: ImageBitmap,
   rotation: Rotation,
+  upright: boolean,
   still: boolean,
 ): Promise<void> {
   if (!ort || !session) return bitmap.close();
@@ -87,12 +88,12 @@ async function infer(
     track = LOST;
     trackRotation = rotation;
   }
-  // 相册那张与取景无关：不沿用锁定的范围、不假定画面是正的，也不改写取景的跟踪状态
+  // 相册那张与取景无关：不沿用锁定的范围，也不改写取景的跟踪状态
   const out = await runFrame(
     (crop) => detect(bitmap, crop, rotation),
     frame,
     still ? LOST : track,
-    !still,
+    upright,
   ).catch((err: unknown) => {
     bitmap.close();
     throw err;
@@ -180,7 +181,7 @@ self.onmessage = (e: MessageEvent<ToWorker>) => {
           }
           busy = true;
           try {
-            await infer(msg.frameId, msg.bitmap, msg.rotation, msg.still);
+            await infer(msg.frameId, msg.bitmap, msg.rotation, msg.upright, msg.still);
           } finally {
             busy = false;
           }

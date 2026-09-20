@@ -77,6 +77,8 @@ export interface LayoutResult {
 }
 
 const MAX_MELDS = 4;
+/** 「这个方向不设边」：调用方会把窗口夹进画面 */
+const FAR = 1e9;
 const MAX_INDICATORS = 5;
 
 /** 补出来的牌（暗杠只露中间两张、杠里一张认成牌背）没有对应的框 */
@@ -338,10 +340,17 @@ export function layoutHand(
   }
 
   const swap = !opts.upright && isPortrait(kept);
-  // 牌是刚性的，同一张照片里正放牌的框比例高度一致；明显更窄的框是误检（残缺、杂物），剔除
+  // 牌是刚性的，同一行里正放牌的框比例高度一致；明显更窄的框是误检（残缺、杂物），剔除。
+  // 按行比而不是全图比：侧着看的牌山、远处的牌河比例与手牌不同，混在一起算中位数会把手牌里正常的牌也判成异常
   const all = toItems(kept, swap, opts.sideAspect);
-  const ratioRef = median(all.filter((i) => !i.side).map((i) => i.w / i.h));
-  const items = all.filter((i) => i.side || i.w / i.h >= 0.85 * ratioRef);
+  const ratio = (i: Item) => i.w / i.h;
+  const globalRef = median(all.filter((i) => !i.side).map(ratio));
+  const roughH = median(all.filter((i) => !i.side).map((i) => i.h));
+  const items = clusterRows(all, opts.rowGap * roughH).flatMap((row) => {
+    const up = row.filter((i) => !i.side);
+    const ref = up.length >= 3 ? median(up.map(ratio)) : globalRef;
+    return row.filter((i) => i.side || ratio(i) >= 0.85 * ref);
+  });
   if (items.length < all.length) {
     warn("odd_box", "info", `${all.length - items.length} 个检测框形状异常，已忽略`);
     const keptItems = new Set(items);
@@ -643,20 +652,29 @@ export function layoutHand(
     doraOrigins = originsOf(indicatorRows[1]!);
   }
 
-  // 窗口：横向是已认出的牌（暗牌 + 副露，副露可以摆在别的行）两侧各留 side，纵向是指示牌与副露可能出现的范围
+  const total = closed.length + melds.length * 3;
+  // 窗口：横向是已认出的牌（暗牌 + 副露，副露可以摆在别的行）两侧各留 side，纵向是指示牌与副露可能出现的范围。
+  // **没凑满 14 张时放开**：整帧缩小后的那一遍常把手牌行漏检成几段、或漏掉一两组副露，窗口若只围着认出来的
+  // 那一段，下一遍就再也看不见其余的牌，会在「认不全 → 回整帧 → 还是这一段」里打转。横向放到整帧宽，
+  // 纵向按还缺的副露组数每组多留一跳。
   const windowOf = (): Box => {
-    const inRow = [closedGroup, ...meldGroups].flat();
-    const x1 = Math.min(...inRow.map((i) => i.cx - i.w / 2)) - HAND_WINDOW.side * scale.w;
-    const x2 = Math.max(...inRow.map((i) => i.cx + i.w / 2)) + HAND_WINDOW.side * scale.w;
+    const missing = Math.min(MAX_MELDS, Math.max(0, Math.ceil((14 - total) / 3)));
+    const seen = [closedGroup, ...meldGroups].flat();
+    const x1 = missing
+      ? -FAR
+      : Math.min(...seen.map((i) => i.cx - i.w / 2)) - HAND_WINDOW.side * scale.w;
+    const x2 = missing
+      ? FAR
+      : Math.max(...seen.map((i) => i.cx + i.w / 2)) + HAND_WINDOW.side * scale.w;
     const cys = [handRow.cy, ...meldGroups.map((g) => rowOf.get(g)!.cy)];
-    const reach = (HAND_WINDOW.hop + HAND_WINDOW.secondHop + 0.5) * scale.h;
+    const slack = missing * HAND_WINDOW.hop * scale.h;
+    const reach = (HAND_WINDOW.hop + HAND_WINDOW.secondHop + 0.5) * scale.h + slack;
     const y1 = Math.min(...cys) - reach;
     // 下方没有指示牌，只留一跳给还没认出来的副露；竖拍分不清上下，两侧对称
-    const y2 = Math.max(...cys) + (swap ? reach : (HAND_WINDOW.hop + 0.5) * scale.h);
+    const y2 = Math.max(...cys) + (swap ? reach : (HAND_WINDOW.hop + 0.5) * scale.h + slack);
     return swap ? [y1, x1, y2, x2] : [x1, y1, x2, y2];
   };
 
-  const total = closed.length + melds.length * 3;
   if (total !== 14) warn("count", "blocking", `暗牌与副露合计应为 14 张，实际 ${total} 张`);
 
   return {

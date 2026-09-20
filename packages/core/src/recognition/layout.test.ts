@@ -738,6 +738,34 @@ describe("layoutHand：照片里带着牌河", () => {
     expect(r.warnings.filter((w) => w.severity === "blocking")).toEqual([]);
   });
 
+  it("window：没凑满 14 张就放开——横向不设边，纵向按缺的副露组数多留几跳", () => {
+    // 整帧缩小后漏检了 3 张：认出来的只是 11 张的一段，外加缺一组副露
+    const seg = row([...CLOSED13.slice(0, 10), "9m~"], 300, 600);
+    const [x1, y1, x2, y2] = layoutHand(seg.dets).window!;
+    const cy = 600 + H / 2;
+    expect(x1).toBeLessThan(-1e6);
+    expect(x2).toBeGreaterThan(1e6);
+    expect(Math.abs(y1 - (cy - 10.5 * H))).toBeLessThan(6);
+    expect(Math.abs(y2 - (cy + 8.5 * H))).toBeLessThan(6);
+  });
+
+  it("形状异常按行判：牌山侧面的牌接近方形，不该让手牌里正常的牌变成异常", () => {
+    // 手牌 40×56（0.71）；牌山 30 张 54×56（0.96）——全图中位数会落在 0.96，手牌全被判窄
+    const hand = row([...CLOSED13, "9m~"], 10, 600);
+    const wall = Array.from({ length: 30 }, (_, i) => ({
+      ...det("back", 10 + (i % 15) * 58, 100 + Math.floor(i / 15) * 60),
+      box: [
+        10 + (i % 15) * 58,
+        100 + Math.floor(i / 15) * 60,
+        64 + (i % 15) * 58,
+        156 + Math.floor(i / 15) * 60,
+      ],
+    })) as Detection[];
+    const r = layoutHand([...hand.dets, ...wall], { upright: true });
+    expect(r.hand.closed).toHaveLength(14);
+    expect(r.warnings.map((w) => w.code)).not.toContain("odd_box");
+  });
+
   it("没有暗牌组时 window 为 null", () => {
     expect(layoutHand([]).window).toBeNull();
     expect(layoutHand(row(["5z", "5z~", "5z"], 10, 100).dets).window).toBeNull();

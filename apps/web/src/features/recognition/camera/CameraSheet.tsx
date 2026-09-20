@@ -240,7 +240,13 @@ export function CameraSheet({
     [detector],
   );
 
-  useLiveDetect({ detector, videoRef, rotation, active: active && ready, onFrame });
+  useLiveDetect({
+    detector,
+    videoRef,
+    view: { rotation, known: rotationSource !== "none" },
+    active: active && ready,
+    onFrame,
+  });
 
   /** 检测框（整帧像素）画回屏幕要用的摆放；取景区域或画面尺寸还没就绪时不画 */
   const view: Viewport | null =

@@ -14,9 +14,18 @@ export type ToWorker =
   /**
    * bitmap 是**整帧**，随消息转移；识别哪一块由 Worker 自己定（见 runFrame）。
    * rotation = 界面转了多少度（手机横持而页面没跟着转时，帧是躺着的，识别前先转正）。
-   * still = 相册里挑的一张：不沿用取景时锁定的范围，也不假定画面是正的。
+   * upright = 转正以后画面确实是正的（方向由陀螺仪或用户定过）。没人定过方向时为 false：
+   * 旋转锁开着横持的人以前靠布局的「多数框宽 > 高 ⇒ 竖拍」投票兜住，这条兜底要留着。
+   * still = 相册里挑的一张：不沿用取景时锁定的范围，方向同样未知。
    */
-  | { type: "infer"; frameId: number; bitmap: ImageBitmap; rotation: Rotation; still: boolean }
+  | {
+      type: "infer";
+      frameId: number;
+      bitmap: ImageBitmap;
+      rotation: Rotation;
+      upright: boolean;
+      still: boolean;
+    }
   /** 把 Worker 手上最近跑完的那一帧收紧、编码回来 */
   | { type: "grab"; quality: number };
 

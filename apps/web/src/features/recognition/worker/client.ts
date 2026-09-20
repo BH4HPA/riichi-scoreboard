@@ -7,8 +7,11 @@ import type { FrameResult, FromWorker, Grabbed, ToWorker } from "./protocol";
 const JPEG_QUALITY = 0.85;
 
 export interface Detector {
-  /** 送一帧（整帧）去推理；bitmap 的所有权转移给 Worker，调用方不要再碰它。"still" = 相册里挑的一张 */
-  infer(bitmap: ImageBitmap, rotation: Rotation | "still"): number;
+  /**
+   * 送一帧（整帧）去推理；bitmap 的所有权转移给 Worker，调用方不要再碰它。
+   * "still" = 相册里挑的一张；否则给界面的方向，以及这个方向是不是有人（陀螺仪 / 用户）定过。
+   */
+  infer(bitmap: ImageBitmap, view: "still" | { rotation: Rotation; known: boolean }): number;
   /** 取 Worker 手上最近跑完的那一帧：收紧到手牌的 JPEG，连同同一帧的检测框与识别结果 */
   grab(): Promise<Grabbed | null>;
   /** 一帧跑完；r 为 null 表示它被背压丢掉了，调用方据此复位自己的闸门 */
@@ -99,18 +102,19 @@ function spawn(modelId: string, imgsz: number, onProgress?: LoadProgress): Promi
     }
 
     return {
-      infer(bitmap, rotation) {
+      infer(bitmap, view) {
         const id = ++frameId;
         if (dead) {
           bitmap.close();
           return id;
         }
-        const still = rotation === "still";
+        const still = view === "still";
         const msg: ToWorker = {
           type: "infer",
           frameId: id,
           bitmap,
-          rotation: still ? 0 : rotation,
+          rotation: still ? 0 : view.rotation,
+          upright: !still && view.known,
           still,
         };
         worker.postMessage(msg, [bitmap]);
