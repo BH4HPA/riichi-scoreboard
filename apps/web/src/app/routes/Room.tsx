@@ -6,6 +6,7 @@ import { useRoomStore } from "@/ws/store";
 import { SocketContext, useRoomConnection } from "@/ws/useRoom";
 import { PhoneLobby } from "@/features/lobby/PhoneLobby";
 import { PhoneGame } from "@/features/room/PhoneGame";
+import { TenPhoneGame } from "@/features/ten/TenPhoneGame";
 import { RoomConnecting, RoomDissolved, RoomUnavailable } from "@/features/room/RoomGate";
 import { prefetchDetector } from "@/features/recognition/prefetch";
 import { clearLastRoom, writeLastRoom } from "@/features/join/lastRoom";
@@ -43,7 +44,9 @@ export function Room() {
     <SocketContext.Provider value={socket}>
       {room.phase === "lobby" || !room.game ? (
         <PhoneLobby room={room} mySeat={mySeat} />
-      ) : room.kind === "ten" ? null : (
+      ) : room.kind === "ten" ? (
+        <TenPhoneGame room={room} />
+      ) : (
         <PhoneGame room={room} />
       )}
       <Notice />

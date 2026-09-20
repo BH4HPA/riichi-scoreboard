@@ -4,6 +4,7 @@ import { YakuChips } from "@/features/hand/YakuChips";
 import { PreviewGrid } from "@/features/settlement/PreviewGrid";
 import { Badge } from "@/ui/controls";
 import { cn } from "@/lib/utils";
+import { MIRROR_HOLD_MS, MIRROR_STALE, MIRROR_STALE_TRANSITION } from "./held";
 import { useHeld } from "./useHeld";
 
 const MODE_LABELS = {
@@ -16,12 +17,6 @@ const MODE_LABELS = {
 
 type SettlementIntent = Extract<UiIntent, { kind: "settlement" }>;
 
-/** 手机改牌后引擎重算约 300 ms；留足余量，超过仍为空才算真的清掉 */
-const HOLD_MS = 1000;
-/** 按住的旧值：调暗加轻微高斯模糊，一眼看出是「上一份、正在重算」 */
-const STALE = "opacity-50 blur-[2px]";
-const STALE_TRANSITION = "transition-[opacity,filter] duration-200";
-
 /** 电视全屏模态：实时镜像手机端的结算录入（和牌者、牌面、番符役种、四家增减）。 */
 export function SettlementMirror({
   state,
@@ -33,8 +28,8 @@ export function SettlementMirror({
   names: string[];
 }) {
   const who = state.seat !== null ? names[state.seat] : state.name;
-  const deltas = useHeld(intent.deltas, HOLD_MS);
-  const summary = useHeld(intent.summary, HOLD_MS);
+  const deltas = useHeld(intent.deltas, MIRROR_HOLD_MS);
+  const summary = useHeld(intent.summary, MIRROR_HOLD_MS);
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-bg/90 p-8 backdrop-blur-sm">
       <div className="w-full max-w-5xl rounded-2xl border border-accent/40 bg-surface p-8 shadow-2xl">
@@ -63,13 +58,15 @@ export function SettlementMirror({
               deltas={deltas.value}
               names={names}
               size="lg"
-              className={cn(STALE_TRANSITION, deltas.stale && STALE)}
+              className={cn(MIRROR_STALE_TRANSITION, deltas.stale && MIRROR_STALE)}
             />
           ) : (
             <p className="text-xl text-muted">填写中…</p>
           )}
           {summary.value && (
-            <p className={cn("mt-4 text-xl", STALE_TRANSITION, summary.stale && STALE)}>
+            <p
+              className={cn("mt-4 text-xl", MIRROR_STALE_TRANSITION, summary.stale && MIRROR_STALE)}
+            >
               {summary.value}
             </p>
           )}
@@ -79,10 +76,10 @@ export function SettlementMirror({
   );
 }
 
-/** 一位和牌者：牌面与算番结果在重算期间按住上一份并调暗。 */
-function WinBlock({ win, names }: { win: SettlementWinView; names: string[] }) {
-  const hand = useHeld(win.hand, HOLD_MS);
-  const evaluated = useHeld(win.evaluated?.isAgari ? win.evaluated : null, HOLD_MS);
+/** 一位和牌者：牌面与算番结果在重算期间按住上一份并调暗。二人房的结算镜像也用它。 */
+export function WinBlock({ win, names }: { win: SettlementWinView; names: string[] }) {
+  const hand = useHeld(win.hand, MIRROR_HOLD_MS);
+  const evaluated = useHeld(win.evaluated?.isAgari ? win.evaluated : null, MIRROR_HOLD_MS);
   const e = evaluated.value;
   return (
     <div className="mt-6 space-y-3">
@@ -91,8 +88,8 @@ function WinBlock({ win, names }: { win: SettlementWinView; names: string[] }) {
         <span
           className={cn(
             "text-4xl font-semibold tabular text-accent",
-            STALE_TRANSITION,
-            evaluated.stale && STALE,
+            MIRROR_STALE_TRANSITION,
+            evaluated.stale && MIRROR_STALE,
           )}
         >
           {e
@@ -103,7 +100,7 @@ function WinBlock({ win, names }: { win: SettlementWinView; names: string[] }) {
         </span>
       </div>
       {hand.value && (
-        <div className={cn("space-y-3", STALE_TRANSITION, hand.stale && STALE)}>
+        <div className={cn("space-y-3", MIRROR_STALE_TRANSITION, hand.stale && MIRROR_STALE)}>
           <HandStrip
             closed={hand.value.closed}
             melds={hand.value.melds}
@@ -122,8 +119,8 @@ function WinBlock({ win, names }: { win: SettlementWinView; names: string[] }) {
           yakuman={e.yakuman}
           className={cn(
             "text-base [&>span]:px-2.5 [&>span]:py-1",
-            STALE_TRANSITION,
-            evaluated.stale && STALE,
+            MIRROR_STALE_TRANSITION,
+            evaluated.stale && MIRROR_STALE,
           )}
         />
       )}

@@ -278,3 +278,90 @@ test("截图：取景框、确认态与算点数页", async ({ browser }) => {
   await p.screenshot({ path: `${OUT}/phone-tile-replace.png` });
   await tvCtx.close();
 });
+
+test("截图：首页选房型与二人房（《天》规则）", async ({ browser }) => {
+  const tvCtx = await newContext(browser, {
+    ...devices["Desktop Chrome"],
+    viewport: { width: 1600, height: 900 },
+  });
+  const tv = await tvCtx.newPage();
+  await tv.goto("/");
+  await tv.getByTestId("open-ten").waitFor();
+  await tv.screenshot({ path: `${OUT}/desktop-landing-kinds.png` });
+  await tv.getByTestId("open-ten").click();
+  const code = (await tv.getByTestId("room-code").textContent())?.trim() ?? "";
+  await tv.screenshot({ path: `${OUT}/ten-tv-lobby.png` });
+  // 回首页：房间还在，按钮写「继续 … 房间码」+「新建」
+  await tv.getByRole("link", { name: "返回首页" }).click();
+  await tv.getByTestId("new-ten").waitFor();
+  await tv.screenshot({ path: `${OUT}/desktop-landing-continue.png` });
+  await tv.getByTestId("open-ten").click();
+
+  const east = await phone(browser, code, "阿东");
+  const west = await phone(browser, code, "阿西");
+  await east.getByTestId("seat-0").click();
+  await west.getByTestId("seat-1").click();
+  await east.screenshot({ path: `${OUT}/ten-phone-lobby.png` });
+
+  await east.getByRole("button", { name: "规则说明" }).click();
+  await east.getByRole("dialog").getByRole("switch", { name: "投到电视" }).click();
+  await east.getByRole("dialog").getByRole("tab", { name: "3" }).click();
+  await tv.getByTestId("ten-guide-mirror").waitFor();
+  await east.screenshot({ path: `${OUT}/ten-phone-guide.png` });
+  await tv.screenshot({ path: `${OUT}/ten-tv-guide-mirror.png` });
+  await east.keyboard.press("Escape");
+
+  for (const p of [east, west]) await p.getByRole("button", { name: "准备", exact: true }).click();
+  await tv.getByTestId("score-0").waitFor({ timeout: 10_000 });
+  await tv.screenshot({ path: `${OUT}/ten-tv-stage-a.png` });
+  await east.screenshot({ path: `${OUT}/ten-phone-stage-a.png`, fullPage: true });
+
+  await east.getByRole("button", { name: "立直", exact: true }).click();
+  const pick = west.getByTestId("guess-tiles");
+  for (const [a, b] of [
+    ["1萬", "9萬"],
+    ["東", "白"],
+    ["3筒", "6筒"],
+  ]) {
+    await pick.getByRole("button", { name: a! }).click();
+    await pick.getByRole("button", { name: b! }).click();
+    await west.getByRole("button", { name: "指定这两张" }).click();
+    await west.getByRole("button", { name: "指定这两张" }).waitFor();
+  }
+  await pick.getByRole("button", { name: "2索" }).click();
+  await tv.screenshot({ path: `${OUT}/ten-tv-stage-b.png` });
+  await west.screenshot({ path: `${OUT}/ten-phone-stage-b-defender.png`, fullPage: true });
+  await east.screenshot({ path: `${OUT}/ten-phone-stage-b-attacker.png`, fullPage: true });
+
+  await east.getByRole("button", { name: "自摸和" }).click();
+  const dialog = east.getByRole("dialog");
+  await dialog.getByRole("tab", { name: "牌面" }).click();
+  await east.screenshot({ path: `${OUT}/ten-phone-tsumo-hand.png` });
+  await dialog.getByRole("tab", { name: "番符" }).click();
+  await dialog.getByRole("button", { name: "3", exact: true }).click();
+  await dialog.getByRole("button", { name: "30", exact: true }).click();
+  await tv.getByText("+6,000").waitFor();
+  await east.screenshot({ path: `${OUT}/ten-phone-tsumo.png` });
+  await tv.screenshot({ path: `${OUT}/ten-tv-mirror-tsumo.png` });
+  await dialog.getByRole("button", { name: "确认自摸和" }).click();
+  await tv.getByTestId("guess-board").waitFor({ state: "detached" });
+  await tv.screenshot({ path: `${OUT}/ten-tv-history.png` });
+
+  await west.getByRole("button", { name: "终局", exact: true }).click();
+  await west.getByRole("button", { name: "确认终局" }).click();
+  await tv.getByTestId("ten-final").waitFor();
+  await tv.screenshot({ path: `${OUT}/ten-tv-final.png` });
+  await west.screenshot({ path: `${OUT}/ten-phone-final.png`, fullPage: true });
+
+  // Pad 竖屏主控台（单栏）：Stage B 的全牌型板放在得分卡下面
+  await west.getByRole("button", { name: "撤销" }).click();
+  await west.getByRole("button", { name: "听牌宣言" }).click();
+  const padCtx = await newContext(browser, {
+    ...devices["iPad Pro 11"],
+    storageState: await tvCtx.storageState(),
+  });
+  const pad = await padCtx.newPage();
+  await pad.goto("/console?kind=ten");
+  await pad.getByTestId("guess-board").waitFor();
+  await pad.screenshot({ path: `${OUT}/ten-pad-stage-b.png`, fullPage: true });
+});

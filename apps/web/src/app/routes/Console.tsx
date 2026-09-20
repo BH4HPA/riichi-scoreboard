@@ -9,6 +9,7 @@ import { useRoomStore } from "@/ws/store";
 import { SocketContext, useRoomConnection } from "@/ws/useRoom";
 import { useConsoleRoom } from "@/features/console/useConsoleRoom";
 import { ConsoleGame } from "@/features/console/ConsoleGame";
+import { TenConsoleGame } from "@/features/ten/TenConsoleGame";
 import { DissolveButton } from "@/features/console/DissolveButton";
 import { ConsoleLobby } from "@/features/lobby/ConsoleLobby";
 import { RiichiMusicPlayer } from "@/features/music/RiichiMusicPlayer";
@@ -61,7 +62,9 @@ export function Console() {
               </>
             }
           />
-        ) : room.kind === "ten" ? null : (
+        ) : room.kind === "ten" ? (
+          <TenConsoleGame room={room} game={room.game} intents={intents} wide={wide} />
+        ) : (
           <ConsoleGame
             room={room}
             game={room.game}

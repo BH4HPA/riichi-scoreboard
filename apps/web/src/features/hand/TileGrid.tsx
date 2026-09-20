@@ -10,6 +10,8 @@ export function TileGrid({
   aka,
   disabled,
   selected,
+  marked,
+  struck,
   onPick,
   size = "sm",
   buttonClassName,
@@ -19,6 +21,10 @@ export function TileGrid({
   aka: boolean;
   disabled: (tile: Tile) => boolean;
   selected?: (tile: Tile) => boolean;
+  /** 角标（强调色圆点）：提醒眼睛往这儿看 */
+  marked?: (tile: Tile) => boolean;
+  /** 划掉（已排除） */
+  struck?: (tile: Tile) => boolean;
   onPick?: ((tile: Tile) => void) | undefined;
   size?: TileSize;
   /** 点击区样式：键盘把点击区撑到整格，牌图保持原尺寸居中 */
@@ -32,6 +38,8 @@ export function TileGrid({
       tile={t}
       size={size}
       selected={selected?.(t) ?? false}
+      mark={marked?.(t) ?? false}
+      struck={struck?.(t) ?? false}
       dim={disabled(t)}
       onClick={onPick ? () => onPick(t) : undefined}
       {...(buttonClassName ? { buttonClassName } : {})}
