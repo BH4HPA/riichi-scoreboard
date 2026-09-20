@@ -37,8 +37,8 @@ export function useRotation(): {
 } {
   const [rotation, setRotation] = useState<Rotation>(readRotation);
   const [source, setSource] = useState<RotationSource>("none");
-  /** 陀螺仪上一次的判定；拿不准时沿用它，判定变了才切 */
-  const verdictRef = useRef<Rotation>(rotation);
+  /** 陀螺仪上一次的判定；拿不准时沿用它，判定变了才切。null = 还没给出过判定 */
+  const verdictRef = useRef<Rotation | null>(null);
   const [listening, setListening] = useState(false);
   useEffect(() => {
     let cancelled = false;
@@ -58,13 +58,9 @@ export function useRotation(): {
     if (!listening) return;
     const onTilt = (e: DeviceOrientationEvent) => {
       if (e.beta === null || e.gamma === null) return;
-      const next = rotationFromTilt(
-        e.beta,
-        e.gamma,
-        screen.orientation?.angle ?? 0,
-        verdictRef.current,
-      );
-      if (next === verdictRef.current) return;
+      const next = rotationFromTilt(e.beta, e.gamma, screen.orientation?.angle ?? 0);
+      // 第一个确定的判定哪怕与记忆的方向相同也要算数：从这一刻起方向才是「已知」的
+      if (next === null || next === verdictRef.current) return;
       verdictRef.current = next;
       apply(next, "gyro");
     };

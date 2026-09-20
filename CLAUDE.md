@@ -189,8 +189,13 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   indicator rows must be equally long: a longer far row is the river's last row and is dropped, any other
   mismatch is `indicator_mismatch` (`blocking`). Known limit: one dora + a one-tile river tail inside the
   window is indistinguishable — `LayoutGuide` tells users to keep indicators close and the river away.
-  `layoutHand(…, {upright: true})` skips the "most boxes are wide ⇒ photo is rotated" vote (the live path
-  knows its orientation; side-on walls are wide boxes). `recognition/__fixtures__/records.json` holds 50
+  `layoutHand(…, {upright: true})` skips the "most boxes are wide ⇒ photo is rotated" vote (side-on walls are
+  wide boxes); the live path passes it **only once the gyroscope or the user has set the orientation** —
+  until then the vote stays as the safety net for people holding the phone sideways with rotation lock on.
+  While the hand is short of 14 tiles the `window` opens up (full width, one extra hop per missing meld): the
+  downscaled first pass often fragments the hand row, and a window hugging the fragment would never see the
+  rest. `odd_box` (boxes much narrower than their neighbours) is judged per row, not against the whole photo.
+  `recognition/__fixtures__/records.json` holds 50
   production records (boxes + confirmed hands, no photos) as the regression set for layout changes.
   `layoutHand` never throws
   and is bounded (memoized partition; adversarial 300-box inputs stay under a few ms); it returns warnings the editor
@@ -205,15 +210,15 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   page. The video and the boxes are not rotated (the screen itself is), only the close button / progress /
   bottom panel; the worker rotates the frame upright before detection, so photos and detections are always
   upright. Sources: a permanent manual button and the gyroscope (`tilt.ts`: gravity components from β/γ,
-  > 15° and > 1.5× the other axis, otherwise keep the last verdict; minus `screen.orientation.angle` so a page
-  > that rotates by itself needs nothing) — the gyroscope only speaks when its verdict changes, so whichever
-  > happened last wins. Motion permission is asked on open (Android/desktop grant silently, iOS refuses outside
-  > a gesture) and again on the button tap (iOS prompts here). Last rotation is kept in `riichi.camera.rotation`.
-  > Session telemetry: closing the viewfinder posts one `RecognitionSessionSummary` (no photo) to
-  > `POST /api/recognition-sessions` (`recognition_sessions`, migration v6, 120/h per player + 1200/h global;
-  > `useSessionStats`, sent once on unmount or `pagehide` with `keepalive`) — frames, settled frames, second
-  > passes, per-code `blocking` counts, key changes, max votes, outcome (`auto`/`manual`/`album`/`abandoned`),
-  > rotation + source. Stored recognitions only ever show successful captures; this is where failures show up.
+  more than 15° and more than 1.5× the other axis, otherwise keep the last verdict; minus `screen.orientation.angle` so a page
+  that rotates by itself needs nothing) — the gyroscope only speaks when its verdict changes, so whichever
+  happened last wins. Motion permission is asked on open (Android/desktop grant silently, iOS refuses outside
+  a gesture) and again on the button tap (iOS prompts here). Last rotation is kept in `riichi.camera.rotation`.
+  Session telemetry: closing the viewfinder posts one `RecognitionSessionSummary` (no photo) to
+  `POST /api/recognition-sessions` (`recognition_sessions`, migration v6, 120/h per player + 1200/h global;
+  `useSessionStats`, sent once on unmount or `pagehide` with `keepalive`) — frames, settled frames, second
+  passes, per-code `blocking` counts, key changes, max votes, outcome (`auto`/`manual`/`album`/`abandoned`),
+  rotation + source. Stored recognitions only ever show successful captures; this is where failures show up.
 - Riichi music: `RoomView.music` (`{track, seat, at}`) is memory-only room state like `online`; a client
   sends `{type:"music", track: id | null}` (the section lives in the shared `settlement/controls/ControlButtons`, so the console
   can press it for local players with `seat: null`), the TV plays the track from the static bucket

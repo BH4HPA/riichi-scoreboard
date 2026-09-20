@@ -104,7 +104,7 @@ export function useSessionStats(
       a.sent = true;
       void reportRecognitionSession(summarize(), token).catch(() => undefined);
     };
-    // 关标签页 / 切走不会触发卸载：这时来不及注册，只有已经有身份的才发得出去
+    // 关标签页、跳去别的页面不会触发卸载：这时来不及注册，只有已经有身份的才发得出去
     const onHide = () => send(useSession.getState().token);
     window.addEventListener("pagehide", onHide);
     return () => {

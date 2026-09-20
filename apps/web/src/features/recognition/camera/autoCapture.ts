@@ -9,11 +9,13 @@ export const REASON_FRAMES = 3;
 export interface CaptureState {
   /** 最近几帧的牌面指纹，新的在后；null = 这一帧不算数（有 blocking，或还没收紧到手牌周围） */
   keys: readonly (string | null)[];
+  /** 与 keys 逐位对应：那一帧认出了几张指示牌 */
+  indicators: readonly number[];
   /** 正在挡着定格的那条 blocking，及它已经连续出现了几帧 */
   blocked: { message: string; frames: number } | null;
 }
 
-export const EMPTY_CAPTURE: CaptureState = { keys: [], blocked: null };
+export const EMPTY_CAPTURE: CaptureState = { keys: [], indicators: [], blocked: null };
 
 /**
  * 牌面指纹：**只比暗牌 + 和张 + 副露，不比指示牌**。
@@ -43,6 +45,9 @@ export function reasonOf(state: CaptureState): string | null {
  *
  * 滑窗投票而不是「连续 N 帧」：画面里带着牌河时，单帧漏检 / 多认很常见，一帧不算数就清零的话永远凑不齐；
  * 但最新两帧必须一致——A B A B A 这种一半时间在跳的牌面，A 也能攒够 3 票，不该定格。
+ *
+ * 指纹不含指示牌，但**定格的那一帧不能比同一副牌的其它几帧少认指示牌**：指示牌离手牌远、常常隔帧才认出来，
+ * 手牌一稳就拍的话，拍下的往往恰好是没认出指示牌的那一帧。窗口里始终没见过就照常定格。
  */
 export function feedFrame(
   state: CaptureState,
@@ -52,6 +57,8 @@ export function feedFrame(
   const block = frame.settled ? frame.warnings.find((w) => w.severity === "blocking") : undefined;
   const key = frame.settled && !block ? handKey(frame.hand) : null;
   const keys = [...state.keys, key].slice(-WINDOW_FRAMES);
+  const seen = frame.hand.doraIndicators.length + frame.hand.uraIndicators.length;
+  const indicators = [...state.indicators, seen].slice(-WINDOW_FRAMES);
   const blocked = !frame.settled
     ? state.blocked
     : block
@@ -60,7 +67,8 @@ export function feedFrame(
           frames: state.blocked?.message === block.message ? state.blocked.frames + 1 : 1,
         }
       : null;
-  const next: CaptureState = { keys, blocked };
+  const next: CaptureState = { keys, indicators, blocked };
   const agreed = key !== null && keys[keys.length - 2] === key;
-  return { state: next, fire: agreed && votesOf(next) >= STABLE_FRAMES };
+  const most = Math.max(...indicators.filter((_, i) => keys[i] === key));
+  return { state: next, fire: agreed && seen >= most && votesOf(next) >= STABLE_FRAMES };
 }

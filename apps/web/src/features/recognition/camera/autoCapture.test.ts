@@ -100,6 +100,20 @@ describe("feedFrame", () => {
   });
 });
 
+describe("指示牌", () => {
+  const withDora = frame(hand({ doraIndicators: [5] }));
+
+  it("同一副牌的前几帧认出过指示牌：不在没认出来的这一帧定格，等它回来", () => {
+    expect(run([withDora, A, A]).fires).toEqual([false, false, false]);
+    expect(run([withDora, A, A, withDora, withDora]).fires.at(-1)).toBe(true);
+  });
+
+  it("窗口里始终没见过指示牌，照常定格；见过的那一帧滑出窗口以后也不再等", () => {
+    expect(run([A, A, A]).fires.at(-1)).toBe(true);
+    expect(run([withDora, A, A, A, A, A]).fires.at(-1)).toBe(true);
+  });
+});
+
 describe("reasonOf", () => {
   it("同一条 blocking 连着挡了几帧才告诉用户；一帧好的就收回", () => {
     const few = run(Array.from({ length: REASON_FRAMES - 1 }, () => BAD)).state;

@@ -18,7 +18,7 @@ function Row({ tiles, sideways = [] }: { tiles: Tile[]; sideways?: number[] }) {
 export function LayoutGuide({ onClose }: { onClose: () => void }) {
   return (
     <div
-      className="absolute inset-0 z-10 flex flex-col justify-center gap-4 overflow-y-auto bg-black/90 p-5 text-white"
+      className="pointer-events-auto absolute inset-0 z-10 flex flex-col justify-center gap-4 overflow-y-auto bg-black/90 p-5 text-white"
       role="dialog"
       aria-label="摆牌示意"
     >

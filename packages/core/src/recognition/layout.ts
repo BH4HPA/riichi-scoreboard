@@ -558,7 +558,9 @@ export function layoutHand(
     melds.push({ open: true, tiles: faces });
     meldOrigins.push(origins);
   };
-  for (const seg of parts.get(closedGroup)?.melds ?? []) addMeld(seg);
+  const ownMelds = parts.get(closedGroup)?.melds ?? [];
+  if (ownMelds.length > MAX_MELDS) warn("bad_group", "blocking", "副露超过 4 组，多出的已忽略");
+  for (const seg of ownMelds.slice(0, MAX_MELDS)) addMeld(seg);
   // 没有暗牌组时无从谈窗口：照片里只有副露，全收
   const meldGroups = closedPick
     ? nearbyMeldGroups(closedGroup, handRow, scale.h)
@@ -566,21 +568,32 @@ export function layoutHand(
   // 凑满 14 张就不再收：牌山里的牌背时有时无地拼成「暗杠」，照单全收会让逐帧结果来回跳。
   // 由近及远选，选定后仍按画面顺序（自上而下、从左到右）输出——回流靠组序与用户确认的手牌逐位对齐
   const room = closedPick ? meldRoom(closedSeg) - melds.length : MAX_MELDS;
-  const chosen = new Map<Item[], number>();
+  const chosen = new Map<Item[], Item[][]>();
+  let skipped = 0;
   let left = room;
   for (const g of meldGroups) {
     if (left <= 0) break;
-    const take = Math.min(left, parts.get(g)!.melds.length);
-    chosen.set(g, take);
-    left -= take;
+    // 一组里只容得下一部分时取离手牌近的那几段；没取的算场外牌
+    const at = closedGroup.reduce((n, i) => n + i.cx, 0) / Math.max(1, closedGroup.length);
+    const mid = (seg: Item[]) => seg.reduce((n, i) => n + i.cx, 0) / seg.length;
+    const segs = [...parts.get(g)!.melds].sort(
+      (p, q) => Math.abs(mid(p) - at) - Math.abs(mid(q) - at),
+    );
+    const taken = new Set(segs.slice(0, left));
+    skipped += segs.slice(left).flat().length;
+    chosen.set(
+      g,
+      parts.get(g)!.melds.filter((seg) => taken.has(seg)),
+    );
+    left -= taken.size;
   }
   for (const row of rows) {
     for (const g of row.groups) {
-      const take = chosen.get(g);
-      if (take === undefined) continue;
+      const segs = chosen.get(g);
+      if (segs === undefined) continue;
       consumed.add(g);
       droppedBacks += parts.get(g)!.dropped;
-      for (const seg of parts.get(g)!.melds.slice(0, take)) addMeld(seg);
+      for (const seg of segs) addMeld(seg);
     }
   }
   if (droppedBacks > 0)
@@ -633,7 +646,7 @@ export function layoutHand(
   const takenRows = new Set(usedIndicators);
   const extra = leftover.reduce(
     (n, { tiles }) => n + tiles.filter((t) => !takenRows.has(t)).length,
-    0,
+    skipped,
   );
   if (extra > 0) warn("extra_rows", "info", `有 ${extra} 张牌不在手牌、副露或指示牌的位置，已忽略`);
   let doraIndicators: Tile[] = [];
@@ -659,14 +672,15 @@ export function layoutHand(
   // 纵向按还缺的副露组数每组多留一跳。
   const windowOf = (): Box => {
     const missing = Math.min(MAX_MELDS, Math.max(0, Math.ceil((14 - total) / 3)));
-    const seen = [closedGroup, ...meldGroups].flat();
+    // 只看选中的组：没选中的多半是牌山里时有时无的「暗杠」，算进来窗口会跟着它抖
+    const seen = [closedGroup, ...chosen.keys()].flat();
     const x1 = missing
       ? -FAR
       : Math.min(...seen.map((i) => i.cx - i.w / 2)) - HAND_WINDOW.side * scale.w;
     const x2 = missing
       ? FAR
       : Math.max(...seen.map((i) => i.cx + i.w / 2)) + HAND_WINDOW.side * scale.w;
-    const cys = [handRow.cy, ...meldGroups.map((g) => rowOf.get(g)!.cy)];
+    const cys = [handRow.cy, ...[...chosen.keys()].map((g) => rowOf.get(g)!.cy)];
     const slack = missing * HAND_WINDOW.hop * scale.h;
     const reach = (HAND_WINDOW.hop + HAND_WINDOW.secondHop + 0.5) * scale.h + slack;
     const y1 = Math.min(...cys) - reach;

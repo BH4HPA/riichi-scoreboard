@@ -766,6 +766,25 @@ describe("layoutHand：照片里带着牌河", () => {
     expect(r.warnings.map((w) => w.code)).not.toContain("odd_box");
   });
 
+  it("window 只看选中的副露：同一行远处凑巧成形的一组不会把窗口拉过去", () => {
+    const hand = row([...CLOSED13, "9m~"], 10, 600);
+    const alone = layoutHand(hand.dets).window!;
+    const stray = row(["back", "5z", "5z", "back"], 1500, 600);
+    const r = layoutHand([...hand.dets, ...stray.dets]);
+    expect(r.hand.melds).toEqual([]);
+    // 同一行的行中心会被那一组带偏零点几个像素，横向必须分毫不差
+    r.window!.forEach((v, i) =>
+      expect(Math.abs(v - alone[i]!)).toBeLessThan(i % 2 === 0 ? 1e-9 : 1),
+    );
+  });
+
+  it("同一排里连着 5 组副露：只取 4 组并告警（PATCH 的校验上限就是 4 组）", () => {
+    const names = ["1z", "2z", "3z", "4z", "5z"].flatMap((t) => [t, `${t}~`, t]);
+    const r = layoutHand(row([...names, "2p", "2p~"], 10, 300).dets);
+    expect(r.hand.melds).toHaveLength(4);
+    expect(r.warnings.map((w) => w.code)).toContain("bad_group");
+  });
+
   it("没有暗牌组时 window 为 null", () => {
     expect(layoutHand([]).window).toBeNull();
     expect(layoutHand(row(["5z", "5z~", "5z"], 10, 100).dets).window).toBeNull();

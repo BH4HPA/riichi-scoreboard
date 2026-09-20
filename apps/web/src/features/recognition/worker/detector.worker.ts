@@ -42,8 +42,13 @@ let held: Held | null = null;
 /** 取景时锁定的识别范围，跨帧沿用；手机一转坐标系就变了，作废重找 */
 let track: TrackState = LOST;
 let trackRotation: Rotation = 0;
-/** 上一帧还在推理时新帧直接丢掉：背压，不排队 */
+/** 上一帧还在推理时新的**实时帧**直接丢掉：背压，不排队 */
 let busy = false;
+/**
+ * 相册那张例外：它是用户亲手选的、只此一张，撞上还在推理的实时帧时排在后面跑，不丢。
+ * （主线程重送没有用——丢帧的回包几毫秒就到，而在途的那一帧要跑几百毫秒。）
+ */
+let pendingStill: Extract<ToWorker, { type: "infer" }> | null = null;
 
 const post = (msg: FromWorker, transfer?: Transferable[]) =>
   transfer ? self.postMessage(msg, transfer) : self.postMessage(msg);
@@ -173,7 +178,12 @@ self.onmessage = (e: MessageEvent<ToWorker>) => {
           await init(msg.wasm, msg.model, msg.imgsz);
           post({ type: "ready" });
           return;
-        case "infer":
+        case "infer": {
+          if (busy && msg.still && session) {
+            pendingStill?.bitmap.close();
+            pendingStill = msg;
+            return;
+          }
           // 丢帧也要回包：主线程的背压闸门只在收到结果时复位，静默丢弃会让循环永久停摆
           if (busy || !session) {
             msg.bitmap.close();
@@ -182,10 +192,16 @@ self.onmessage = (e: MessageEvent<ToWorker>) => {
           busy = true;
           try {
             await infer(msg.frameId, msg.bitmap, msg.rotation, msg.upright, msg.still);
+            while (pendingStill) {
+              const next: Extract<ToWorker, { type: "infer" }> = pendingStill;
+              pendingStill = null;
+              await infer(next.frameId, next.bitmap, next.rotation, next.upright, true);
+            }
           } finally {
             busy = false;
           }
           return;
+        }
         case "grab":
           await grab(msg.quality);
           return;

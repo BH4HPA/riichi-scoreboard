@@ -1,4 +1,4 @@
-import { layoutHand, type Box, type LayoutOptions, type LayoutResult } from "./layout";
+import { layoutHand, type Box, type LayoutResult } from "./layout";
 import type { Detection, RecognizedHand } from "./types";
 
 /**
@@ -17,9 +17,9 @@ export const SETTLE_GAIN = 1.2;
 /** 连续这么多帧认不出一手自洽的牌，就放弃 ROI 回到整帧：ROI 可能锁在了错的一行上，或者副露在 ROI 外面 */
 export const LOST_FRAMES = 2;
 /** ROI 各边的移动不到长边的这个比例就沿用上一帧的：镜头轻微晃动时裁剪区域不跟着抖 */
-export const ROI_STEADY = 0.08;
+const ROI_STEADY = 0.08;
 /** 定格照片在被采信的牌外面留的边，单位是牌的长边：要小于相邻一行的中心距（约 0.9），否则牌河的框会跟进照片 */
-export const CAPTURE_PAD = 0.35;
+const CAPTURE_PAD = 0.35;
 
 export const fullFrame = (frame: FrameSize): Box => [0, 0, frame.width, frame.height];
 
@@ -84,12 +84,13 @@ export interface TightCapture {
  * 照片里也不会留着一堆没人标注的牌（YOLO 会把它们学成背景）。
  * 收紧后在块内的框上**重跑布局**——回流导出时做的正是这件事——手牌必须与收紧前逐位相同，
  * 否则返回 null，调用方退回不收紧的那一块。
+ * 重跑**必须用默认选项**：导出时 `align` 就是这么跑的，这里多传一个选项（比如 upright），
+ * 两边的手牌就可能对不上，原本干净的记录会整条送人工。
  */
 export function tightenCapture(
   detections: readonly Detection[],
   layout: LayoutResult,
   frame: FrameSize,
-  options: Partial<LayoutOptions> = {},
 ): TightCapture | null {
   const used = layout.provenance.usedDetections.map((i) => detections[i]!);
   if (used.length === 0) return null;
@@ -106,7 +107,7 @@ export function tightenCapture(
   );
   if (!box) return null;
   const moved = translateInto(detections, box);
-  const again = layoutHand(moved, options);
+  const again = layoutHand(moved);
   if (handKey(again.hand) !== handKey(layout.hand)) return null;
   return { box, detections: moved, layout: again };
 }

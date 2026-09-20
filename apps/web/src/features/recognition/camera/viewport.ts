@@ -1,5 +1,5 @@
-import type { Box } from "@riichi/core";
-import { sourceBox, type Rotation } from "./orientation/upright";
+import type { Box, FrameSize } from "@riichi/core";
+import { sourceBox, uprightSize, type Rotation } from "./orientation/upright";
 
 export interface Viewport {
   /** 视频原始像素（没转正的那一帧） */
@@ -8,6 +8,23 @@ export interface Viewport {
   /** 取景区域在屏幕上的尺寸 */
   displayWidth: number;
   displayHeight: number;
+}
+
+/**
+ * 由一帧的识别结果拼出 Viewport。结果里的 `frame` 是**转正后**的尺寸，屏幕上铺的却是没转正的视频：
+ * 横持时两者宽高相反，直接拿来用的话框会画大一圈还偏位。宽高互换是自逆的，再换一次就是原始尺寸。
+ */
+export function viewportOf(
+  result: { frame: FrameSize; rotation: Rotation },
+  display: { clientWidth: number; clientHeight: number },
+): Viewport {
+  const source = uprightSize(result.frame, result.rotation);
+  return {
+    videoWidth: source.width,
+    videoHeight: source.height,
+    displayWidth: display.clientWidth,
+    displayHeight: display.clientHeight,
+  };
 }
 
 /** 画面在取景区域里的实际摆放（像素）：铺满居中、裁掉多出来的边（object-cover） */

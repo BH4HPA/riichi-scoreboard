@@ -12,8 +12,9 @@ import { HandView } from "@/features/hand/HandView";
 import { RECOGNITION_MODEL } from "../modelUrl";
 import { closeDetector, openDetector, type Detector } from "../worker/client";
 import type { FrameResult } from "../worker/protocol";
+import { warningsUnder } from "../applyRecognized";
 import { loadPhoto } from "../photoFile";
-import { fitLongEdge, STILL_MAX_EDGE, type Viewport } from "./viewport";
+import { fitLongEdge, STILL_MAX_EDGE, viewportOf } from "./viewport";
 import { DetectionOverlay } from "./DetectionOverlay";
 import { EMPTY_CAPTURE, feedFrame, reasonOf, STABLE_FRAMES, votesOf } from "./autoCapture";
 import { LayoutGuide } from "./LayoutGuide";
@@ -26,8 +27,6 @@ import { useLiveDetect } from "./useLiveDetect";
 
 /** 一直没认出有效牌面就停流，省电防烫（用户拍板 60 秒） */
 const IDLE_STOP_MS = 60_000;
-/** 相册那张撞上还在推理的实时帧会被背压丢掉：重送几次 */
-const STILL_RETRIES = 3;
 
 export interface Capture {
   blob: Blob;
@@ -35,7 +34,7 @@ export interface Capture {
 }
 
 /**
- * 全屏取景：不用框选，识别线程自己在整帧里找到手牌、只识别它周围那一块；连续三帧认出同一副牌就自动定格。
+ * 全屏取景：不用框选，识别线程自己在整帧里找到手牌、只识别它周围那一块；最近几帧里认稳了同一副牌就自动定格。
  * 自绘覆盖层而不是 `Dialog`——`DialogContent` 在手机上是 92dvh 的底部抽屉，盖不满屏；
  * 层级取 75（Select 60 / Tooltip 70 / Notice 80 之间）。
  * **由调用方按需挂载 / 卸载**（不是 open 开关）：每次打开都是全新状态，不用在 effect 里重置。
@@ -73,10 +72,8 @@ export function CameraSheet({
   });
   const captureRef = useRef(EMPTY_CAPTURE);
   const frameRotationRef = useRef<FrameResult["rotation"]>(0);
-  /** 相册那张：在途的 frameId、缩好的原图（被背压丢掉时重送）、还能重送几次 */
-  const stillRef = useRef<{ frameId: number; source: OffscreenCanvas; retries: number } | null>(
-    null,
-  );
+  /** 相册那张在途的 frameId；null = 没有 */
+  const stillRef = useRef<number | null>(null);
   const grabbingRef = useRef(false);
   const lastGoodRef = useRef(openedAt);
 
@@ -170,7 +167,10 @@ export function CameraSheet({
         frameRotationRef.current = r.rotation;
         captureRef.current = EMPTY_CAPTURE;
       }
-      const out = feedFrame(captureRef.current, r);
+      const out = feedFrame(captureRef.current, {
+        ...r,
+        warnings: warningsUnder(r.warnings, rules),
+      });
       captureRef.current = out.state;
       countFrame(r, out.state);
       setGate(out.state);
@@ -181,7 +181,7 @@ export function CameraSheet({
         void capture("auto");
       }
     },
-    [capture, countFrame],
+    [capture, countFrame, rules],
   );
 
   // 相册那张是一次性的：结果一到就直接定格，不参与稳定判断。实时循环此刻停着，单独收
@@ -189,9 +189,9 @@ export function CameraSheet({
     if (!detector) return;
     return detector.onResult((r) => {
       const still = stillRef.current;
-      if (!still) return;
+      if (still === null) return;
       if (r) {
-        if (r.frameId !== still.frameId) return;
+        if (r.frameId !== still) return;
         stillRef.current = null;
         setStillBusy(false);
         setLive(r);
@@ -199,15 +199,7 @@ export function CameraSheet({
         void capture("album");
         return;
       }
-      // null = 撞上了还在推理的实时帧、被背压丢掉：重送；次数用完才让用户重来
-      if (still.retries > 0) {
-        still.retries -= 1;
-        void createImageBitmap(still.source).then((bitmap) => {
-          if (stillRef.current === still) still.frameId = detector.infer(bitmap, "still");
-          else bitmap.close();
-        });
-        return;
-      }
+      // null = 识别线程废了（相册那张不会被背压丢掉，Worker 会排到当前帧后面跑）
       stillRef.current = null;
       setStillBusy(false);
       setError("这张没识别成功，请重试");
@@ -222,14 +214,12 @@ export function CameraSheet({
         // 相册原图动辄 4000px：按实时帧的尺度缩小再送（识别尺度一致，定格照片也不至于太大）
         const src = await loadPhoto(file);
         const size = fitLongEdge(src.width, src.height, STILL_MAX_EDGE);
-        // 缩好的这份留着：撞上实时帧被丢掉时从它重新出位图（位图一送出去所有权就没了）
-        const source = new OffscreenCanvas(size.width, size.height);
-        const ctx = source.getContext("2d")!;
+        const canvas = new OffscreenCanvas(size.width, size.height);
+        const ctx = canvas.getContext("2d")!;
         ctx.imageSmoothingQuality = "high";
         ctx.drawImage(src, 0, 0, size.width, size.height);
         src.close();
-        const frameId = detector.infer(await createImageBitmap(source), "still");
-        stillRef.current = { frameId, source, retries: STILL_RETRIES };
+        stillRef.current = detector.infer(canvas.transferToImageBitmap(), "still");
       } catch (err) {
         // 失败要复位：否则 stillBusy 一直为真，实时取景再也不会恢复
         stillRef.current = null;
@@ -249,15 +239,7 @@ export function CameraSheet({
   });
 
   /** 检测框（整帧像素）画回屏幕要用的摆放；取景区域或画面尺寸还没就绪时不画 */
-  const view: Viewport | null =
-    live && area
-      ? {
-          videoWidth: live.frame.width,
-          videoHeight: live.frame.height,
-          displayWidth: area.clientWidth,
-          displayHeight: area.clientHeight,
-        }
-      : null;
+  const view = live && area ? viewportOf(live, area) : null;
 
   /** 相机用不了（权限、无设备、占用、非 HTTPS）：快门没有意义，给相册入口 */
   const camBroken = camError !== null;
@@ -341,12 +323,14 @@ export function CameraSheet({
       </div>
 
       <div
-        className="pointer-events-none absolute [&>*]:pointer-events-auto"
+        // 容器自己不接事件（下面的检测框要能点），要接的孩子各自声明
+        className="pointer-events-none absolute"
         style={chromeStyle}
         data-testid="camera-chrome"
         data-rotation={rotation}
       >
-        {!paused && !live && (
+        {/* 认稳手牌之前一直留着：画面里一有框就撤掉的话只闪一秒，没人来得及读 */}
+        {!paused && !reason && votesOf(gate) === 0 && (
           <p className="pointer-events-none absolute inset-x-0 top-1/3 text-center text-sm text-white/80 drop-shadow">
             对准手牌，牌河留在画面上方
           </p>
@@ -354,7 +338,7 @@ export function CameraSheet({
         {paused && (
           <button
             type="button"
-            className="absolute inset-0 flex items-center justify-center bg-black/70 text-white"
+            className="pointer-events-auto absolute inset-0 flex items-center justify-center bg-black/70 text-white"
             onClick={() => {
               lastGoodRef.current = Date.now();
               setPaused(false);
@@ -367,7 +351,7 @@ export function CameraSheet({
           type="button"
           onClick={onClose}
           aria-label="关闭取景"
-          className="absolute left-3 top-3 rounded-full bg-black/50 p-2 text-white"
+          className="pointer-events-auto absolute left-3 top-3 rounded-full bg-black/50 p-2 text-white"
         >
           <X className="h-5 w-5" />
         </button>
@@ -399,7 +383,7 @@ export function CameraSheet({
           <button
             type="button"
             onClick={() => setPicked(null)}
-            className="absolute inset-x-3 top-3 rounded-lg bg-black/70 px-3 py-2 text-sm text-white"
+            className="pointer-events-auto absolute inset-x-3 top-3 rounded-lg bg-black/70 px-3 py-2 text-sm text-white"
           >
             {RECOGNITION_CLASSES[picked.cls] ?? "?"} · 置信度 {Math.round(picked.conf * 100)}%
           </button>
@@ -407,7 +391,7 @@ export function CameraSheet({
         <div
           data-testid="camera-panel"
           // 底栏浮在画面上：自带一层渐变压暗，字才读得清
-          className="absolute inset-x-0 bottom-0 space-y-2 bg-gradient-to-t from-black/85 via-black/70 to-transparent px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 text-white"
+          className="pointer-events-auto absolute inset-x-0 bottom-0 space-y-2 bg-gradient-to-t from-black/85 via-black/70 to-transparent px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 text-white"
         >
           {camError && <p className="text-sm text-neg">{camError}</p>}
           {error && (
