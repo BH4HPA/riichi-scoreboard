@@ -12,13 +12,18 @@ export interface RuleField {
   control: FieldType;
 }
 
+export type RuleGroupKey = "scoring" | "hand" | "win" | "progress" | "final";
+
 export interface RuleGroup {
+  /** 与 `RoomRules` 的分段同名：只消费部分规则的场合（二人房）据此筛选 */
+  key: RuleGroupKey;
   title: string;
   fields: RuleField[];
 }
 
 export const RULE_GROUPS: RuleGroup[] = [
   {
+    key: "scoring",
     title: "点数换算",
     fields: [
       {
@@ -60,6 +65,7 @@ export const RULE_GROUPS: RuleGroup[] = [
     ],
   },
   {
+    key: "hand",
     title: "役与宝牌",
     fields: [
       {
@@ -94,6 +100,7 @@ export const RULE_GROUPS: RuleGroup[] = [
     ],
   },
   {
+    key: "win",
     title: "和了裁定",
     fields: [
       {
@@ -111,6 +118,7 @@ export const RULE_GROUPS: RuleGroup[] = [
     ],
   },
   {
+    key: "progress",
     title: "进行",
     fields: [
       {
@@ -174,6 +182,7 @@ export const RULE_GROUPS: RuleGroup[] = [
     ],
   },
   {
+    key: "final",
     title: "终局",
     fields: [
       {

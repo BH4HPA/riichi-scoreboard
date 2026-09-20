@@ -199,7 +199,7 @@ test("截图：取景框、确认态与算点数页", async ({ browser }) => {
   const calc = await calcCtx.newPage();
   await withDetector(calc);
   // 非手机首页：没有主控台提示，次要链接组只剩一行
-  await calc.goto("/?stay=1");
+  await calc.goto("/");
   await calc.getByRole("link", { name: /拍照算点数/ }).waitFor();
   await calc.screenshot({ path: `${OUT}/desktop-narrow-landing.png` });
   await calc.goto("/calc");

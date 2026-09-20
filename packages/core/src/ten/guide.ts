@@ -76,3 +76,5 @@ export const TEN_GUIDE_PAGES: readonly TenGuidePage[] = [
 ];
 
 export const TEN_GUIDE_KEYS: readonly string[] = TEN_GUIDE_PAGES.map((p) => p.key);
+/** 打开规则说明时的第一页 */
+export const TEN_GUIDE_FIRST = TEN_GUIDE_PAGES[0]!.key;

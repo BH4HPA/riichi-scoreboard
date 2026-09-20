@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import type { RoomView } from "@riichi/core";
+import type { RoomKind, RoomView } from "@riichi/core";
 import { api, ApiError } from "@/api/client";
 import { useSession } from "@/api/session";
-import { readLocal, writeLocal } from "@/lib/localStore";
-
-const ROOM_KEY = "riichi.console.room";
+import { readConsoleRoom, writeConsoleRoom } from "./consoleRooms";
 
 /**
- * 主控台的房间：优先复用本机上次的房间码；不存在（404）或已解散（410）则新建。
- * `newRoom` 供解散后的自动重建使用。
+ * 主控台的房间：优先复用本机上次开的这种房型的房间；不存在（404）或已解散（410）则新建。
+ * `newRoom` 供解散后的自动重建使用（沿用当前房型）。
  */
-export function useConsoleRoom() {
+export function useConsoleRoom(kind: RoomKind) {
   const ensure = useSession((s) => s.ensure);
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -19,24 +17,27 @@ export function useConsoleRoom() {
     const { token } = await ensure();
     const { room } = await api<{ room: RoomView }>("/api/rooms", {
       method: "POST",
-      body: {},
+      body: { kind },
       token,
     });
-    writeLocal(ROOM_KEY, room.code);
+    writeConsoleRoom(kind, room.code);
     return room.code;
-  }, [ensure]);
+  }, [ensure, kind]);
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
         const { token } = await ensure();
-        const saved = readLocal(ROOM_KEY);
+        const saved = readConsoleRoom(kind);
         if (saved) {
           try {
-            await api(`/api/rooms/${saved}`, { token });
-            if (active) setCode(saved);
-            return;
+            const { room } = await api<{ room: RoomView }>(`/api/rooms/${saved}`, { token });
+            // 每种房型各记各的码，正常不会错配；服务端回滚到不认房型的版本时视图没有 kind，一律当四人房
+            if ((room.kind ?? "yonma") === kind) {
+              if (active) setCode(saved);
+              return;
+            }
           } catch (err) {
             if (!(err instanceof ApiError && (err.status === 404 || err.status === 410))) throw err;
           }
@@ -51,7 +52,7 @@ export function useConsoleRoom() {
     return () => {
       active = false;
     };
-  }, [ensure, create]);
+  }, [ensure, create, kind]);
 
   const newRoom = useCallback(async () => {
     try {

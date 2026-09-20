@@ -1,6 +1,8 @@
 import { useEffect } from "react";
-import { Wifi } from "lucide-react";
-import { seatNames } from "@riichi/core";
+import { Link, useSearchParams } from "react-router";
+import { Home, Wifi } from "lucide-react";
+import { isRoomKind, seatNames } from "@riichi/core";
+import { Button } from "@/ui/button";
 import { Notice } from "@/ui/notice";
 import { useMediaQuery, WIDE_CONSOLE_QUERY } from "@/lib/useMediaQuery";
 import { useRoomStore } from "@/ws/store";
@@ -13,7 +15,10 @@ import { RiichiMusicPlayer } from "@/features/music/RiichiMusicPlayer";
 
 /** 主控台入口：建房/连房、按阶段与屏宽装配大厅或对局页。 */
 export function Console() {
-  const { code, error, newRoom } = useConsoleRoom();
+  // 房型来自首页的选择；不带参数（旧书签）就是四人房
+  const [params] = useSearchParams();
+  const requested = params.get("kind");
+  const { code, error, newRoom } = useConsoleRoom(isRoomKind(requested) ? requested : "yonma");
   const socket = useRoomConnection(code);
   const room = useRoomStore((s) => s.room);
   const intents = useRoomStore((s) => s.intents);
@@ -42,9 +47,18 @@ export function Console() {
         {room.phase === "lobby" || !room.game ? (
           <ConsoleLobby
             room={room}
+            intents={intents}
             wide={wide}
             extraActions={
-              <DissolveButton code={room.code} size="lg" variant="ghost" className="text-neg" />
+              <>
+                {/* 房型在首页选：没有这个出口，进了四人主控台想改开二人房只能手改地址 */}
+                <Button asChild size="lg" variant="ghost">
+                  <Link to="/">
+                    <Home className="h-5 w-5" /> 返回首页
+                  </Link>
+                </Button>
+                <DissolveButton code={room.code} size="lg" variant="ghost" className="text-neg" />
+              </>
             }
           />
         ) : room.kind === "ten" ? null : (

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, Trash2, UserPlus } from "lucide-react";
-import { WIND_LABELS, type LocalPlayerView, type Seat } from "@riichi/core";
+import type { LocalPlayerView, Seat } from "@riichi/core";
 import { ApiError } from "@/api/client";
 import { useSession } from "@/api/session";
 import { Avatar } from "@/ui/avatar";
@@ -17,12 +17,15 @@ import { localsApi } from "./localsApi";
  */
 export function LocalPlayerDialog({
   seat,
+  labels,
   open,
   onOpenChange,
   seatedIds,
   onSit,
 }: {
   seat: Seat | null;
+  /** 各座位的风位标签（随房型） */
+  labels: readonly string[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** 已在座位上的玩家 id（不可重复入座） */
@@ -32,7 +35,7 @@ export function LocalPlayerDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        title={seat === null ? "本地玩家" : `${WIND_LABELS[seat]}家 · 添加本地玩家`}
+        title={seat === null ? "本地玩家" : `${labels[seat]}家 · 添加本地玩家`}
         description="本地玩家由主控台代为操作，不需要手机；档案保存在本设备。"
       >
         {open && (

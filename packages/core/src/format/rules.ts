@@ -1,3 +1,4 @@
+import { TEN_DURATION_MS, TEN_STICKS } from "../ten/state";
 import type { RoomRules } from "../types/rules";
 import { formatPoints } from "./round";
 
@@ -31,5 +32,20 @@ export function rulesSummary(rules: RoomRules): string[] {
     rules.progress.agariYame ? "和了止" : "无和了止",
     rules.progress.abortiveDraws ? "途中流局" : "无途中流局",
     rules.final.tieRule === "split" ? "同点按分" : "同点起家优先",
+  ];
+}
+
+/** 二人房（《天》规则）的摘要：固定的赛制两项 + 它实际消费的算番算点规则。 */
+export function tenRulesSummary(rules: RoomRules): string[] {
+  return [
+    `限时 ${TEN_DURATION_MS / 60_000} 分钟`,
+    `立直棒各 ${TEN_STICKS} 根`,
+    rules.scoring.kiriageMangan ? "切上满贯" : "无切上",
+    rules.scoring.kazoeYakuman ? "累计役满" : "13 番封顶三倍满",
+    `赤 ${rules.hand.akaCount}`,
+    rules.hand.kuitan ? "食断" : "无食断",
+    rules.hand.uraDora ? "里宝" : "无里宝",
+    rules.hand.ippatsu ? "一发" : "无一发",
+    `本场 ${formatPoints(rules.scoring.honbaValue)}`,
   ];
 }

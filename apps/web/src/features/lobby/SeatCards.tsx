@@ -1,5 +1,5 @@
 import { Check, LogOut, UserPlus } from "lucide-react";
-import { isLocalPlayer, SEATS, WIND_LABELS, type PlayerRef, type Seat } from "@riichi/core";
+import { isLocalPlayer, type PlayerRef, type Seat } from "@riichi/core";
 import { Avatar } from "@/ui/avatar";
 import { Badge } from "@/ui/controls";
 import { cn } from "@/lib/utils";
@@ -18,12 +18,13 @@ function AvatarSlot({ tv }: { tv: boolean }) {
 }
 
 /**
- * 四个座位卡。手机端：点空座入座（onPick），点自己的座位离座（onLeave）——整卡即按钮。
+ * 座位卡：座位数与风位标签随房型（四人房东南西北，二人房东西）。手机端：点空座入座（onPick），点自己的座位离座（onLeave）——整卡即按钮。
  * 电视端：空座可「添加本地玩家」（onAddLocal）。本地玩家（快照 kind=local）与离线的设备玩家
  * 任何端都可「离座」（onLeave）——身份丢失的手机靠这个回收自己的旧座位。
  */
 export function SeatCards({
   seats,
+  labels,
   ready,
   online,
   mySeat,
@@ -33,6 +34,8 @@ export function SeatCards({
   tv = false,
 }: {
   seats: (PlayerRef | null)[];
+  /** 各座位的风位标签（core `seatLabels(room.kind)`） */
+  labels: readonly string[];
   ready: boolean[];
   online: boolean[];
   mySeat: Seat | null;
@@ -43,8 +46,8 @@ export function SeatCards({
 }) {
   return (
     <div className={cn("grid gap-2", onAddLocal ? "grid-cols-2" : "grid-cols-1", tv && "gap-4")}>
-      {SEATS.map((seat) => {
-        const p = seats[seat];
+      {seats.map((p, index) => {
+        const seat = index as Seat;
         const mine = mySeat === seat;
         const isLocal = isLocalPlayer(p);
         const offline = p !== null && !isLocal && online[seat] === false;
@@ -55,7 +58,7 @@ export function SeatCards({
         );
         const wind = (
           <span className={cn("w-6 text-center font-semibold text-muted", tv && "text-2xl")}>
-            {WIND_LABELS[seat]}
+            {labels[seat]}
           </span>
         );
 
@@ -68,7 +71,7 @@ export function SeatCards({
               data-testid={`seat-${seat}`}
               className={cn(cardClass, "hover:border-accent/60")}
               onClick={() => onPick(seat)}
-              aria-label={`${WIND_LABELS[seat]}家 点击入座`}
+              aria-label={`${labels[seat]}家 点击入座`}
             >
               {wind}
               <AvatarSlot tv={tv} />
@@ -86,7 +89,7 @@ export function SeatCards({
               data-testid={`seat-${seat}`}
               className={cardClass}
               onClick={() => onLeave(seat)}
-              aria-label={`${WIND_LABELS[seat]}家 ${p.name}${ready[seat] ? "（已准备）" : ""} 离座`}
+              aria-label={`${labels[seat]}家 ${p.name}${ready[seat] ? "（已准备）" : ""} 离座`}
             >
               {wind}
               <Avatar name={p.name} src={p.avatar} size={tv ? "lg" : "md"} />

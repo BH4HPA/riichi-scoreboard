@@ -167,8 +167,9 @@ const SEAT_LABELS: Record<RoomKind, readonly string[]> = {
   ten: ["东", "西"],
 };
 
-export function seatLabels(kind: RoomKind): readonly string[] {
-  return SEAT_LABELS[kind];
+/** `kind` 缺省按四人房：旧服务端的房间视图没有这个字段 */
+export function seatLabels(kind: RoomKind | undefined): readonly string[] {
+  return SEAT_LABELS[kind ?? "yonma"];
 }
 
 /** 空座的占位名；`kind` 缺省按四人房（调用方只有座位列表时） */
