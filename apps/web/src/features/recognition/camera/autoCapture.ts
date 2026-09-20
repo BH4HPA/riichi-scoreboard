@@ -14,7 +14,7 @@ export const EMPTY_CAPTURE: CaptureState = { key: null, count: 0 };
 
 /**
  * 牌面指纹：**只比暗牌 + 和张 + 副露，不比指示牌**。
- * 指示牌在取景带最远端、最容易闪，而它对「这手牌认全了没有」这个判断最不重要；
+ * 指示牌离手牌最远、最容易闪，而它对「这手牌认全了没有」这个判断最不重要；
  * 定格时取触发帧的指示牌即可。
  */
 export function handKey(hand: RecognizedHand): string {

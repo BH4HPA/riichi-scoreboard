@@ -24,7 +24,7 @@ function run(frames: Array<ReturnType<typeof frame>>): boolean[] {
 }
 
 describe("handKey", () => {
-  it("指示牌不参与指纹：它在取景带最远端最容易闪，对「认全了没有」也最不重要", () => {
+  it("指示牌不参与指纹：它离手牌最远最容易闪，对「认全了没有」也最不重要", () => {
     expect(handKey(hand({ doraIndicators: [5] }))).toBe(handKey(hand({ doraIndicators: [6, 7] })));
   });
 

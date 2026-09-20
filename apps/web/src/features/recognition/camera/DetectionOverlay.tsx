@@ -1,29 +1,26 @@
 import { RECOGNITION_CLASSES, tileOfClassId, type Detection } from "@riichi/core";
 import { TileFace } from "@/features/hand/TileFace";
-import { boxStyle, type Rect } from "./viewport";
+import { boxOnScreen, type Viewport } from "./viewport";
 
 /**
  * 算点数页的检测框叠加。**标签画牌图不画文字**：38 类的 `1m`/`0p` 小字在手机上糊成一团，
  * 框角贴一张同款牌图，一眼就知道模型认成了什么。牌背没有对应的牌图，退回文字。
- *
- * 框的坐标是裁剪后那一帧的像素，所以按取景带矩形映射回屏幕。
+ * 框是整帧的像素坐标，按画面在屏幕上的摆放映射回去。
  */
 export function DetectionOverlay({
   detections,
-  crop,
+  view,
   onPick,
 }: {
   detections: readonly Detection[];
-  /** 送去推理的那块区域在视频里的位置与尺寸 */
-  crop: Rect;
+  view: Viewport;
   onPick: (d: Detection) => void;
 }) {
-  if (crop.width <= 0 || crop.height <= 0) return null;
   return (
-    <div className="pointer-events-none absolute inset-x-0" style={{ top: 0, bottom: 0 }}>
+    <div className="pointer-events-none absolute inset-0">
       {detections.map((d, i) => {
         const tile = tileOfClassId(d.cls);
-        const style = boxStyle(d.box, crop);
+        const style = boxOnScreen(d.box, view);
         if (!style) return null;
         return (
           <button

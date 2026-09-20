@@ -12,21 +12,20 @@ import { HandView } from "@/features/hand/HandView";
 import { RECOGNITION_MODEL } from "../modelUrl";
 import { closeDetector, openDetector, type Detector } from "../worker/client";
 import type { FrameResult } from "../worker/protocol";
-import { BAND_DEFAULT, fitLongEdge, STILL_MAX_EDGE, type Rect } from "./viewport";
-import { BandOverlay } from "./BandOverlay";
+import { loadPhoto } from "../photoFile";
+import { fitLongEdge, STILL_MAX_EDGE, type Viewport } from "./viewport";
 import { DetectionOverlay } from "./DetectionOverlay";
-import { StillPicker } from "./StillPicker";
 import { EMPTY_CAPTURE, feedFrame, STABLE_FRAMES } from "./autoCapture";
 import { LayoutGuide } from "./LayoutGuide";
+import { RoiOverlay } from "./RoiOverlay";
 import { useCameraStream } from "./useCameraStream";
 import { useCanvasPreview } from "./useCanvasPreview";
-import { useElementHeight } from "./useElementHeight";
 import { useLiveDetect } from "./useLiveDetect";
 
 /** 一直没认出有效牌面就停流，省电防烫（用户拍板 60 秒） */
 const IDLE_STOP_MS = 60_000;
-/** grab 回来的 frameId 要能配上同一帧的识别结果，留最近几帧就够 */
-const FRAME_MEMORY = 4;
+/** 相册那张撞上还在推理的实时帧会被背压丢掉：重送几次 */
+const STILL_RETRIES = 3;
 
 export interface Capture {
   blob: Blob;
@@ -34,7 +33,7 @@ export interface Capture {
 }
 
 /**
- * 全屏取景：对准手牌，连续三帧认出同一副牌就自动定格。
+ * 全屏取景：不用框选，识别线程自己在整帧里找到手牌、只识别它周围那一块；连续三帧认出同一副牌就自动定格。
  * 自绘覆盖层而不是 `Dialog`——`DialogContent` 在手机上是 92dvh 的底部抽屉，盖不满屏；
  * 层级取 75（Select 60 / Tooltip 70 / Notice 80 之间）。
  * **由调用方按需挂载 / 卸载**（不是 open 开关）：每次打开都是全新状态，不用在 effect 里重置。
@@ -54,18 +53,15 @@ export function CameraSheet({
   const [detector, setDetector] = useState<Detector | null>(null);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [band, setBand] = useState(BAND_DEFAULT);
   const [live, setLive] = useState<FrameResult | null>(null);
   const [stable, setStable] = useState(0);
   const [paused, setPaused] = useState(false);
   const [openedAt] = useState(() => Date.now());
 
-  const [file, setFile] = useState<File | null>(null);
   /** 相册那张正在推理：实时循环让开，免得两边抢 Worker 互相把对方的帧挤掉 */
   const [stillBusy, setStillBusy] = useState(false);
   /** 定格的视觉回执：iOS 全系没有 navigator.vibrate，只靠震动等于没有反馈 */
   const [flash, setFlash] = useState(false);
-  const [cropRect, setCropRect] = useState<Rect | null>(null);
   const [picked, setPicked] = useState<Detection | null>(null);
   const [guide, setGuide] = useState(false);
   const onCloseRef = useRef(onClose);
@@ -73,20 +69,18 @@ export function CameraSheet({
     onCloseRef.current = onClose;
   });
   const captureRef = useRef(EMPTY_CAPTURE);
-  const stillRef = useRef(0);
-  /** 已经处理过的相册帧：实时监听若也收到它，不能再当实时帧计数 */
-  const stillDoneRef = useRef(0);
+  /** 相册那张：在途的 frameId、缩好的原图（被背压丢掉时重送）、还能重送几次 */
+  const stillRef = useRef<{ frameId: number; source: OffscreenCanvas; retries: number } | null>(
+    null,
+  );
   const grabbingRef = useRef(false);
   const lastGoodRef = useRef(openedAt);
-  const framesRef = useRef(new Map<number, FrameResult>());
 
   // 看「怎么摆」时停流、停识别：人在读说明，不该对着桌面偷偷定格
-  const active = !paused && file === null && !stillBusy && !guide;
+  const active = !paused && !stillBusy && !guide;
   const lost = useCallback(() => setPaused(true), []);
   const { videoRef, error: camError, ready } = useCameraStream(active, lost);
   const [area, setArea] = useState<HTMLDivElement | null>(null);
-  const [panel, setPanel] = useState<HTMLDivElement | null>(null);
-  const panelHeight = useElementHeight(panel);
   const [preview, setPreview] = useState<HTMLCanvasElement | null>(null);
   const painted = useCanvasPreview(videoRef, preview);
 
@@ -143,23 +137,12 @@ export function CameraSheet({
     if (!detector || grabbingRef.current) return;
     grabbingRef.current = true;
     try {
+      // 照片、检测框、识别结果由 Worker 从同一帧里一起给出：分开取就可能错位，回流出来的训练数据也跟着错
       const got = await detector.grab();
       const modelId = RECOGNITION_MODEL?.id;
       if (!got || !modelId) return;
-      // 只认 Worker 回报的那一帧：照片与检测框必须同源，否则回流出来的训练数据是错位的
-      const frame = framesRef.current.get(got.frameId);
-      if (!frame) return;
-      onCapture({
-        blob: got.blob,
-        result: {
-          modelId,
-          ms: frame.ms,
-          detections: frame.detections,
-          hand: frame.hand,
-          warnings: frame.warnings,
-          provenance: frame.provenance,
-        },
-      });
+      const { blob, ms, detections, hand, warnings, provenance } = got;
+      onCapture({ blob, result: { modelId, ms, detections, hand, warnings, provenance } });
     } finally {
       grabbingRef.current = false;
     }
@@ -168,22 +151,10 @@ export function CameraSheet({
   const onFrame = useCallback(
     (r: FrameResult) => {
       setLive(r);
-      const map = framesRef.current;
-      map.set(r.frameId, r);
-      for (const id of map.keys()) if (id < r.frameId - FRAME_MEMORY) map.delete(id);
-
-      // 相册那张是一次性的：结果一到就直接定格，不参与连续三帧的稳定判断
-      if (r.frameId === stillDoneRef.current) return;
-      if (r.frameId === stillRef.current) {
-        stillDoneRef.current = r.frameId;
-        stillRef.current = 0;
-        setStillBusy(false);
-        setFlash(true);
-        void capture();
-        return;
-      }
-
-      const out = feedFrame(captureRef.current, r);
+      // 还没收紧到手牌周围的那一遍只认得准位置、认不准花色：不计入稳定判断
+      const out = r.settled
+        ? feedFrame(captureRef.current, r)
+        : { state: EMPTY_CAPTURE, fire: false };
       captureRef.current = out.state;
       setStable(out.state.count);
       if (out.state.count > 0) lastGoodRef.current = Date.now();
@@ -196,40 +167,55 @@ export function CameraSheet({
     [capture],
   );
 
-  // 相册那张的结果单独收：实时循环此刻是停着的（相机用不了、或正在让路给这一张），它的监听不在
+  // 相册那张是一次性的：结果一到就直接定格，不参与稳定判断。实时循环此刻停着，单独收
   useEffect(() => {
     if (!detector) return;
     return detector.onResult((r) => {
-      if (stillRef.current === 0) return;
+      const still = stillRef.current;
+      if (!still) return;
       if (r) {
-        if (r.frameId === stillRef.current) onFrame(r);
+        if (r.frameId !== still.frameId) return;
+        stillRef.current = null;
+        setStillBusy(false);
+        setLive(r);
+        setFlash(true);
+        void capture();
         return;
       }
-      // null = 被背压丢掉了：相册那张不会再有结果，复位让用户重来
-      stillRef.current = 0;
+      // null = 撞上了还在推理的实时帧、被背压丢掉：重送；次数用完才让用户重来
+      if (still.retries > 0) {
+        still.retries -= 1;
+        void createImageBitmap(still.source).then((bitmap) => {
+          if (stillRef.current === still) still.frameId = detector.infer(bitmap, true);
+          else bitmap.close();
+        });
+        return;
+      }
+      stillRef.current = null;
       setStillBusy(false);
       setError("这张没识别成功，请重试");
     });
-  }, [detector, onFrame]);
+  }, [detector, capture]);
 
   const runStill = useCallback(
-    async (src: ImageBitmap, rect: Rect) => {
-      if (!detector) return setFile(null);
-      // 紧接着的 setFile(null) 会让相机与实时循环恢复；stillBusy 让它们继续停到静帧结果回来，
-      // 否则这一张会撞上实时帧被背压丢掉，用户点了「用这块识别」却什么也不发生
+    async (file: File) => {
+      if (!detector) return;
       setStillBusy(true);
-      setFile(null);
       try {
-        // 相册原图动辄 4000px：裁出来的一条按实时帧的尺度缩小再送（识别尺度一致，定格照片也不至于太大）
-        const size = fitLongEdge(rect.width, rect.height, STILL_MAX_EDGE);
-        const canvas = new OffscreenCanvas(size.width, size.height);
-        const ctx = canvas.getContext("2d")!;
+        // 相册原图动辄 4000px：按实时帧的尺度缩小再送（识别尺度一致，定格照片也不至于太大）
+        const src = await loadPhoto(file);
+        const size = fitLongEdge(src.width, src.height, STILL_MAX_EDGE);
+        // 缩好的这份留着：撞上实时帧被丢掉时从它重新出位图（位图一送出去所有权就没了）
+        const source = new OffscreenCanvas(size.width, size.height);
+        const ctx = source.getContext("2d")!;
         ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(src, rect.x, rect.y, rect.width, rect.height, 0, 0, size.width, size.height);
-        stillRef.current = detector.infer(canvas.transferToImageBitmap());
+        ctx.drawImage(src, 0, 0, size.width, size.height);
+        src.close();
+        const frameId = detector.infer(await createImageBitmap(source), true);
+        stillRef.current = { frameId, source, retries: STILL_RETRIES };
       } catch (err) {
         // 失败要复位：否则 stillBusy 一直为真，实时取景再也不会恢复
-        stillRef.current = 0;
+        stillRef.current = null;
         setStillBusy(false);
         setError(err instanceof Error ? err.message : "这张照片处理失败");
       }
@@ -237,16 +223,18 @@ export function CameraSheet({
     [detector],
   );
 
-  useLiveDetect({
-    detector,
-    videoRef,
-    area,
-    band,
-    bottomInset: panelHeight,
-    active: active && ready,
-    onFrame,
-    ...(mode === "calc" ? { onCrop: setCropRect } : {}),
-  });
+  useLiveDetect({ detector, videoRef, active: active && ready, onFrame });
+
+  /** 检测框（整帧像素）画回屏幕要用的摆放；取景区域或画面尺寸还没就绪时不画 */
+  const view: Viewport | null =
+    live && area
+      ? {
+          videoWidth: live.frame.width,
+          videoHeight: live.frame.height,
+          displayWidth: area.clientWidth,
+          displayHeight: area.clientHeight,
+        }
+      : null;
 
   /** 相机用不了（权限、无设备、占用、非 HTTPS）：快门没有意义，给相册入口 */
   const camBroken = camError !== null;
@@ -271,7 +259,7 @@ export function CameraSheet({
     >
       <div
         ref={setArea}
-        // 画面铺满整屏，底栏浮在上面（沉浸）：取景带与裁剪都以整屏为准
+        // 画面铺满整屏，底栏浮在上面（沉浸）
         className="absolute inset-0 overflow-hidden"
         data-testid="camera-area"
       >
@@ -290,34 +278,19 @@ export function CameraSheet({
           data-testid="camera-preview"
           data-painted={painted || undefined}
         />
-        {/* 取景带下方的暗色遮罩一直铺到屏幕底部：底栏压在暗区上，颜色连成一片 */}
-        {!paused && (
-          <div
-            className="absolute inset-x-0 bottom-0 bg-black/60"
-            style={{ height: panelHeight }}
-            aria-hidden
-          />
+        {live && view && !paused && !stillBusy && (
+          <>
+            <RoiOverlay frame={live} view={view} />
+            {mode === "calc" && (
+              <DetectionOverlay detections={live.detections} view={view} onPick={setPicked} />
+            )}
+          </>
         )}
-        {/* 取景带只在底栏以上的可见部分里（画面铺满整屏，底栏浮在下面） */}
-        <div className="absolute inset-x-0 top-0" style={{ bottom: panelHeight }}>
-          {!paused && (
-            <BandOverlay
-              band={band}
-              onBandChange={setBand}
-              hint="把手牌、副露和宝牌指示牌放进框里"
-            />
-          )}
-          {mode === "calc" && live && !paused && (
-            <div
-              className="absolute inset-x-0"
-              style={{ top: `${((1 - band) / 2) * 100}%`, height: `${band * 100}%` }}
-            >
-              {cropRect && (
-                <DetectionOverlay detections={live.detections} crop={cropRect} onPick={setPicked} />
-              )}
-            </div>
-          )}
-        </div>
+        {!paused && !live && (
+          <p className="pointer-events-none absolute inset-x-0 top-1/3 text-center text-sm text-white/80 drop-shadow">
+            对准手牌，牌河留在画面上方
+          </p>
+        )}
         {paused && (
           <button
             type="button"
@@ -374,9 +347,9 @@ export function CameraSheet({
       </div>
 
       <div
-        ref={setPanel}
         data-testid="camera-panel"
-        className="absolute inset-x-0 bottom-0 space-y-2 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 text-white"
+        // 底栏浮在画面上：自带一层渐变压暗，字才读得清
+        className="absolute inset-x-0 bottom-0 space-y-2 bg-gradient-to-t from-black/85 via-black/70 to-transparent px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 text-white"
       >
         {camError && <p className="text-sm text-neg">{camError}</p>}
         {error && (
@@ -390,7 +363,7 @@ export function CameraSheet({
           </div>
         )}
         {/* 固定高度（一行手牌 + 一行指示牌）：模型下载进度、认出/没认出来回切换都在这一格里，
-            底栏不能伸缩，否则取景带跟着跳 */}
+            底栏不能伸缩，否则画面下沿跟着跳 */}
         <div className="h-[70px] overflow-hidden" data-testid="camera-live">
           {downloading ? (
             <div>
@@ -442,7 +415,7 @@ export function CameraSheet({
                   onChange={(e) => {
                     const f = e.target.files?.[0] ?? null;
                     e.target.value = "";
-                    if (f) setFile(f);
+                    if (f) void runStill(f);
                   }}
                 />
               </label>
@@ -460,14 +433,6 @@ export function CameraSheet({
           </span>
         </div>
       </div>
-
-      {file && (
-        <StillPicker
-          file={file}
-          onPick={(bitmap, rect) => void runStill(bitmap, rect)}
-          onCancel={() => setFile(null)}
-        />
-      )}
     </div>,
     document.body,
   );

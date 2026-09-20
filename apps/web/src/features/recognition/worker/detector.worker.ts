@@ -3,35 +3,47 @@ import type * as OrtModule from "onnxruntime-web/wasm";
 import type { InferenceSession } from "onnxruntime-web/wasm";
 import {
   decodeNmsOutput,
-  layoutHand,
+  LOST,
   RECOGNITION_CLASSES,
   RECOGNITION_PHOTO_MAX_BYTES,
+  tightenCapture,
+  type Box,
+  type Detection,
+  type LayoutResult,
+  type TrackState,
 } from "@riichi/core";
 import { toModelInput } from "./preprocess";
 import type { FromWorker, ToWorker } from "./protocol";
+import { runFrame } from "./runFrame";
 
 /**
- * 推理 Worker：只做「字节 → 会话」与「位图 → 检测框 → 布局」。下载、进度、重试都在主线程。
+ * 推理 Worker：只做「字节 → 会话」与「整帧 → 找到手牌 → 检测框 → 布局」。下载、进度、重试都在主线程。
  * 每帧 300 ms 的推理放主线程会让相机预览卡成幻灯片，所以取景框必须走这里。
  *
- * 留着最近一帧的位图不 close：自动定格时主线程只发一个 frameId，由这里把**那一帧**
- * 编码成 JPEG 回传。照片与检测框必须是同一帧，否则回流出来的训练数据是错位的。
+ * 留着最近**跑完**的那一帧不 close：自动定格时由这里把那一帧收紧到手牌、编码成 JPEG 回传。
+ * 照片、检测框、识别结果必须出自同一帧，否则回流出来的训练数据是错位的——所以三样一起存、一起换。
  */
 let ort: typeof OrtModule | null = null;
 let session: InferenceSession | null = null;
 let imgsz = 640;
 
-let held: { frameId: number; bitmap: ImageBitmap } | null = null;
+interface Held {
+  frameId: number;
+  bitmap: ImageBitmap;
+  ms: number;
+  /** 整帧坐标 */
+  detections: Detection[];
+  layout: LayoutResult;
+  crop: Box;
+}
+let held: Held | null = null;
+/** 取景时锁定的识别范围，跨帧沿用 */
+let track: TrackState = LOST;
 /** 上一帧还在推理时新帧直接丢掉：背压，不排队 */
 let busy = false;
 
 const post = (msg: FromWorker, transfer?: Transferable[]) =>
   transfer ? self.postMessage(msg, transfer) : self.postMessage(msg);
-
-function hold(frameId: number, bitmap: ImageBitmap): void {
-  held?.bitmap.close();
-  held = { frameId, bitmap };
-}
 
 async function init(wasm: Uint8Array, model: Uint8Array, size: number): Promise<void> {
   // iOS 16.3 及更早没有 OffscreenCanvas，会在第一帧推理时才抛 ReferenceError —— 那时界面已经
@@ -47,33 +59,69 @@ async function init(wasm: Uint8Array, model: Uint8Array, size: number): Promise<
   session = await ort.InferenceSession.create(model, { executionProviders: ["wasm"] });
 }
 
-async function infer(frameId: number, bitmap: ImageBitmap): Promise<void> {
-  if (!ort || !session) return;
+/** 识别整帧里的一块；框从块内坐标平移回整帧坐标 */
+async function detect(bitmap: ImageBitmap, crop: Box): Promise<Detection[]> {
+  const { data, geom } = toModelInput(bitmap, crop, imgsz);
+  const input = new ort!.Tensor("float32", data, [1, 3, imgsz, imgsz]);
+  const outputs = await session!.run({ [session!.inputNames[0]!]: input });
+  const output = outputs[session!.outputNames[0]!]!.data as Float32Array;
+  return decodeNmsOutput(output, geom, RECOGNITION_CLASSES.length).map((d) => ({
+    ...d,
+    box: [d.box[0] + crop[0], d.box[1] + crop[1], d.box[2] + crop[0], d.box[3] + crop[1]],
+  }));
+}
+
+async function infer(frameId: number, bitmap: ImageBitmap, still: boolean): Promise<void> {
+  if (!ort || !session) return bitmap.close();
   const t0 = performance.now();
-  const { data, geom } = toModelInput(bitmap, imgsz);
-  const input = new ort.Tensor("float32", data, [1, 3, imgsz, imgsz]);
-  const outputs = await session.run({ [session.inputNames[0]!]: input });
-  const output = outputs[session.outputNames[0]!]!.data as Float32Array;
-  const detections = decodeNmsOutput(output, geom, RECOGNITION_CLASSES.length);
-  const { hand, warnings, provenance } = layoutHand(detections);
+  const frame = { width: bitmap.width, height: bitmap.height };
+  // 相册那张与取景无关：不沿用锁定的范围、不假定画面是正的，也不改写取景的跟踪状态
+  const out = await runFrame(
+    (crop) => detect(bitmap, crop),
+    frame,
+    still ? LOST : track,
+    !still,
+  ).catch((err: unknown) => {
+    bitmap.close();
+    throw err;
+  });
+  if (!still) track = out.track;
+  const ms = Math.round(performance.now() - t0);
+  held?.bitmap.close();
+  held = { frameId, bitmap, ms, detections: out.detections, layout: out.layout, crop: out.crop };
   post({
     type: "result",
     frameId,
-    ms: Math.round(performance.now() - t0),
-    detections,
-    hand,
-    warnings,
-    provenance,
+    ms,
+    detections: out.detections,
+    hand: out.layout.hand,
+    warnings: out.layout.warnings,
+    provenance: out.layout.provenance,
+    frame,
+    crop: out.crop,
+    settled: out.settled,
+    passes: out.passes,
   });
 }
 
 async function grab(quality: number): Promise<void> {
   if (!held) return post({ type: "grab-miss" });
-  // frameId 必须和 bitmap 一起取：下面 await 编码时新帧会把 held 换掉，
-  // 之后再读 held.frameId 就会回出「新帧的 id + 旧帧的像素」——照片与检测框错位。
-  const { bitmap, frameId } = held;
-  const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-  canvas.getContext("2d")!.drawImage(bitmap, 0, 0);
+  // 整个 held 一次取走：下面 await 编码时新帧会把它换掉，之后再读就会回出「新帧的结果 + 旧帧的像素」
+  const { bitmap, frameId, ms, detections, layout, crop } = held;
+  const frame = { width: bitmap.width, height: bitmap.height };
+  // 收紧到被采信的牌；收紧会改变手牌时（牌河紧贴着指示牌）退回识别用的那一块，框只平移不筛
+  const tight = tightenCapture(detections, layout, frame);
+  const box = tight?.box ?? crop;
+  const shot = tight ?? {
+    layout,
+    detections: detections.map((d) => ({
+      ...d,
+      box: [d.box[0] - box[0], d.box[1] - box[1], d.box[2] - box[0], d.box[3] - box[1]],
+    })) as Detection[],
+  };
+  const [w, h] = [box[2] - box[0], box[3] - box[1]];
+  const canvas = new OffscreenCanvas(w, h);
+  canvas.getContext("2d")!.drawImage(bitmap, box[0], box[1], w, h, 0, 0, w, h);
   // 必须显式指定类型：convertToBlob 默认出 PNG，同尺寸能大 10 倍，会撞服务端 2 MB 的上限。
   // 纹理密的画面（桌布、噪点）同尺寸 JPEG 也可能超：按字节兜底，逐级降质量，任何来源的帧都成立
   let blob = await canvas.convertToBlob({ type: "image/jpeg", quality });
@@ -81,7 +129,17 @@ async function grab(quality: number): Promise<void> {
     if (blob.size <= RECOGNITION_PHOTO_MAX_BYTES || q >= quality) continue;
     blob = await canvas.convertToBlob({ type: "image/jpeg", quality: q });
   }
-  post({ type: "grabbed", frameId, blob });
+  const { hand, warnings, provenance } = shot.layout;
+  post({
+    type: "grabbed",
+    frameId,
+    blob,
+    ms,
+    detections: shot.detections,
+    hand,
+    warnings,
+    provenance,
+  });
 }
 
 self.onmessage = (e: MessageEvent<ToWorker>) => {
@@ -99,10 +157,9 @@ self.onmessage = (e: MessageEvent<ToWorker>) => {
             msg.bitmap.close();
             return post({ type: "dropped", frameId: msg.frameId });
           }
-          hold(msg.frameId, msg.bitmap);
           busy = true;
           try {
-            await infer(msg.frameId, msg.bitmap);
+            await infer(msg.frameId, msg.bitmap, msg.still);
           } finally {
             busy = false;
           }

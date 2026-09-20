@@ -199,13 +199,6 @@ test("连拍两张：第二次打开取景框仍能识别（模型字节被转�
   const second = sampleViewfinder(p);
   await shoot(p, dialog);
   const again = await second;
-  // 取景带只在底栏以上：带的下沿不压到浮在画面上的底栏
-  await dialog.getByTestId("recognize-button").click();
-  const band = p.getByTestId("band-body");
-  const panel = p.getByTestId("camera-panel");
-  const bandBox = await band.boundingBox();
-  const panelBox = await panel.boundingBox();
-  if (bandBox && panelBox) expect(bandBox.y + bandBox.height).toBeLessThanOrEqual(panelBox.y + 1);
   await expect(p.getByTestId("camera-sheet")).toHaveCount(0, { timeout: 30_000 });
   expect(again.shown).toBe(true);
   expect(again.uncovered).toBe(false);
@@ -260,17 +253,13 @@ test("相机不可用 → 取景页仍能打开：说明原因、不出快门、
   await expect(sheet.getByText(/当前环境无法使用相机/)).toBeVisible();
   // 快门不能点就不出现
   await expect(sheet.getByTestId("camera-shutter")).toHaveCount(0);
-  // 画面铺满整屏、底栏浮在上面：取景带只在底栏以上，带的下沿不压到底栏
-  const bandBox = (await sheet.getByTestId("band-body").boundingBox())!;
-  const panelBox = (await sheet.getByTestId("camera-panel").boundingBox())!;
-  expect(bandBox.y + bandBox.height).toBeLessThanOrEqual(panelBox.y + 1);
   await expect(sheet.getByLabel("从相册选一张")).toBeVisible();
   await expect(sheet.getByText("拍下的牌面照片会用来改进识别")).toBeVisible();
   await sheet.getByRole("button", { name: "怎么摆" }).click();
   await expect(sheet.getByText("手牌连成一排", { exact: false })).toBeVisible();
   await sheet.getByRole("button", { name: "知道了" }).click();
 
-  // 相册选一张：取景带可以拖着移动，「用这块识别」后定格回填牌面
+  // 相册选一张：不用框选，自己在整张照片里找到手牌，定格回填牌面
   // 用一张 4032×3024 的噪点大图（JPEG 编码后远超 2 MB）：送识别前必须缩小，否则留存上传 413
   const big = await p.evaluate(() => {
     const c = document.createElement("canvas");
@@ -290,34 +279,6 @@ test("相机不可用 → 取景页仍能打开：说明原因、不出快门、
     mimeType: "image/jpeg",
     buffer: Buffer.from(big, "base64"),
   });
-  const picker = p.getByTestId("still-picker");
-  const body = picker.getByTestId("band-body");
-  const before = (await body.boundingBox())!;
-  await p.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
-  await p.mouse.down();
-  await p.mouse.move(before.x + before.width / 2, before.y + before.height / 2 + 1000, {
-    steps: 8,
-  });
-  await p.mouse.up();
-  // 拖到底：被夹在画面内
-  expect((await body.boundingBox())!.y).toBeGreaterThan(before.y + 40);
-  // 把手往下拉到底后手指不动：带高不能自己一路涨（曾经每次移动都用被夹住的中线反推，越算越大）
-  const handle = picker.getByRole("slider", { name: "取景带高度" });
-  const h = (await handle.boundingBox())!;
-  await p.mouse.move(h.x + h.width / 2, h.y + h.height / 2);
-  await p.mouse.down();
-  await p.mouse.move(h.x + h.width / 2, h.y + h.height / 2 + 12, { steps: 4 });
-  const grown = Number(await handle.getAttribute("aria-valuenow"));
-  expect(grown).toBeLessThan(70);
-  // 指尖原地微微抖动（真机手指不可能绝对静止）
-  for (let i = 0; i < 6; i++) {
-    await p.mouse.move(h.x + h.width / 2, h.y + h.height / 2 + 12 + (i % 2));
-  }
-  expect(Math.abs(Number(await handle.getAttribute("aria-valuenow")) - grown)).toBeLessThanOrEqual(
-    1,
-  );
-  await p.mouse.up();
-  await picker.getByRole("button", { name: "用这块识别" }).click();
   await expect(sheet).toHaveCount(0, { timeout: 30_000 });
   await expect(dialog.getByTestId("hand-confirm")).toBeVisible();
   expect((await uploaded).status()).toBe(201);

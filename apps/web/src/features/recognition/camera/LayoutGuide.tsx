@@ -60,7 +60,11 @@ export function LayoutGuide({ onClose }: { onClose: () => void }) {
           </p>
         </div>
       </div>
-      <p className="text-xs text-white/60">整副牌放进框里，对准后会自动拍下；牌河挪到框外。</p>
+      <p className="text-xs text-white/60">
+        不用框选：手牌放在画面中部偏下，会自己找到并拍下。
+        <strong className="text-white/80">指示牌紧贴手牌上方，牌河离远一点</strong>
+        ——挨得太近的牌河末行会被当成指示牌。
+      </p>
       <button
         type="button"
         onClick={onClose}
