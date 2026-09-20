@@ -9,7 +9,7 @@ export function RoiOverlay({ frame, view }: { frame: FrameResult; view: Viewport
   const whole =
     frame.crop[2] - frame.crop[0] === frame.frame.width &&
     frame.crop[3] - frame.crop[1] === frame.frame.height;
-  const roi = whole ? null : boxOnScreen(frame.crop, view);
+  const roi = whole ? null : boxOnScreen(frame.crop, frame.rotation, view);
   return (
     <div className="pointer-events-none absolute inset-0" aria-hidden>
       {roi && (
@@ -27,7 +27,7 @@ export function RoiOverlay({ frame, view }: { frame: FrameResult; view: Viewport
         </div>
       )}
       {frame.provenance.usedDetections.map((i) => {
-        const style = boxOnScreen(frame.detections[i]!.box, view);
+        const style = boxOnScreen(frame.detections[i]!.box, frame.rotation, view);
         return (
           style && (
             <span key={i} style={style} className="absolute rounded-sm border border-white/70" />

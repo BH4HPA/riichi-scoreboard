@@ -26,7 +26,7 @@ describe("fitBox", () => {
 
 describe("boxOnScreen", () => {
   it("整帧坐标的框按 cover 的缩放与偏移画回屏幕", () => {
-    const at = boxOnScreen([540, 960, 640, 1100], portrait)!;
+    const at = boxOnScreen([540, 960, 640, 1100], 0, portrait)!;
     const s = 780 / 1920;
     expect(at.left).toBeCloseTo(195); // 画面中线落在屏幕中线
     expect(at.top).toBeCloseTo(390);
@@ -35,11 +35,21 @@ describe("boxOnScreen", () => {
   });
 
   it("被裁到屏幕外的部分给出负值，不夹", () => {
-    expect(boxOnScreen([0, 0, 50, 50], portrait)!.left).toBeLessThan(0);
+    expect(boxOnScreen([0, 0, 50, 50], 0, portrait)!.left).toBeLessThan(0);
+  });
+
+  it("逆时针横持：正立帧左上角的一块落在屏幕右上（机顶朝左，屏幕右上就是观察者的左上）", () => {
+    const at = boxOnScreen([0, 0, 192, 108], 90, portrait)!;
+    const s = 780 / 1920;
+    // 正立帧 1920×1080 的左上 192×108 → 原始帧 x ∈ [972, 1080]、y ∈ [0, 192]：屏幕右上
+    expect(at.width).toBeCloseTo(108 * s);
+    expect(at.height).toBeCloseTo(192 * s);
+    expect(at.top).toBeCloseTo(0);
+    expect(at.left + at.width).toBeCloseTo((390 + 1080 * s) / 2);
   });
 
   it("尺寸退化时返回 null", () => {
-    expect(boxOnScreen([0, 0, 1, 1], { ...portrait, displayWidth: 0 })).toBeNull();
+    expect(boxOnScreen([0, 0, 1, 1], 0, { ...portrait, displayWidth: 0 })).toBeNull();
   });
 });
 

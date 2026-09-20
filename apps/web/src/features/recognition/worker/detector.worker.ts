@@ -12,7 +12,8 @@ import {
   type LayoutResult,
   type TrackState,
 } from "@riichi/core";
-import { toModelInput } from "./preprocess";
+import { uprightSize, type Rotation } from "../camera/orientation/upright";
+import { drawUpright, toModelInput } from "./preprocess";
 import type { FromWorker, ToWorker } from "./protocol";
 import { runFrame } from "./runFrame";
 
@@ -30,6 +31,7 @@ let imgsz = 640;
 interface Held {
   frameId: number;
   bitmap: ImageBitmap;
+  rotation: Rotation;
   ms: number;
   /** 整帧坐标 */
   detections: Detection[];
@@ -37,8 +39,9 @@ interface Held {
   crop: Box;
 }
 let held: Held | null = null;
-/** 取景时锁定的识别范围，跨帧沿用 */
+/** 取景时锁定的识别范围，跨帧沿用；手机一转坐标系就变了，作废重找 */
 let track: TrackState = LOST;
+let trackRotation: Rotation = 0;
 /** 上一帧还在推理时新帧直接丢掉：背压，不排队 */
 let busy = false;
 
@@ -60,8 +63,8 @@ async function init(wasm: Uint8Array, model: Uint8Array, size: number): Promise<
 }
 
 /** 识别整帧里的一块；框从块内坐标平移回整帧坐标 */
-async function detect(bitmap: ImageBitmap, crop: Box): Promise<Detection[]> {
-  const { data, geom } = toModelInput(bitmap, crop, imgsz);
+async function detect(bitmap: ImageBitmap, crop: Box, rotation: Rotation): Promise<Detection[]> {
+  const { data, geom } = toModelInput(bitmap, crop, rotation, imgsz);
   const input = new ort!.Tensor("float32", data, [1, 3, imgsz, imgsz]);
   const outputs = await session!.run({ [session!.inputNames[0]!]: input });
   const output = outputs[session!.outputNames[0]!]!.data as Float32Array;
@@ -71,13 +74,22 @@ async function detect(bitmap: ImageBitmap, crop: Box): Promise<Detection[]> {
   }));
 }
 
-async function infer(frameId: number, bitmap: ImageBitmap, still: boolean): Promise<void> {
+async function infer(
+  frameId: number,
+  bitmap: ImageBitmap,
+  rotation: Rotation,
+  still: boolean,
+): Promise<void> {
   if (!ort || !session) return bitmap.close();
   const t0 = performance.now();
-  const frame = { width: bitmap.width, height: bitmap.height };
+  const frame = uprightSize(bitmap, rotation);
+  if (!still && rotation !== trackRotation) {
+    track = LOST;
+    trackRotation = rotation;
+  }
   // 相册那张与取景无关：不沿用锁定的范围、不假定画面是正的，也不改写取景的跟踪状态
   const out = await runFrame(
-    (crop) => detect(bitmap, crop),
+    (crop) => detect(bitmap, crop, rotation),
     frame,
     still ? LOST : track,
     !still,
@@ -88,7 +100,15 @@ async function infer(frameId: number, bitmap: ImageBitmap, still: boolean): Prom
   if (!still) track = out.track;
   const ms = Math.round(performance.now() - t0);
   held?.bitmap.close();
-  held = { frameId, bitmap, ms, detections: out.detections, layout: out.layout, crop: out.crop };
+  held = {
+    frameId,
+    bitmap,
+    rotation,
+    ms,
+    detections: out.detections,
+    layout: out.layout,
+    crop: out.crop,
+  };
   post({
     type: "result",
     frameId,
@@ -98,6 +118,7 @@ async function infer(frameId: number, bitmap: ImageBitmap, still: boolean): Prom
     warnings: out.layout.warnings,
     provenance: out.layout.provenance,
     frame,
+    rotation,
     crop: out.crop,
     settled: out.settled,
     passes: out.passes,
@@ -107,8 +128,8 @@ async function infer(frameId: number, bitmap: ImageBitmap, still: boolean): Prom
 async function grab(quality: number): Promise<void> {
   if (!held) return post({ type: "grab-miss" });
   // 整个 held 一次取走：下面 await 编码时新帧会把它换掉，之后再读就会回出「新帧的结果 + 旧帧的像素」
-  const { bitmap, frameId, ms, detections, layout, crop } = held;
-  const frame = { width: bitmap.width, height: bitmap.height };
+  const { bitmap, rotation, frameId, ms, detections, layout, crop } = held;
+  const frame = uprightSize(bitmap, rotation);
   // 收紧到被采信的牌；收紧会改变手牌时（牌河紧贴着指示牌）退回识别用的那一块，框只平移不筛
   const tight = tightenCapture(detections, layout, frame);
   const box = tight?.box ?? crop;
@@ -121,7 +142,7 @@ async function grab(quality: number): Promise<void> {
   };
   const [w, h] = [box[2] - box[0], box[3] - box[1]];
   const canvas = new OffscreenCanvas(w, h);
-  canvas.getContext("2d")!.drawImage(bitmap, box[0], box[1], w, h, 0, 0, w, h);
+  drawUpright(canvas.getContext("2d")!, bitmap, box, rotation, { x: 0, y: 0, width: w, height: h });
   // 必须显式指定类型：convertToBlob 默认出 PNG，同尺寸能大 10 倍，会撞服务端 2 MB 的上限。
   // 纹理密的画面（桌布、噪点）同尺寸 JPEG 也可能超：按字节兜底，逐级降质量，任何来源的帧都成立
   let blob = await canvas.convertToBlob({ type: "image/jpeg", quality });
@@ -159,7 +180,7 @@ self.onmessage = (e: MessageEvent<ToWorker>) => {
           }
           busy = true;
           try {
-            await infer(msg.frameId, msg.bitmap, msg.still);
+            await infer(msg.frameId, msg.bitmap, msg.rotation, msg.still);
           } finally {
             busy = false;
           }

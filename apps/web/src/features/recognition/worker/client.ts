@@ -1,13 +1,14 @@
 import { RECOGNITION_MODEL } from "../modelUrl";
 import { loadBytes, type LoadProgress } from "./bytes";
+import type { Rotation } from "../camera/orientation/upright";
 import type { FrameResult, FromWorker, Grabbed, ToWorker } from "./protocol";
 
 /** 定格帧编码成 JPEG 的质量，与既有的上传照片一致 */
 const JPEG_QUALITY = 0.85;
 
 export interface Detector {
-  /** 送一帧（整帧）去推理；bitmap 的所有权转移给 Worker，调用方不要再碰它。still = 相册里挑的一张 */
-  infer(bitmap: ImageBitmap, still?: boolean): number;
+  /** 送一帧（整帧）去推理；bitmap 的所有权转移给 Worker，调用方不要再碰它。"still" = 相册里挑的一张 */
+  infer(bitmap: ImageBitmap, rotation: Rotation | "still"): number;
   /** 取 Worker 手上最近跑完的那一帧：收紧到手牌的 JPEG，连同同一帧的检测框与识别结果 */
   grab(): Promise<Grabbed | null>;
   /** 一帧跑完；r 为 null 表示它被背压丢掉了，调用方据此复位自己的闸门 */
@@ -98,13 +99,20 @@ function spawn(modelId: string, imgsz: number, onProgress?: LoadProgress): Promi
     }
 
     return {
-      infer(bitmap, still = false) {
+      infer(bitmap, rotation) {
         const id = ++frameId;
         if (dead) {
           bitmap.close();
           return id;
         }
-        const msg: ToWorker = { type: "infer", frameId: id, bitmap, still };
+        const still = rotation === "still";
+        const msg: ToWorker = {
+          type: "infer",
+          frameId: id,
+          bitmap,
+          rotation: still ? 0 : rotation,
+          still,
+        };
         worker.postMessage(msg, [bitmap]);
         return id;
       },

@@ -407,3 +407,58 @@ test("算点数页：设场况 → 拍 → 重新拍 → 识别正确出番符�
     "true",
   );
 });
+
+test("横屏：倾斜过 15° 才自动切、手动按钮随时能改、下次打开记得上次的方向", async ({ browser }) => {
+  const ctx = await newContext(browser, { viewport: { width: 400, height: 800 } });
+  const p = await ctx.newPage();
+  // 新版 Chromium 也有 requestPermission，默认站点设置是允许；测试环境要显式给
+  await ctx.grantPermissions(["camera", "accelerometer", "gyroscope", "magnetometer"]);
+  // 模型下不来，取景页就不会自动定格关掉，可以从容地转
+  await p.route("**/riichi/models/*.onnx", (route) => route.abort());
+  // 无头 Chromium 不派发真实的传感器事件（CDP 的覆写也不派发）：在页面里发合成事件，
+  // 覆盖的是「监听 → 判定 → 界面」；真实传感器与 iOS 授权只能真机验
+  const tilt = (beta: number, gamma: number) =>
+    p.evaluate(
+      ([b, g]) =>
+        window.dispatchEvent(
+          new DeviceOrientationEvent("deviceorientation", { alpha: 0, beta: b, gamma: g }),
+        ),
+      [beta, gamma],
+    );
+
+  await p.goto("/calc");
+  await p.getByRole("button", { name: /开始拍/ }).click();
+  const chrome = p.getByTestId("camera-chrome");
+  await expect(chrome).toHaveAttribute("data-rotation", "0");
+
+  // 对着桌面、略微不平：不切
+  await tilt(4, -10);
+  await p.waitForTimeout(200);
+  await expect(chrome).toHaveAttribute("data-rotation", "0");
+  // 逆时针横持（左边朝下）→ 界面转 90°，宽高互换
+  await tilt(5, -50);
+  await expect(chrome).toHaveAttribute("data-rotation", "90");
+  const box = (await chrome.boundingBox())!;
+  expect(Math.round(box.width)).toBe(400); // 转过去以后外接矩形仍铺满竖屏
+  expect(Math.round(box.height)).toBe(800);
+  await expect(p.getByRole("button", { name: "切回竖屏" })).toHaveAttribute("aria-pressed", "true");
+  // 顺时针横持
+  await tilt(5, 50);
+  await expect(chrome).toHaveAttribute("data-rotation", "270");
+
+  // 放平以后陀螺仪不出声：手动改回竖屏，不会被抢回去
+  await tilt(3, 8);
+  await p.getByTestId("camera-rotate").click();
+  await expect(chrome).toHaveAttribute("data-rotation", "0");
+  await p.waitForTimeout(200);
+  await expect(chrome).toHaveAttribute("data-rotation", "0");
+
+  // 手动切到横屏后关掉：下次打开还是横的
+  await p.getByTestId("camera-rotate").click();
+  await expect(chrome).toHaveAttribute("data-rotation", "90");
+  await p.getByRole("button", { name: "关闭取景" }).click();
+  await expect(p.getByTestId("camera-sheet")).toHaveCount(0);
+  await p.getByRole("button", { name: /开始拍/ }).click();
+  await expect(p.getByTestId("camera-chrome")).toHaveAttribute("data-rotation", "90");
+  await ctx.close();
+});

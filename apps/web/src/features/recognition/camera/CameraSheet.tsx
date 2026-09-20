@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Images, X } from "lucide-react";
+import { Images, RotateCw, X } from "lucide-react";
 import {
   RECOGNITION_CLASSES,
   type Detection,
@@ -17,6 +17,7 @@ import { fitLongEdge, STILL_MAX_EDGE, type Viewport } from "./viewport";
 import { DetectionOverlay } from "./DetectionOverlay";
 import { EMPTY_CAPTURE, feedFrame, reasonOf, STABLE_FRAMES, votesOf } from "./autoCapture";
 import { LayoutGuide } from "./LayoutGuide";
+import { useRotation } from "./orientation/useRotation";
 import { RoiOverlay } from "./RoiOverlay";
 import { useCameraStream } from "./useCameraStream";
 import { useCanvasPreview } from "./useCanvasPreview";
@@ -55,6 +56,7 @@ export function CameraSheet({
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState<FrameResult | null>(null);
   const [gate, setGate] = useState(EMPTY_CAPTURE);
+  const { rotation, toggle: toggleRotation } = useRotation();
   const [paused, setPaused] = useState(false);
   const [openedAt] = useState(() => Date.now());
 
@@ -69,6 +71,7 @@ export function CameraSheet({
     onCloseRef.current = onClose;
   });
   const captureRef = useRef(EMPTY_CAPTURE);
+  const frameRotationRef = useRef<FrameResult["rotation"]>(0);
   /** 相册那张：在途的 frameId、缩好的原图（被背压丢掉时重送）、还能重送几次 */
   const stillRef = useRef<{ frameId: number; source: OffscreenCanvas; retries: number } | null>(
     null,
@@ -151,6 +154,11 @@ export function CameraSheet({
   const onFrame = useCallback(
     (r: FrameResult) => {
       setLive(r);
+      // 手机一转，之前攒的票是另一个方向下认出来的：作废重数
+      if (r.rotation !== frameRotationRef.current) {
+        frameRotationRef.current = r.rotation;
+        captureRef.current = EMPTY_CAPTURE;
+      }
       const out = feedFrame(captureRef.current, r);
       captureRef.current = out.state;
       setGate(out.state);
@@ -183,7 +191,7 @@ export function CameraSheet({
       if (still.retries > 0) {
         still.retries -= 1;
         void createImageBitmap(still.source).then((bitmap) => {
-          if (stillRef.current === still) still.frameId = detector.infer(bitmap, true);
+          if (stillRef.current === still) still.frameId = detector.infer(bitmap, "still");
           else bitmap.close();
         });
         return;
@@ -208,7 +216,7 @@ export function CameraSheet({
         ctx.imageSmoothingQuality = "high";
         ctx.drawImage(src, 0, 0, size.width, size.height);
         src.close();
-        const frameId = detector.infer(await createImageBitmap(source), true);
+        const frameId = detector.infer(await createImageBitmap(source), "still");
         stillRef.current = { frameId, source, retries: STILL_RETRIES };
       } catch (err) {
         // 失败要复位：否则 stillBusy 一直为真，实时取景再也不会恢复
@@ -220,7 +228,7 @@ export function CameraSheet({
     [detector],
   );
 
-  useLiveDetect({ detector, videoRef, active: active && ready, onFrame });
+  useLiveDetect({ detector, videoRef, rotation, active: active && ready, onFrame });
 
   /** 检测框（整帧像素）画回屏幕要用的摆放；取景区域或画面尺寸还没就绪时不画 */
   const view: Viewport | null =
@@ -243,6 +251,20 @@ export function CameraSheet({
     ? `${total}/14 · ${Math.min(STABLE_FRAMES, votesOf(gate))}/${STABLE_FRAMES}`
     : null;
   const reason = reasonOf(gate);
+  /**
+   * 手机横持而页面没跟着转时，把关闭键、进度、底栏这些整体转过去：一个与屏幕同心、宽高互换的容器。
+   * 画面与检测框不转——屏幕本身已经横过来了。
+   */
+  const chromeStyle =
+    rotation !== 0 && area
+      ? {
+          left: "50%",
+          top: "50%",
+          width: area.clientHeight,
+          height: area.clientWidth,
+          transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
+        }
+      : { inset: 0 };
 
   // portal 到 body：DialogContent 在 ≥640px 上有 translate，transform 祖先会让 fixed 以它为
   // 包含块，取景框就被压进对话框里不再全屏；顺带让背后的内容退出无障碍树。
@@ -281,10 +303,31 @@ export function CameraSheet({
           <>
             <RoiOverlay frame={live} view={view} />
             {mode === "calc" && (
-              <DetectionOverlay detections={live.detections} view={view} onPick={setPicked} />
+              <DetectionOverlay
+                detections={live.detections}
+                rotation={live.rotation}
+                view={view}
+                onPick={setPicked}
+              />
             )}
           </>
         )}
+        {flash && (
+          <span
+            className="pointer-events-none absolute inset-0 bg-white/70"
+            onAnimationEnd={() => setFlash(false)}
+            style={{ animation: "riichi-flash 220ms ease-out forwards" }}
+            aria-hidden
+          />
+        )}
+      </div>
+
+      <div
+        className="pointer-events-none absolute [&>*]:pointer-events-auto"
+        style={chromeStyle}
+        data-testid="camera-chrome"
+        data-rotation={rotation}
+      >
         {!paused && !live && (
           <p className="pointer-events-none absolute inset-x-0 top-1/3 text-center text-sm text-white/80 drop-shadow">
             对准手牌，牌河留在画面上方
@@ -326,14 +369,6 @@ export function CameraSheet({
             {reason}
           </p>
         )}
-        {flash && (
-          <span
-            className="pointer-events-none absolute inset-0 bg-white/70"
-            onAnimationEnd={() => setFlash(false)}
-            style={{ animation: "riichi-flash 220ms ease-out forwards" }}
-            aria-hidden
-          />
-        )}
         {guide && (
           <LayoutGuide
             onClose={() => {
@@ -351,93 +386,102 @@ export function CameraSheet({
             {RECOGNITION_CLASSES[picked.cls] ?? "?"} · 置信度 {Math.round(picked.conf * 100)}%
           </button>
         )}
-      </div>
-
-      <div
-        data-testid="camera-panel"
-        // 底栏浮在画面上：自带一层渐变压暗，字才读得清
-        className="absolute inset-x-0 bottom-0 space-y-2 bg-gradient-to-t from-black/85 via-black/70 to-transparent px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 text-white"
-      >
-        {camError && <p className="text-sm text-neg">{camError}</p>}
-        {error && (
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm text-neg">{error}</p>
-            {mode === "room" && (
-              <Button variant="outline" size="sm" className="shrink-0 text-fg" onClick={onClose}>
-                返回键盘录入
-              </Button>
+        <div
+          data-testid="camera-panel"
+          // 底栏浮在画面上：自带一层渐变压暗，字才读得清
+          className="absolute inset-x-0 bottom-0 space-y-2 bg-gradient-to-t from-black/85 via-black/70 to-transparent px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-6 text-white"
+        >
+          {camError && <p className="text-sm text-neg">{camError}</p>}
+          {error && (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-neg">{error}</p>
+              {mode === "room" && (
+                <Button variant="outline" size="sm" className="shrink-0 text-fg" onClick={onClose}>
+                  返回键盘录入
+                </Button>
+              )}
+            </div>
+          )}
+          {/* 固定高度（一行手牌 + 一行指示牌）：模型下载进度、认出/没认出来回切换都在这一格里，
+            底栏不能伸缩，否则画面下沿跟着跳 */}
+          <div className="h-[70px] overflow-hidden" data-testid="camera-live">
+            {downloading ? (
+              <div>
+                <p className="text-xs">
+                  模型下载中 {Math.round(progress * 100)}%（约 25 MB，只下一次）
+                </p>
+                <div className="mt-1 h-1 w-full overflow-hidden rounded bg-white/20">
+                  <div
+                    className="h-full bg-accent transition-[width]"
+                    style={{ width: `${Math.round(progress * 100)}%` }}
+                  />
+                </div>
+              </div>
+            ) : (
+              live && (
+                <div className="overflow-x-auto px-1 py-1">
+                  <HandView
+                    hand={live.hand}
+                    size="xs"
+                    showUra={rules.hand.uraDora}
+                    indicatorClassName="text-white/70"
+                    className="w-max"
+                  />
+                </div>
+              )
             )}
           </div>
-        )}
-        {/* 固定高度（一行手牌 + 一行指示牌）：模型下载进度、认出/没认出来回切换都在这一格里，
-            底栏不能伸缩，否则画面下沿跟着跳 */}
-        <div className="h-[70px] overflow-hidden" data-testid="camera-live">
-          {downloading ? (
-            <div>
-              <p className="text-xs">
-                模型下载中 {Math.round(progress * 100)}%（约 25 MB，只下一次）
-              </p>
-              <div className="mt-1 h-1 w-full overflow-hidden rounded bg-white/20">
-                <div
-                  className="h-full bg-accent transition-[width]"
-                  style={{ width: `${Math.round(progress * 100)}%` }}
-                />
-              </div>
-            </div>
-          ) : (
-            live && (
-              <div className="overflow-x-auto px-1 py-1">
-                <HandView
-                  hand={live.hand}
-                  size="xs"
-                  showUra={rules.hand.uraDora}
-                  indicatorClassName="text-white/70"
-                  className="w-max"
-                />
-              </div>
-            )
-          )}
-        </div>
-        {/* 最后一行：左边说明，右边相册与快门。min-h-8 按按钮高度留位，快门出现/消失时底栏不伸缩 */}
-        <div className="flex min-h-8 items-center justify-between gap-3 text-xs text-white/70">
-          <span className="flex min-w-0 items-center gap-3">
-            <span className="truncate">拍下的牌面照片会用来改进识别</span>
-            <button type="button" className="shrink-0 underline" onClick={() => setGuide(true)}>
-              怎么摆
-            </button>
-          </span>
-          <span className="flex shrink-0 items-center gap-2">
-            {/* 相册：算点数页常驻；房间里就地拍一张成本接近零，只在相机用不了时才给 */}
-            {(mode === "calc" || camBroken) && (
-              <label
-                className="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-lg border border-white/40 px-2.5 text-sm text-white"
-                aria-label="从相册选一张"
+          {/* 最后一行：左边说明，右边相册与快门。min-h-8 按按钮高度留位，快门出现/消失时底栏不伸缩 */}
+          <div className="flex min-h-8 items-center justify-between gap-3 text-xs text-white/70">
+            <span className="flex min-w-0 items-center gap-3">
+              <span className="truncate">拍下的牌面照片会用来改进识别</span>
+              <button type="button" className="shrink-0 underline" onClick={() => setGuide(true)}>
+                怎么摆
+              </button>
+            </span>
+            <span className="flex shrink-0 items-center gap-2">
+              {/* 相册：算点数页常驻；房间里就地拍一张成本接近零，只在相机用不了时才给 */}
+              {(mode === "calc" || camBroken) && (
+                <label
+                  className="inline-flex h-8 shrink-0 cursor-pointer items-center rounded-lg border border-white/40 px-2.5 text-sm text-white"
+                  aria-label="从相册选一张"
+                >
+                  <Images className="h-4 w-4" />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    data-testid="camera-album"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0] ?? null;
+                      e.target.value = "";
+                      if (f) void runStill(f);
+                    }}
+                  />
+                </label>
+              )}
+              <button
+                type="button"
+                onClick={toggleRotation}
+                aria-label={rotation === 0 ? "切到横屏" : "切回竖屏"}
+                aria-pressed={rotation !== 0}
+                data-testid="camera-rotate"
+                className={`inline-flex h-8 shrink-0 items-center rounded-lg border px-2.5 text-white ${rotation === 0 ? "border-white/40" : "border-accent bg-accent/20"}`}
               >
-                <Images className="h-4 w-4" />
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  data-testid="camera-album"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0] ?? null;
-                    e.target.value = "";
-                    if (f) void runStill(f);
-                  }}
-                />
-              </label>
-            )}
-            {canShoot && (
-              <Button
-                variant="accent"
-                size="sm"
-                onClick={() => void capture()}
-                data-testid="camera-shutter"
-              >
-                快门
-              </Button>
-            )}
-          </span>
+                <RotateCw className="h-4 w-4" />
+              </button>
+              {canShoot && (
+                <Button
+                  variant="accent"
+                  size="sm"
+                  onClick={() => void capture()}
+                  data-testid="camera-shutter"
+                >
+                  快门
+                </Button>
+              )}
+            </span>
+          </div>
         </div>
       </div>
     </div>,
