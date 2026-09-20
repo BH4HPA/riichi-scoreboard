@@ -303,7 +303,7 @@ test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手�
   await tv.goto("/console"); // 新的浏览器上下文没有保存的房间码，会自动新建房间
   const code = (await tv.getByTestId("room-code").textContent())?.trim() ?? "";
 
-  // 开局键旁说明还差什么；「新房间」已并入「解散房间」
+  // 开局键旁说明还差什么；大厅没有「新房间」键（换房间走「返回首页」→「新建」，或解散后回首页再开）
   await expect(tv.getByText("还差 4 人入座")).toBeVisible();
   await expect(tv.getByRole("button", { name: "新房间" })).toHaveCount(0);
 
@@ -390,6 +390,8 @@ test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手�
   // 对局中解散（入口在「操作」对话框）：手机看到提示；主控台回首页，不再自动开新房，且没有错误提示
   await tv.getByRole("button", { name: "操作" }).click();
   await tv.getByRole("button", { name: "解散房间" }).click();
+  // 确认框如实说明之后会怎样：回首页，不再说「随即开一个新房间」
+  await expect(tv.getByRole("dialog")).toContainText("本机回到首页");
   await tv.getByRole("button", { name: "解散", exact: true }).click();
   await expect(phones[0]!.getByText(`房间 ${code} 已解散`)).toBeVisible();
   await expect(tv).toHaveURL(/\/$/);
