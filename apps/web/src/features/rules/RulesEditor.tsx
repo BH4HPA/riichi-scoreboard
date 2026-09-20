@@ -17,7 +17,7 @@ import { Button } from "@/ui/button";
 import { Input, Label, Select, Switch } from "@/ui/controls";
 import { useRoomStore } from "@/ws/store";
 import { cn } from "@/lib/utils";
-import { getPath, RULE_GROUPS, setPath, type RuleField, type RuleGroupKey } from "./fields";
+import { getPath, ruleGroupsFor, setPath, type RuleField } from "./fields";
 
 function FieldControl({
   field,
@@ -76,17 +76,17 @@ export function RulesEditor({
   onChange,
   editable,
   columns = 1,
-  groups,
+  kind,
 }: {
   value: RoomRules;
   onChange: (r: RoomRules) => void;
   editable: boolean;
-  /** 只显示这些分组（二人房只消费点数换算与役、宝牌）；不传 = 全部 */
-  groups?: readonly RuleGroupKey[] | undefined;
+  /** 房型：二人房只显示它实际消费的分组与字段（见 `ruleGroupsFor`）；不传 = 四人房，全部显示 */
+  kind?: RoomKind | undefined;
   /** 分组多列排版（电视大厅用） */
   columns?: 1 | 2;
 }) {
-  const shown = groups ? RULE_GROUPS.filter((g) => groups.includes(g.key)) : RULE_GROUPS;
+  const shown = ruleGroupsFor(kind);
   // 马点说明属于「终局」一节：那一节不显示时它也没有意义
   const showUma = shown.some((g) => g.key === "final");
   const { presets, loadPresets, savePreset, deletePreset } = useSession();

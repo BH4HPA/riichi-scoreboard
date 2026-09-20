@@ -19,7 +19,6 @@ import { RulesEditor } from "@/features/rules/RulesEditor";
 import { SiteBrand, SiteFooter } from "@/features/site/SiteFooter";
 import { TenGuideDialog } from "@/features/ten/guide/TenGuideDialog";
 import { TenGuideMirror } from "@/features/ten/guide/TenGuideMirror";
-import { TEN_RULE_GROUPS } from "@/features/ten/rules";
 import { LocalPlayerDialog } from "./LocalPlayerDialog";
 import { SeatCards } from "./SeatCards";
 import { startBlocker } from "./startBlocker";
@@ -47,7 +46,6 @@ export function ConsoleLobby({
   const [guideOpen, setGuideOpen] = useState(false);
   const ten = room.kind === "ten";
   const labels = seatLabels(room.kind);
-  const ruleGroups = ten ? TEN_RULE_GROUPS : undefined;
   const [localSeat, setLocalSeat] = useState<Seat | null>(null);
   const [localOpen, setLocalOpen] = useState(false);
   // 窄屏首次进入大厅自动展示二维码；房间码变了再弹一次
@@ -88,7 +86,7 @@ export function ConsoleLobby({
         <span className="flex items-center gap-2">
           {ten && (
             <Button variant="outline" size="sm" onClick={() => setGuideOpen(true)}>
-              <BookOpen className="h-4 w-4" /> 规则说明
+              <BookOpen className="h-4 w-4" /> 玩法说明
             </Button>
           )}
           <Button variant="outline" size="sm" onClick={() => setRulesOpen(true)}>
@@ -99,7 +97,7 @@ export function ConsoleLobby({
       <div className="min-h-0 flex-1 overflow-y-auto">
         {ten && (
           <p className="mb-3 text-xs text-muted">
-            《天》二人麻将：得分按四人麻将的自摸收入计算，所以只有这两节规则生效。
+            《天》二人麻将：得分按四人麻将的自摸收入计算，这里只列对它生效的规则。
           </p>
         )}
         <RulesEditor
@@ -107,7 +105,7 @@ export function ConsoleLobby({
           onChange={() => undefined}
           editable={false}
           columns={2}
-          groups={ruleGroups}
+          kind={room.kind}
         />
       </div>
     </div>
@@ -202,7 +200,7 @@ export function ConsoleLobby({
         rules={room.rules}
         description="开局前可修改；开局后锁定。"
         className="sm:max-w-2xl"
-        groups={ruleGroups}
+        kind={room.kind}
         onApply={(rules) => send({ type: "setRules", rules })}
       />
       {ten && (

@@ -1,8 +1,7 @@
 import { useState } from "react";
-import type { RoomRules } from "@riichi/core";
+import type { RoomKind, RoomRules } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Dialog, DialogContent, DialogFooter } from "@/ui/dialog";
-import type { RuleGroupKey } from "./fields";
 import { RulesEditor } from "./RulesEditor";
 
 /** 大厅里改规则的弹窗：每次打开从房间当前规则起草，「应用规则」成功才关闭。 */
@@ -12,7 +11,7 @@ export function RulesDialog({
   rules,
   description,
   className,
-  groups,
+  kind,
   onApply,
 }: {
   open: boolean;
@@ -20,8 +19,8 @@ export function RulesDialog({
   rules: RoomRules;
   description: string;
   className?: string;
-  /** 只编辑这些分组（见 RulesEditor） */
-  groups?: readonly RuleGroupKey[] | undefined;
+  /** 房型（见 RulesEditor） */
+  kind?: RoomKind | undefined;
   onApply: (rules: RoomRules) => Promise<boolean>;
 }) {
   return (
@@ -34,7 +33,7 @@ export function RulesDialog({
         {open && (
           <RulesForm
             rules={rules}
-            groups={groups}
+            kind={kind}
             onCancel={() => onOpenChange(false)}
             onApply={async (draft) => {
               if (await onApply(draft)) onOpenChange(false);
@@ -48,19 +47,19 @@ export function RulesDialog({
 
 function RulesForm({
   rules,
-  groups,
+  kind,
   onCancel,
   onApply,
 }: {
   rules: RoomRules;
-  groups: readonly RuleGroupKey[] | undefined;
+  kind: RoomKind | undefined;
   onCancel: () => void;
   onApply: (rules: RoomRules) => Promise<void>;
 }) {
   const [draft, setDraft] = useState(rules);
   return (
     <>
-      <RulesEditor value={draft} onChange={setDraft} editable groups={groups} />
+      <RulesEditor value={draft} onChange={setDraft} editable kind={kind} />
       <DialogFooter>
         <Button variant="outline" onClick={onCancel}>
           取消

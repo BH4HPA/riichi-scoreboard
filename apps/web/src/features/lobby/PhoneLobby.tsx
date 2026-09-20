@@ -10,7 +10,6 @@ import { RulesDialog } from "@/features/rules/RulesDialog";
 import { RulesSummary } from "@/features/rules/RulesEditor";
 import { SiteFooter } from "@/features/site/SiteFooter";
 import { TenGuideDialog } from "@/features/ten/guide/TenGuideDialog";
-import { TEN_RULE_GROUPS } from "@/features/ten/rules";
 import { SeatCards } from "./SeatCards";
 import { useCountdown } from "./useCountdown";
 import { useRulesChangedNotice } from "./useRulesChangedNotice";
@@ -76,7 +75,7 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
           </span>
           {ten && (
             <Button variant="outline" size="sm" onClick={() => setGuideOpen(true)}>
-              <BookOpen className="h-4 w-4" /> 规则说明
+              <BookOpen className="h-4 w-4" /> 玩法说明
             </Button>
           )}
         </div>
@@ -111,7 +110,7 @@ export function PhoneLobby({ room, mySeat }: { room: RoomView; mySeat: Seat | nu
         onOpenChange={setRulesOpen}
         rules={room.rules}
         description="开局前所有人都可修改；开局后锁定。"
-        groups={ten ? TEN_RULE_GROUPS : undefined}
+        kind={room.kind}
         onApply={(rules) => ownRulesChange(() => send({ type: "setRules", rules }))}
       />
       {ten && <TenGuideDialog open={guideOpen} onOpenChange={setGuideOpen} castable />}

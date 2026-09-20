@@ -6,7 +6,7 @@ const STEPS: Record<TenStage["kind"], { title: string; steps: string[] }> = {
     title: "Stage A",
     steps: [
       "照常摸打，可以吃、碰、杠。",
-      "先听牌的一方在手机上按「▶ 立直」或「听牌宣言」。",
+      "先听牌的一方按「▶ 立直」或「听牌宣言」。",
       "18 巡无人宣言：记「流局」。",
     ],
   },
@@ -23,7 +23,7 @@ const STEPS: Record<TenStage["kind"], { title: string; steps: string[] }> = {
 
 /**
  * 电视上的流程提示：大家对《天》规则不熟，对局中把「这个阶段该做什么」常驻在得分卡下面。
- * 完整的规则说明在手机的「规则」页，可以投上来。
+ * 完整的玩法说明：手机在「规则」页（可以投上来），主控台在「操作」里。
  */
 export function TenStageHint({ stage, tv = false }: { stage: TenStage; tv?: boolean }) {
   const { title, steps } = STEPS[stage.kind];

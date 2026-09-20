@@ -38,7 +38,7 @@ export function TenHeader({
           庄家 {names[game.dealer]}
         </span>
       )}
-      <TimeBadge mark={timeMark} tv={tv} />
+      <TimeBadge mark={timeMark} stage={stage.kind} tv={tv} />
     </div>
   );
 }

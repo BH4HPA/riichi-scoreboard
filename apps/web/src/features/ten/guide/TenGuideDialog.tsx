@@ -6,7 +6,7 @@ import { CastSwitch } from "@/features/mirror/CastSwitch";
 import { TenGuide } from "./TenGuide";
 
 /**
- * 大厅里的规则说明弹层。手机端带「投到电视」开关：电视大厅平时看不到规则说明，打开后全屏跟着讲解者读到的那一节；
+ * 「玩法说明」弹层（大厅、主控台对局中）。手机端带「投到电视」开关：电视大厅平时看不到规则说明，打开后全屏跟着讲解者读到的那一节；
  * 关掉弹层即复位。主控台自己打开时直接在本机看（`castable=false`）。
  */
 export function TenGuideDialog({
@@ -30,7 +30,7 @@ export function TenGuideDialog({
       }}
     >
       <DialogContent
-        title="《天》二人麻将规则"
+        title="《天》二人麻将玩法"
         description="不熟悉规则的话，开局前一起过一遍。"
         className="sm:max-w-2xl"
       >

@@ -24,9 +24,24 @@ test("桌面 UA 打开首页先选房型：创建四人房；回首页后按钮�
   await page.getByTestId("open-yonma").click();
   await expect(page.getByTestId("room-code")).toHaveText(first);
 
+  // 「新建」失败（这里让建房接口报错）：本机记的旧房间还在，回首页仍然能「继续」
   await page.getByRole("link", { name: "返回首页" }).click();
+  await page.route("**/api/rooms", (route) =>
+    route.request().method() === "POST"
+      ? route.fulfill({ status: 503, body: "{}" })
+      : route.fallback(),
+  );
+  await page.getByTestId("new-yonma").click();
+  await page.getByRole("link", { name: "返回首页" }).click();
+  await expect(page.getByTestId("open-yonma")).toHaveText(new RegExp(`继续四人麻将房间 ${first}`));
+  await page.unroute("**/api/rooms");
+
+  // 建成了才替换；刷新不会再建一个
   await page.getByTestId("new-yonma").click();
   await expect(page.getByTestId("room-code")).not.toHaveText(first);
+  const second = (await page.getByTestId("room-code").textContent())!.trim();
+  await page.reload();
+  await expect(page.getByTestId("room-code")).toHaveText(second);
 
   // 二人房另记一个码，互不影响
   await page.getByRole("link", { name: "返回首页" }).click();

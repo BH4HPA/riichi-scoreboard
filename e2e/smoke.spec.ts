@@ -387,13 +387,14 @@ test("主控台添加本地玩家（免手机）+ 两台手机 → 开局；手�
   await phones[0]!.getByRole("button", { name: "撤销" }).click();
   await expect(phones[0]!.getByRole("button", { name: "自摸", exact: true })).toBeVisible();
 
-  // 对局中解散（入口在「操作」对话框）：手机看到提示，主控台自动开新房，且没有错误提示
+  // 对局中解散（入口在「操作」对话框）：手机看到提示；主控台回首页，不再自动开新房，且没有错误提示
   await tv.getByRole("button", { name: "操作" }).click();
   await tv.getByRole("button", { name: "解散房间" }).click();
   await tv.getByRole("button", { name: "解散", exact: true }).click();
   await expect(phones[0]!.getByText(`房间 ${code} 已解散`)).toBeVisible();
-  await expect(tv.getByTestId("room-code")).toBeVisible();
-  expect((await tv.getByTestId("room-code").textContent())?.trim()).not.toBe(code);
+  await expect(tv).toHaveURL(/\/$/);
+  // 解散的房间已经忘掉：首页写的是「创建」而不是「继续」
+  await expect(tv.getByTestId("open-yonma")).toHaveText(/创建四人麻将房间/);
   await expect(tv.getByText("操作失败")).toHaveCount(0);
   await expect(tv.getByText("连接已断开")).toHaveCount(0);
   await tvCtx.close();

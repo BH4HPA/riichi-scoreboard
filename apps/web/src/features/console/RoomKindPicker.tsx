@@ -2,7 +2,7 @@ import { Link, useNavigate } from "react-router";
 import { Swords, Users } from "lucide-react";
 import { ROOM_KINDS, type RoomKind } from "@riichi/core";
 import { Button } from "@/ui/button";
-import { consolePath, forgetConsoleRoom } from "./consoleRooms";
+import { consolePath } from "./consoleRooms";
 import { useSavedConsoleRooms } from "./useSavedConsoleRooms";
 
 const KIND_INFO: Record<RoomKind, { name: string; hint: string; icon: typeof Users }> = {
@@ -55,11 +55,9 @@ export function RoomKindPicker() {
                 variant="outline"
                 className="h-16 shrink-0"
                 data-testid={`new-${kind}`}
-                onClick={() => {
-                  // 旧房间留给还连着的人，闲置后服务端自会卸载；本机只是不再回到它
-                  forgetConsoleRoom(kind);
-                  navigate(consolePath(kind));
-                }}
+                // 只带上「要新建」的意图：本机记的房间码等新房建成才替换，建房失败时「继续」还在。
+                // 旧房间留给还连着的人，闲置后服务端自会卸载
+                onClick={() => void navigate(consolePath(kind), { state: { fresh: true } })}
               >
                 新建
               </Button>

@@ -37,7 +37,7 @@ test("二人房：首页选房型 → 投屏规则说明 → 宣言 → 全牌�
   const west = await phone(browser, code, "阿西", 1);
 
   // ── 大厅：规则说明投到电视。手机上五节竖着平铺，读到哪一节电视就切到哪一节；关掉弹层即消失 ──
-  await east.getByRole("button", { name: "规则说明" }).click();
+  await east.getByRole("button", { name: "玩法说明" }).click();
   const guide = east.getByRole("dialog");
   await expect(guide.getByTestId("ten-guide")).toContainText("两个人打，比的是谁的听牌更难猜");
   // 不分页：后面几节也都在（不用点 1–5 的标签）
@@ -119,7 +119,7 @@ test("二人房：首页选房型 → 投屏规则说明 → 宣言 → 全牌�
   await expect(tv.getByTestId("ten-stage")).toHaveText("Stage B · 阿东 立直");
   await expect(tv.getByTestId("sticks-0")).toHaveText("立直棒 9");
   await expect(tv.getByTestId("music-float")).toBeVisible();
-  await expect(tv.getByTestId("guess-board")).toBeVisible();
+  await expect(tv.getByTestId("guess-board")).toContainText("排除记录");
   await expect(tv.getByText("暂无记录")).toHaveCount(0);
   // 进攻方的手机只读；防守方的手机点一下划掉、再点一下恢复——没有轮次、没有确认按钮
   await expect(east.getByTestId("guess-tiles").getByRole("button")).toHaveCount(0);
@@ -151,6 +151,16 @@ test("二人房：首页选房型 → 投屏规则说明 → 宣言 → 全牌�
   expect(Math.abs(gapX - gapY)).toBeLessThan(1.5);
   expect(b1!.width).toBeGreaterThan(34);
 
+  // 宽屏 Stage B 右栏让给了牌板：页头给「记录」按钮，历史始终查得到
+  await tv.getByRole("button", { name: /^记录/ }).click();
+  await expect(tv.getByRole("dialog")).toContainText("历史记录");
+  await tv.keyboard.press("Escape");
+  // 只用主控台 + 本地玩家时也得查得到玩法：在「操作」里
+  await tv.getByRole("button", { name: "操作" }).click();
+  await tv.getByRole("dialog").getByRole("button", { name: "玩法说明" }).click();
+  await expect(tv.getByTestId("ten-guide")).toContainText("两个人打，比的是谁的听牌更难猜");
+  await tv.keyboard.press("Escape");
+
   // ── 自摸：和牌者就是进攻方，不用选人；电视全屏镜像；立直开关锁住 ──
   await east.getByRole("button", { name: "自摸", exact: true }).click();
   await expect(tv.getByTestId("music-float")).toHaveCount(0);
@@ -179,8 +189,9 @@ test("二人房：首页选房型 → 投屏规则说明 → 宣言 → 全牌�
   // 自己提交的这一笔不该弹「局面已变化」
   await expect(east.getByRole("dialog")).toHaveCount(0);
   await expect(east.getByText("局面已变化，结算已关闭")).toHaveCount(0);
-  // 记完一局：回到 Stage A，右栏换回历史
+  // 记完一局：回到 Stage A，右栏换回历史（页头不再重复给「记录」按钮）
   await expect(tv.getByTestId("guess-board")).toHaveCount(0);
+  await expect(tv.getByRole("button", { name: /^记录/ })).toHaveCount(0);
   await expect(tv.getByText(/阿东 立直后自摸 3 番 30 符，得 6,000 点/)).toBeVisible();
   await expect(tv.getByRole("heading", { name: "第 2 局 1 本场" })).toBeVisible();
 
@@ -245,7 +256,7 @@ test("二人房：首页选房型 → 投屏规则说明 → 宣言 → 全牌�
   await expect(tv.getByTestId("ten-guide-mirror")).toHaveCount(0);
 
   // ── 重开一局 = 放弃眼下这一场强制从头来：对局中（这里还在 Stage B）就能点，不必先终局 ──
-  await west.getByRole("button", { name: "重开一局" }).click();
+  await west.getByRole("button", { name: "重开整场" }).click();
   await expect(west.getByRole("dialog")).toContainText("放弃眼下这一场");
   await west.getByRole("button", { name: "确认重开" }).click();
   await expect(tv.getByTestId("score-0")).toHaveText("0");

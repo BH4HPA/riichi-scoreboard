@@ -9,6 +9,7 @@ import { ConfirmDialog } from "@/ui/confirm-dialog";
 import { useCommand } from "@/ws/useRoom";
 import { DissolveDialog } from "@/features/console/DissolveButton";
 import { useMirror } from "@/features/mirror/useMirror";
+import { TenGuideDialog } from "../guide/TenGuideDialog";
 import { useCloseOnStale } from "@/features/settlement/drafts/useCloseOnStale";
 import { TenTsumoDialog } from "./TenTsumoDialog";
 import type { TenDialog } from "./useTenDialogs";
@@ -129,7 +130,7 @@ export function TenControlHost({
       />
       <ConfirmDialog
         {...openOf("newGame")}
-        title="重开一局？"
+        title="重开整场？"
         description={`${game.status === "finished" ? "" : "放弃眼下这一场。"}得分、立直棒与历史记录从头开始，1 小时重新计；座位与规则不变。此操作不可撤销。`}
         confirmText="确认重开"
         danger
@@ -138,10 +139,12 @@ export function TenControlHost({
       <ConfirmDialog
         {...openOf("lobby")}
         title="返回大厅？"
-        description="回到大厅后可以调整座位与规则，再开新的一局。二人麻将的对局不计入个人战绩。"
+        description="回到大厅后可以调整座位与规则。本场的得分与记录不会保留（二人麻将不计入个人战绩），需要的话请先截图。"
         confirmText="返回大厅"
         onConfirm={() => send({ type: "toLobby" })}
       />
+      {/* 只用一台主控台 + 本地玩家时，对局中也得查得到玩法：主控台在本机直接看（不投屏） */}
+      {dissolveCode && <TenGuideDialog {...openOf("guide")} castable={false} />}
       {dissolveCode && <DissolveDialog code={dissolveCode} {...openOf("dissolve")} />}
     </>
   );

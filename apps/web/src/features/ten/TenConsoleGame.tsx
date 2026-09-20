@@ -34,7 +34,7 @@ export function TenConsoleGame({
   const finished = present.status === "finished";
   const stageB = !finished && present.stage.kind === "B" ? present.stage : null;
   const pickable = stageB !== null && canPickFor(stageB, room.seats, null);
-  useTimeMarkNotice(room.timeMark);
+  useTimeMarkNotice(room.timeMark, present.stage.kind);
 
   return (
     <>
@@ -49,6 +49,7 @@ export function TenConsoleGame({
             <TenHistoryTable history={present.history} tv />
           )
         }
+        asideIsHistory={stageB === null}
         history={<TenHistoryTable history={present.history} />}
         historyCount={present.history.length}
         panel={(close) => (
@@ -57,6 +58,7 @@ export function TenConsoleGame({
             seats={room.seats}
             names={names}
             mySeat={null}
+            timeMark={room.timeMark}
             size="lg"
             dissolvable
             onOpen={(key) => {

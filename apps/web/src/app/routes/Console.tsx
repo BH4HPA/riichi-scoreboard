@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { Home, Wifi } from "lucide-react";
 import { isRoomKind, seatNames } from "@riichi/core";
 import { Button } from "@/ui/button";
@@ -7,6 +7,7 @@ import { Notice } from "@/ui/notice";
 import { useMediaQuery, WIDE_CONSOLE_QUERY } from "@/lib/useMediaQuery";
 import { useRoomStore } from "@/ws/store";
 import { SocketContext, useRoomConnection } from "@/ws/useRoom";
+import { forgetConsoleRoom } from "@/features/console/consoleRooms";
 import { useConsoleRoom } from "@/features/console/useConsoleRoom";
 import { ConsoleGame } from "@/features/console/ConsoleGame";
 import { TenConsoleGame } from "@/features/ten/TenConsoleGame";
@@ -19,20 +20,37 @@ export function Console() {
   // 房型来自首页的选择；不带参数（旧书签）就是四人房
   const [params] = useSearchParams();
   const requested = params.get("kind");
-  const { code, error, newRoom } = useConsoleRoom(isRoomKind(requested) ? requested : "yonma");
+  const kind = isRoomKind(requested) ? requested : "yonma";
+  const location = useLocation();
+  const navigate = useNavigate();
+  // 首页点「新建」带来的一次性意图；建成后从历史记录里拿掉，刷新不会再建一个
+  const fresh = (location.state as { fresh?: boolean } | null)?.fresh === true;
+  const { code, error } = useConsoleRoom(kind, fresh);
+  useEffect(() => {
+    if (fresh && code) void navigate(location.pathname + location.search, { replace: true });
+  }, [fresh, code, navigate, location.pathname, location.search]);
   const socket = useRoomConnection(code);
   const room = useRoomStore((s) => s.room);
   const intents = useRoomStore((s) => s.intents);
   const closedReason = useRoomStore((s) => s.closedReason);
   const wide = useMediaQuery(WIDE_CONSOLE_QUERY);
 
-  // 房间被解散（本机或其它端发起）后自动开新房；新连接建立时 closedReason 会被清空，不会重复触发
+  // 房间被解散（本机或其它端发起）：回首页，由人决定接下来开哪种房间——不再自动建一个新的
   useEffect(() => {
-    if (closedReason === "dissolved") void newRoom();
-  }, [closedReason, newRoom]);
+    if (closedReason !== "dissolved") return;
+    forgetConsoleRoom(kind);
+    void navigate("/", { replace: true });
+  }, [closedReason, kind, navigate]);
 
   if (error) {
-    return <div className="flex min-h-dvh items-center justify-center text-neg">{error}</div>;
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3">
+        <p className="text-neg">{error}</p>
+        <Button asChild variant="outline">
+          <Link to="/">返回首页</Link>
+        </Button>
+      </div>
+    );
   }
   if (!socket || !room) {
     return (

@@ -303,7 +303,7 @@ test("截图：首页选房型与二人房（《天》规则）", async ({ brows
   await west.getByTestId("seat-1").click();
   await east.screenshot({ path: `${OUT}/ten-phone-lobby.png` });
 
-  await east.getByRole("button", { name: "规则说明" }).click();
+  await east.getByRole("button", { name: "玩法说明" }).click();
   await east.getByRole("dialog").getByRole("switch", { name: "投到电视" }).click();
   await east
     .getByRole("dialog")

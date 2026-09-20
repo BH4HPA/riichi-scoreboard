@@ -1,5 +1,5 @@
-import { Check, RefreshCcw, Redo2, Undo2, XCircle } from "lucide-react";
-import type { PlayerRef, Seat, TenGameView } from "@riichi/core";
+import { BookOpen, Check, RefreshCcw, Redo2, Undo2, XCircle } from "lucide-react";
+import type { PlayerRef, Seat, TenGameView, TenTimeMark } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Tip } from "@/ui/controls";
 import { useRoomStore } from "@/ws/store";
@@ -17,6 +17,7 @@ export function TenControlButtons({
   seats,
   names,
   mySeat,
+  timeMark,
   size = "md",
   dissolvable = false,
   onOpen,
@@ -25,7 +26,9 @@ export function TenControlButtons({
   seats: (PlayerRef | null)[];
   names: string[];
   mySeat: Seat | null;
+  timeMark: TenTimeMark;
   size?: "sm" | "md" | "lg";
+  /** 主控台专属：最后一段放「玩法说明」（手机在底栏的「规则」页里看）与「解散房间」 */
   dissolvable?: boolean;
   onOpen: (key: TenDialog) => void;
 }) {
@@ -35,6 +38,8 @@ export function TenControlButtons({
   const { present } = game;
   const finished = present.status === "finished";
   const stageB = present.stage.kind === "B";
+  // 时间到且上一局已经记完（回到 Stage A）：该收尾了，把「终局」顶成最显眼的键。仍不自动终局、不拦着继续打
+  const timeUp = timeMark === 3 && !stageB;
   // Stage B 里撤销的就是宣言（划牌不占撤销栈）。撤的是立直时曲子还在放——服务端按命令类型停曲，撤销不在其列——这里顺带停掉
   const undo = () => {
     const { stage } = present;
@@ -96,7 +101,11 @@ export function TenControlButtons({
         <h3 className="mb-1.5 text-xs font-medium text-muted">比赛进程</h3>
         <div className="grid grid-cols-3 gap-1.5">
           {!finished ? (
-            <Button size={size} variant="outline" onClick={() => onOpen("end")}>
+            <Button
+              size={size}
+              variant={timeUp ? "accent" : "outline"}
+              onClick={() => onOpen("end")}
+            >
               <Check className="h-4 w-4" /> 终局
             </Button>
           ) : (
@@ -110,7 +119,7 @@ export function TenControlButtons({
             className="text-neg"
             onClick={() => onOpen("newGame")}
           >
-            <RefreshCcw className="h-4 w-4" /> 重开一局
+            <RefreshCcw className="h-4 w-4" /> 重开整场
           </Button>
         </div>
       </section>
@@ -118,6 +127,9 @@ export function TenControlButtons({
         <section>
           <h3 className="mb-1.5 text-xs font-medium text-muted">房间</h3>
           <div className="grid grid-cols-3 gap-1.5">
+            <Button size={size} variant="outline" onClick={() => onOpen("guide")}>
+              <BookOpen className="h-4 w-4" /> 玩法说明
+            </Button>
             <Button size={size} variant="danger" onClick={() => onOpen("dissolve")}>
               <XCircle className="h-4 w-4" /> 解散房间
             </Button>

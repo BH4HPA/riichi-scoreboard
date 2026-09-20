@@ -56,7 +56,7 @@ export function ControlHost({
       />
       <ConfirmDialog
         {...openOf("newGame")}
-        title="重开一局？"
+        title="重开整场？"
         description={`${game.status === "finished" ? "" : "放弃眼下这一场（不计入战绩）。"}点数、场次、本场数、立直供托与历史记录将重置为初始状态；座位与规则保持不变。此操作不可撤销。`}
         confirmText="确认重开"
         danger

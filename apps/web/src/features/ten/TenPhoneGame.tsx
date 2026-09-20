@@ -7,7 +7,6 @@ import { useTimeMarkNotice } from "./clock/useTimeMarkNotice";
 import { TenFinalPanel } from "./final/TenFinalPanel";
 import { TenGuide } from "./guide/TenGuide";
 import { TenHistoryTable } from "./history/TenHistoryTable";
-import { TEN_RULE_GROUPS } from "./rules";
 import { TenHeader } from "./scoreboard/TenHeader";
 import { TenScoreGrid } from "./scoreboard/TenScoreGrid";
 import { TenControlButtons } from "./settlement/TenControlButtons";
@@ -18,7 +17,7 @@ import { GuessBoard } from "./stageB/GuessBoard";
 
 /**
  * 二人房的手机对局页：得分卡 → Stage B 的全牌型板（谁可以指定见 `canPickFor`）→ 操作栏。
- * 底部「规则」页先放规则说明（可投到电视），再放只读的房间规则。
+ * 底部「规则」页先放玩法说明（可投到电视），再放只读的房间规则（这一段不投）。
  */
 export function TenPhoneGame({ room }: { room: TenRoomView }) {
   const playerId = useRoomStore((s) => s.playerId);
@@ -30,7 +29,7 @@ export function TenPhoneGame({ room }: { room: TenRoomView }) {
   const mySeat = seatOfPlayer(room.seats, playerId);
   const finished = present.status === "finished";
   const stageB = !finished && present.stage.kind === "B" ? present.stage : null;
-  useTimeMarkNotice(room.timeMark);
+  useTimeMarkNotice(room.timeMark, present.stage.kind);
 
   return (
     <PhoneGameShell
@@ -47,7 +46,7 @@ export function TenPhoneGame({ room }: { room: TenRoomView }) {
               value={room.rules}
               onChange={() => undefined}
               editable={false}
-              groups={TEN_RULE_GROUPS}
+              kind="ten"
             />
           </div>
         ),
@@ -77,6 +76,7 @@ export function TenPhoneGame({ room }: { room: TenRoomView }) {
           seats={room.seats}
           names={names}
           mySeat={mySeat}
+          timeMark={room.timeMark}
           size="md"
           onOpen={controls.open}
         />

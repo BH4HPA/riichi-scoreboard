@@ -19,6 +19,7 @@ export function ConsoleGameShell({
   header,
   children,
   aside,
+  asideIsHistory = true,
   history,
   historyCount,
   panel,
@@ -31,6 +32,8 @@ export function ConsoleGameShell({
   children: ReactNode;
   /** 宽屏右栏 */
   aside: ReactNode;
+  /** 右栏此刻放的是不是历史：不是的话（二人房 Stage B 放的是牌板）宽屏也要给「记录」按钮，历史始终查得到 */
+  asideIsHistory?: boolean;
   /** 窄屏历史抽屉的内容 */
   history: ReactNode;
   historyCount: number;
@@ -41,16 +44,18 @@ export function ConsoleGameShell({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const { attach, ratio, ratioAt, set: setRatio } = useSplit();
+  const historyInDrawer = !wide || !asideIsHistory;
   return (
     <div className={wide ? "flex h-dvh flex-col gap-4 p-6" : "flex min-h-dvh flex-col gap-3 p-4"}>
       <header className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">{header}</div>
         <ConnectionBadge />
-        {wide ? (
+        {wide && (
           <span className="text-sm text-muted">
             房间 <span className="font-semibold tabular text-fg">{code}</span>
           </span>
-        ) : (
+        )}
+        {historyInDrawer && (
           <Button variant="outline" size="sm" onClick={() => setHistoryOpen(true)}>
             <History className="h-4 w-4" /> 记录 {historyCount}
           </Button>
@@ -95,7 +100,7 @@ export function ConsoleGameShell({
         </div>
       )}
 
-      {!wide && (
+      {historyInDrawer && (
         <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
           <DialogContent side="right" title="历史记录" description={`共 ${historyCount} 条`}>
             {history}
