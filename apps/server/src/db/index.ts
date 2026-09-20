@@ -96,6 +96,19 @@ CREATE INDEX idx_recognitions_player ON recognitions (player_id, created_at);
   // v5：区分记录来源（房间结算 / 标注模式）。历史记录都来自房间，默认值正好。
   // 照 players.kind 的先例用 TEXT + DEFAULT，取值由 core 的联合类型约束，不加 CHECK。
   `ALTER TABLE recognitions ADD COLUMN source TEXT NOT NULL DEFAULT 'room';`,
+  // v6：取景会话摘要（不含照片）。留存的识别记录全是定格成功的那一帧，认不稳、放弃的会话在这里才有痕迹。
+  // 摘要整体存 JSON（字段随取景页演进，由 core 的 validateRecognitionSession 约束）；常用来筛的两项单列
+  `
+  CREATE TABLE recognition_sessions (
+    id TEXT PRIMARY KEY,
+    player_id TEXT NOT NULL,
+    source TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX idx_recognition_sessions_created ON recognition_sessions (created_at);
+  `,
 ];
 
 export type Database = DatabaseSync;

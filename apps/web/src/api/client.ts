@@ -14,7 +14,14 @@ export class ApiError extends Error {
 
 export async function api<T>(
   path: string,
-  init: { method?: string; body?: unknown; token?: string | null; raw?: BodyInit } = {},
+  init: {
+    method?: string;
+    body?: unknown;
+    token?: string | null;
+    raw?: BodyInit;
+    /** 页面正在关闭时也要发出去的请求（浏览器限 64 KB） */
+    keepalive?: boolean;
+  } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {};
   if (init.token) headers.Authorization = `Bearer ${init.token}`;
@@ -27,6 +34,7 @@ export async function api<T>(
     method: init.method ?? "GET",
     headers,
     body: body ?? null,
+    ...(init.keepalive ? { keepalive: true } : {}),
   });
   if (res.status === 204) return undefined as T;
   const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string };

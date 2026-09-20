@@ -18,6 +18,7 @@ import { DetectionOverlay } from "./DetectionOverlay";
 import { EMPTY_CAPTURE, feedFrame, reasonOf, STABLE_FRAMES, votesOf } from "./autoCapture";
 import { LayoutGuide } from "./LayoutGuide";
 import { useRotation } from "./orientation/useRotation";
+import { useSessionStats } from "./useSessionStats";
 import { RoiOverlay } from "./RoiOverlay";
 import { useCameraStream } from "./useCameraStream";
 import { useCanvasPreview } from "./useCanvasPreview";
@@ -56,7 +57,7 @@ export function CameraSheet({
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState<FrameResult | null>(null);
   const [gate, setGate] = useState(EMPTY_CAPTURE);
-  const { rotation, toggle: toggleRotation } = useRotation();
+  const { rotation, source: rotationSource, toggle: toggleRotation } = useRotation();
   const [paused, setPaused] = useState(false);
   const [openedAt] = useState(() => Date.now());
 
@@ -84,6 +85,12 @@ export function CameraSheet({
   const lost = useCallback(() => setPaused(true), []);
   const { videoRef, error: camError, ready } = useCameraStream(active, lost);
   const [area, setArea] = useState<HTMLDivElement | null>(null);
+  // 两个回调都是稳定引用：直接进依赖数组，不会让下面的订阅每次渲染都重建
+  const { onFrame: countFrame, finish: finishSession } = useSessionStats(mode, {
+    rotation,
+    rotationSource,
+    viewport: area && { width: area.clientWidth, height: area.clientHeight },
+  });
   const [preview, setPreview] = useState<HTMLCanvasElement | null>(null);
   const painted = useCanvasPreview(videoRef, preview);
 
@@ -136,20 +143,24 @@ export function CameraSheet({
     return () => clearInterval(t);
   }, [active]);
 
-  const capture = useCallback(async () => {
-    if (!detector || grabbingRef.current) return;
-    grabbingRef.current = true;
-    try {
-      // 照片、检测框、识别结果由 Worker 从同一帧里一起给出：分开取就可能错位，回流出来的训练数据也跟着错
-      const got = await detector.grab();
-      const modelId = RECOGNITION_MODEL?.id;
-      if (!got || !modelId) return;
-      const { blob, ms, detections, hand, warnings, provenance } = got;
-      onCapture({ blob, result: { modelId, ms, detections, hand, warnings, provenance } });
-    } finally {
-      grabbingRef.current = false;
-    }
-  }, [detector, onCapture]);
+  const capture = useCallback(
+    async (how: "auto" | "manual" | "album") => {
+      if (!detector || grabbingRef.current) return;
+      grabbingRef.current = true;
+      try {
+        // 照片、检测框、识别结果由 Worker 从同一帧里一起给出：分开取就可能错位，回流出来的训练数据也跟着错
+        const got = await detector.grab();
+        const modelId = RECOGNITION_MODEL?.id;
+        if (!got || !modelId) return;
+        const { blob, ms, detections, hand, warnings, provenance } = got;
+        finishSession(how);
+        onCapture({ blob, result: { modelId, ms, detections, hand, warnings, provenance } });
+      } finally {
+        grabbingRef.current = false;
+      }
+    },
+    [detector, onCapture, finishSession],
+  );
 
   const onFrame = useCallback(
     (r: FrameResult) => {
@@ -161,15 +172,16 @@ export function CameraSheet({
       }
       const out = feedFrame(captureRef.current, r);
       captureRef.current = out.state;
+      countFrame(r, out.state);
       setGate(out.state);
       if (votesOf(out.state) > 0) lastGoodRef.current = Date.now();
       if (out.fire) {
         navigator.vibrate?.(30);
         setFlash(true);
-        void capture();
+        void capture("auto");
       }
     },
-    [capture],
+    [capture, countFrame],
   );
 
   // 相册那张是一次性的：结果一到就直接定格，不参与稳定判断。实时循环此刻停着，单独收
@@ -184,7 +196,7 @@ export function CameraSheet({
         setStillBusy(false);
         setLive(r);
         setFlash(true);
-        void capture();
+        void capture("album");
         return;
       }
       // null = 撞上了还在推理的实时帧、被背压丢掉：重送；次数用完才让用户重来
@@ -474,7 +486,7 @@ export function CameraSheet({
                 <Button
                   variant="accent"
                   size="sm"
-                  onClick={() => void capture()}
+                  onClick={() => void capture("manual")}
                   data-testid="camera-shutter"
                 >
                   快门

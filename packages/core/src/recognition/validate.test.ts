@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateRecognitionPatch } from "./validate";
+import { validateRecognitionSession, validateRecognitionPatch } from "./validate";
 
 const hand = {
   closed: [1, 2, 3, 13, 36, 15, 25, 26, 27, 7, 8, 11, 11, 9],
@@ -67,5 +67,48 @@ describe("validateRecognitionPatch", () => {
         recognized: { closed: [40], melds: [], winTile: 0, doraIndicators: [], uraIndicators: [] },
       }),
     ).toThrow();
+  });
+});
+
+describe("validateRecognitionSession", () => {
+  const summary = {
+    source: "calc",
+    outcome: "abandoned",
+    modelId: "d1ec564d-e44a-404e-9140-cf9ea22d1366",
+    durationMs: 18_400,
+    frames: 52,
+    settledFrames: 40,
+    secondPasses: 3,
+    msAvg: 236,
+    blocking: { count: 31, indicator_mismatch: 2 },
+    keyChanges: 17,
+    maxVotes: 2,
+    rotation: 90,
+    rotationSource: "gyro",
+    video: "1080x1920",
+    viewport: "390x844",
+  };
+
+  it("原样通过；没出过帧、模型没发布也是合法的摘要", () => {
+    expect(validateRecognitionSession(summary)).toEqual(summary);
+    const empty = { ...summary, modelId: null, frames: 0, blocking: {}, video: "0x0" };
+    expect(validateRecognitionSession(empty)).toEqual(empty);
+  });
+
+  it.each([
+    ["来源", { source: "tv" }],
+    ["收场方式", { outcome: "crashed" }],
+    ["计数为负", { frames: -1 }],
+    ["计数非整数", { keyChanges: 1.5 }],
+    ["不认识的告警码", { blocking: { whatever: 1 } }],
+    ["方向", { rotation: 180 }],
+    ["尺寸格式", { video: "1080*1920" }],
+    ["模型 id", { modelId: "v1" }],
+  ])("拒收：%s", (_, over) => {
+    expect(() => validateRecognitionSession({ ...summary, ...over })).toThrow();
+  });
+
+  it("多出来的字段不落库", () => {
+    expect(validateRecognitionSession({ ...summary, photo: "x" })).toEqual(summary);
   });
 });

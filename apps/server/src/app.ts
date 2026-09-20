@@ -12,12 +12,14 @@ import { openDatabase, type Database } from "./db";
 import { PlayersRepo } from "./db/players";
 import { PresetsRepo } from "./db/presets";
 import { RecognitionsRepo } from "./db/recognitions";
+import { RecognitionSessionsRepo } from "./db/recognitionSessions";
 import { ResultsRepo } from "./db/results";
 import { RoomsRepo } from "./db/rooms";
 import { evaluateRoutes } from "./http/routes/evaluate";
 import { localRoutes } from "./http/routes/locals";
 import { meRoutes } from "./http/routes/me";
 import { recognitionRoutes } from "./http/routes/recognitions";
+import { recognitionSessionRoutes } from "./http/routes/recognitionSessions";
 import { roomRoutes } from "./http/routes/rooms";
 import { mountStatic } from "./http/static";
 import { RoomRegistry } from "./rooms/registry";
@@ -86,6 +88,7 @@ export function createApp({
   const results = new ResultsRepo(db);
   const presets = new PresetsRepo(db);
   const recognitions = new RecognitionsRepo(db);
+  const sessions = new RecognitionSessionsRepo(db);
   const registry = new RoomRegistry(rooms, results, players, Date.now, timings?.autoStartMs);
   const local = config.cos ? null : new LocalStore(path.join(config.dataDir, "objects"));
   const store: ObjectStore = config.cos ? new CosStore(config.cos) : local!;
@@ -118,6 +121,7 @@ export function createApp({
   app.route("/api/rooms", roomRoutes({ registry, players }));
   app.route("/api/evaluate", evaluateRoutes({ players }));
   app.route("/api/recognitions", recognitionRoutes({ players, recognitions, store, modelId }));
+  app.route("/api/recognition-sessions", recognitionSessionRoutes({ players, sessions }));
   if (local) mountLocalObjects(app, local);
   app.notFound((c) => c.json({ error: "not_found", message: "接口不存在" }, 404));
   app.onError((err, c) => {

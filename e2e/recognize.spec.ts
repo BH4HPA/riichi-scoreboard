@@ -453,10 +453,22 @@ test("横屏：倾斜过 15° 才自动切、手动按钮随时能改、下次�
   await p.waitForTimeout(200);
   await expect(chrome).toHaveAttribute("data-rotation", "0");
 
-  // 手动切到横屏后关掉：下次打开还是横的
+  // 手动切到横屏后关掉：下次打开还是横的；什么都没拍就关，会话摘要照样上报（这类会话别处不留痕迹）
   await p.getByTestId("camera-rotate").click();
   await expect(chrome).toHaveAttribute("data-rotation", "90");
+  const reported = p.waitForRequest(
+    (r) => r.method() === "POST" && r.url().endsWith("/api/recognition-sessions"),
+  );
   await p.getByRole("button", { name: "关闭取景" }).click();
+  const report = await reported;
+  expect(report.postDataJSON()).toMatchObject({
+    source: "calc",
+    outcome: "abandoned",
+    rotation: 90,
+    rotationSource: "manual",
+    viewport: "400x800",
+  });
+  expect((await report.response())?.status()).toBe(204);
   await expect(p.getByTestId("camera-sheet")).toHaveCount(0);
   await p.getByRole("button", { name: /开始拍/ }).click();
   await expect(p.getByTestId("camera-chrome")).toHaveAttribute("data-rotation", "90");
