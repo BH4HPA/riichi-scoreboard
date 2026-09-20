@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { History, PanelRightOpen } from "lucide-react";
-import type { GameView, RoomView, UiState } from "@riichi/core";
+import type { GameView, UiState, YonmaRoomView } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Dialog, DialogContent } from "@/ui/dialog";
 import { ConnectionBadge } from "@/ui/notice";
@@ -27,7 +27,7 @@ export function ConsoleGame({
   intents,
   wide,
 }: {
-  room: RoomView;
+  room: YonmaRoomView;
   game: GameView;
   names: string[];
   intents: UiState[];

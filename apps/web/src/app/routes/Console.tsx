@@ -36,11 +36,10 @@ export function Console() {
     );
   }
 
-  const game = room.game;
   return (
     <SocketContext.Provider value={socket}>
       <div className="min-h-dvh bg-bg text-fg">
-        {room.phase === "lobby" || !game ? (
+        {room.phase === "lobby" || !room.game ? (
           <ConsoleLobby
             room={room}
             wide={wide}
@@ -48,10 +47,10 @@ export function Console() {
               <DissolveButton code={room.code} size="lg" variant="ghost" className="text-neg" />
             }
           />
-        ) : (
+        ) : room.kind === "ten" ? null : (
           <ConsoleGame
             room={room}
-            game={game}
+            game={room.game}
             names={seatNames(room)}
             intents={intents}
             wide={wide}

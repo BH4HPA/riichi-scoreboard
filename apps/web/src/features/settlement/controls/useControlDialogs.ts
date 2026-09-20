@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useRoomStore } from "@/ws/store";
 import { useSocket } from "@/ws/useRoom";
-import { draftStamp } from "../drafts/stamp";
+import { roomDraftStamp } from "../drafts/stamp";
 import { clearRoomDrafts, draftKey, ensureDraft } from "../drafts/store";
 
 export type ControlDialog =
@@ -38,8 +38,9 @@ export function useControlDialogs() {
   const open = (key: ControlDialog) => {
     if (SETTLEMENT_KEYS.has(key) && musicPlaying) socket.music(null);
     const room = useRoomStore.getState().room;
-    if ((key === "tsumo" || key === "ron") && room?.game) {
-      ensureDraft(draftKey(room.code, key), draftStamp(room.gameNo, room.game.present));
+    const stamp = room ? roomDraftStamp(room) : null;
+    if ((key === "tsumo" || key === "ron") && room && stamp !== null) {
+      ensureDraft(draftKey(room.code, key), stamp);
     }
     setDialog(key);
   };

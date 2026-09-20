@@ -1,15 +1,19 @@
 import type { RoomRules } from "../types/rules";
+import type { TenGameState } from "../ten/state";
 import { isLocalPlayer, type GameState, type PlayerRef, type RoomState } from "../types/state";
 import type { Seat } from "../types/tiles";
 
-/** 广播给客户端的房间视图：不含撤销栈本体，只含深度。 */
-export interface GameView {
-  present: GameState;
+/** 广播给客户端的对局视图：不含撤销栈本体，只含深度。 */
+export interface GameViewOf<G> {
+  present: G;
   undoDepth: number;
   redoDepth: number;
 }
+export type GameView = GameViewOf<GameState>;
+export type TenGameView = GameViewOf<TenGameState>;
 
-export interface RoomView {
+/** 房间视图里与房型无关的部分（与 `RoomState` 的壳对应） */
+interface RoomViewShell {
   code: string;
   seq: number;
   phase: RoomState["phase"];
@@ -22,9 +26,21 @@ export interface RoomView {
   autoStartIn: number | null;
   /** 电视正在播放的立直音乐；内存态，不进事件表 */
   music: MusicState | null;
-  game: GameView | null;
   gameNo: number;
 }
+
+export interface YonmaRoomView extends RoomViewShell {
+  kind: "yonma";
+  game: GameView | null;
+}
+
+export interface TenRoomView extends RoomViewShell {
+  kind: "ten";
+  game: TenGameView | null;
+}
+
+/** 以 `kind` 判别；旧服务端不发 `kind`，客户端一律 `kind === "ten" ? 二人 : 四人` */
+export type RoomView = YonmaRoomView | TenRoomView;
 
 /**
  * 谁按下了立直、放哪首：track 为曲库 id；seat 为 null 表示按下者没有座位（主控台代按）。
@@ -48,6 +64,12 @@ export function autoStartEligible(state: RoomState, online: boolean[]): boolean 
   return state.seats.some((p) => p !== null && !isLocalPlayer(p));
 }
 
+function gameView<G>(game: { past: G[]; present: G; future: G[] } | null): GameViewOf<G> | null {
+  return game
+    ? { present: game.present, undoDepth: game.past.length, redoDepth: game.future.length }
+    : null;
+}
+
 export function toRoomView(
   state: RoomState,
   seq: number,
@@ -55,7 +77,7 @@ export function toRoomView(
   autoStartIn: number | null,
   music: MusicState | null,
 ): RoomView {
-  return {
+  const shell: RoomViewShell = {
     code: state.code,
     seq,
     phase: state.phase,
@@ -65,13 +87,9 @@ export function toRoomView(
     online: seatsOnline(state, onlinePlayerIds),
     autoStartIn,
     music,
-    game: state.game
-      ? {
-          present: state.game.present,
-          undoDepth: state.game.past.length,
-          redoDepth: state.game.future.length,
-        }
-      : null,
     gameNo: state.gameNo,
   };
+  return state.kind === "ten"
+    ? { ...shell, kind: "ten", game: gameView(state.game) }
+    : { ...shell, kind: "yonma", game: gameView(state.game) };
 }

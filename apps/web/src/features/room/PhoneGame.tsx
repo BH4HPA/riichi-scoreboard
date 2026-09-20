@@ -7,6 +7,7 @@ import {
   seatNames,
   seatOfPlayer,
   type ReferenceView,
+  type YonmaRoomView,
 } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Dialog, DialogContent } from "@/ui/dialog";
@@ -38,8 +39,7 @@ const NAV: Array<[Exclude<Sheet, null>, typeof History, string]> = [
 ];
 
 /** 手机对局页：计分卡 + 点差 + 操作栏（第一屏先看局势，操作往下翻），底部工具栏打开记录/番符表/规则/我的。 */
-export function PhoneGame() {
-  const room = useRoomStore((s) => s.room)!;
+export function PhoneGame({ room }: { room: YonmaRoomView }) {
   const playerId = useRoomStore((s) => s.playerId);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [refView, setRefView] = useState<ReferenceView>(DEFAULT_REFERENCE_VIEW);

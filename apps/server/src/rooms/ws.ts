@@ -3,7 +3,7 @@ import type { Hono } from "hono";
 import type { UpgradeWebSocket, WSContext } from "hono/ws";
 import {
   assertSeat,
-  handContextAt,
+  roomHandContext,
   validateHandShape,
   WS_CLOSE,
   WS_KEEPALIVE,
@@ -150,16 +150,11 @@ export function mountWebSocket(app: Hono, upgradeWebSocket: UpgradeWebSocket, de
               return;
             case "evaluate": {
               const id = messageId(msg);
-              const game = room.state.game?.present;
-              if (!game) {
-                send(ws, { type: "error", id, code: "no_game", message: "尚未开局" });
-                return;
-              }
               try {
                 assertSeat(msg.seat);
                 const result = evaluateHand(
                   validateHandShape(msg.hand),
-                  handContextAt(game.kyoku, msg.seat),
+                  roomHandContext(room.state, msg.seat),
                   room.state.rules,
                 );
                 send(ws, { type: "evaluate", id: id ?? "", result });

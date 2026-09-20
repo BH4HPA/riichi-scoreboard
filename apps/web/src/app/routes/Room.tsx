@@ -43,8 +43,8 @@ export function Room() {
     <SocketContext.Provider value={socket}>
       {room.phase === "lobby" || !room.game ? (
         <PhoneLobby room={room} mySeat={mySeat} />
-      ) : (
-        <PhoneGame />
+      ) : room.kind === "ten" ? null : (
+        <PhoneGame room={room} />
       )}
       <Notice />
     </SocketContext.Provider>

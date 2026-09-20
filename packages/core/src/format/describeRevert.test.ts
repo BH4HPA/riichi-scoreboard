@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MLEAGUE_RULES } from "../rules/mleague";
 import { createRoom, reduceRoom, replay } from "../reducer/reduce";
 import type { Command } from "../types/commands";
-import type { PlayerRef, RoomState } from "../types/state";
+import type { PlayerRef, YonmaRoomState } from "../types/state";
 import { describeRevert } from "./describeRevert";
 
 const players: PlayerRef[] = ["阿东", "阿南", "阿西", "阿北"].map((name, i) => ({
@@ -13,12 +13,12 @@ const players: PlayerRef[] = ["阿东", "阿南", "阿西", "阿北"].map((name,
 }));
 
 let seq = 0;
-function apply(room: RoomState, command: Command): RoomState {
+function apply(room: YonmaRoomState, command: Command): YonmaRoomState {
   seq += 1;
   return reduceRoom(room, { seq, at: seq, actor: { playerId: null, clientId: "t" }, command });
 }
 
-function started(): RoomState {
+function started(): YonmaRoomState {
   const cmds: Command[] = [
     ...players.map((player, s): Command => ({ type: "sit", seat: s as 0, player })),
     { type: "start", force: true },
@@ -35,7 +35,7 @@ function started(): RoomState {
 }
 
 const manual = (han: number, fu: number) => ({ kind: "manual" as const, han, fu, yakuman: 0 });
-const present = (room: RoomState) => room.game!.present;
+const present = (room: YonmaRoomState) => room.game!.present;
 
 describe("describeRevert", () => {
   it("撤销一笔荣和：局名 + 和牌者 + 类型", () => {

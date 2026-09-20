@@ -22,6 +22,8 @@ export * from "./format/describeRevert";
 export * from "./format/rules";
 export * from "./format/seat";
 export * from "./hand/options";
+export * from "./hand/roomContext";
+export * from "./ten/state";
 export * from "./reference/notation";
 export * from "./reference/yakuTable";
 export * from "./reference/fuTable";

@@ -1,4 +1,4 @@
-import type { PlayerStats, RoomState } from "@riichi/core";
+import type { PlayerStats, RoomState, YonmaRoomState } from "@riichi/core";
 import type { Database } from "./index";
 
 interface ResultRow {
@@ -18,6 +18,8 @@ export class ResultsRepo {
    * finished→playing（撤销终局/调整场况）删除。其它事件不触碰战绩。
    */
   onTransition(prev: RoomState, next: RoomState): void {
+    // 个人战绩是四人零和口径（顺位 1–4、含马点的得分）；二人房不计入
+    if (next.kind !== "yonma") return;
     const sameGame = prev.gameNo === next.gameNo;
     const wasFinished = sameGame && prev.game?.present.status === "finished";
     const isFinished = next.game?.present.status === "finished";
@@ -25,7 +27,7 @@ export class ResultsRepo {
     else if (wasFinished && !isFinished && next.game) this.remove(next.code, next.gameNo);
   }
 
-  private record(room: RoomState): void {
+  private record(room: YonmaRoomState): void {
     const game = room.game!.present;
     if (!game.final) return;
     this.remove(room.code, room.gameNo);

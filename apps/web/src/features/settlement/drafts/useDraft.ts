@@ -1,11 +1,11 @@
 import { useEffect, useRef } from "react";
 import { useRoomStore } from "@/ws/store";
-import { draftStamp } from "./stamp";
+import { roomDraftStamp } from "./stamp";
 import { draftKey, ensureDraft, updateDraft, useDraftStore, type DraftKind } from "./store";
 
 function currentStamp(): string | null {
   const room = useRoomStore.getState().room;
-  return room?.game ? draftStamp(room.gameNo, room.game.present) : null;
+  return room ? roomDraftStamp(room) : null;
 }
 
 /**
@@ -25,7 +25,8 @@ export function useDraft<S>(kind: DraftKind, init: () => S, onStale: () => void)
     onStaleRef.current = onStale;
   });
 
-  const stamp = draftStamp(room.gameNo, room.game!.present);
+  // 结算表单只在对局中打开，此时一定有局面戳
+  const stamp = roomDraftStamp(room)!;
   const stale = entry !== undefined && entry.stamp !== stamp;
   // 正常由打开弹窗的入口备好；兜底防止没有草稿时表单改不动
   useEffect(() => {

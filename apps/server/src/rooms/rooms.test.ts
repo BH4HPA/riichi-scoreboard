@@ -230,7 +230,9 @@ describe("rooms end-to-end", () => {
     seq = (await tv.until("ack")).seq;
     // 电视与手机都收到 playing 状态
     state = await tv.waitState((r) => r.phase === "playing");
-    expect(state.game?.present.points).toEqual([25000, 25000, 25000, 25000]);
+    expect(state.kind === "yonma" && state.game?.present.points).toEqual([
+      25000, 25000, 25000, 25000,
+    ]);
     await phones[3]!.waitState((r) => r.phase === "playing");
 
     // 并发：两台手机基于同一 baseSeq 提交

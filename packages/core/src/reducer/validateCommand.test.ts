@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DomainError } from "../types/errors";
 import { MLEAGUE_RULES } from "../rules/mleague";
 import type { RoomEvent } from "../types/events";
-import type { PlayerRef, RoomState } from "../types/state";
+import type { PlayerRef, YonmaRoomState } from "../types/state";
 import { createRoom, reduceRoom, replay } from "./reduce";
 import { validateCommand } from "./validateCommand";
 
@@ -20,7 +20,7 @@ const ev = (command: RoomEvent["command"], seq = 1): RoomEvent => ({
 });
 const manual = { kind: "manual" as const, han: 1, fu: 30, yakuman: 0 };
 
-function playingRoom(): RoomState {
+function playingRoom(): YonmaRoomState {
   const cmds: RoomEvent["command"][] = [
     ...players.map((player, seat) => ({
       type: "sit" as const,

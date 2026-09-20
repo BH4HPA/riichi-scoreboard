@@ -5,7 +5,7 @@ import {
   RulesError,
   autoStartEligible,
   createRoom,
-  handContextAt,
+  roomHandContext,
   isLocalPlayer,
   reduceRoom,
   replay,
@@ -227,7 +227,13 @@ export class RoomRegistry {
     if (STOPS_MUSIC[command.type]) room.music = null;
     this.reconcileAutoStart(room);
     this.broadcastState(room);
-    if ((command.type === "undo" || command.type === "redo") && prev.game && next.game) {
+    if (
+      (command.type === "undo" || command.type === "redo") &&
+      prev.kind === "yonma" &&
+      next.kind === "yonma" &&
+      prev.game &&
+      next.game
+    ) {
       this.broadcast(room, {
         type: "reverted",
         op: command.type,
@@ -317,9 +323,7 @@ export class RoomRegistry {
 
   private evaluate(state: RoomState, seat: Seat, value: ClientWinValue): WinValue {
     if (value.kind === "manual") return value;
-    const game = state.game?.present;
-    if (!game) throw new DomainError("no_game", "尚未开局");
-    const result = evaluateHand(value.hand, handContextAt(game.kyoku, seat), state.rules);
+    const result = evaluateHand(value.hand, roomHandContext(state, seat), state.rules);
     return { kind: "hand", hand: value.hand, result };
   }
 
