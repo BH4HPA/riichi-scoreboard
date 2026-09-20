@@ -7,10 +7,12 @@ import {
   createRoom,
   roomHandContext,
   isLocalPlayer,
+  nextTenMarkAt,
   reduceRoom,
   replay,
   rulesKey,
   describeRevert,
+  describeTenRevert,
   seatOfPlayer,
   seatsOnline,
   STOPS_MUSIC,
@@ -27,6 +29,7 @@ import {
   type MusicState,
   type PlayerRef,
   type RoomEvent,
+  type RoomKind,
   type RoomRules,
   type RoomState,
   type ServerMessage,
@@ -63,6 +66,8 @@ export interface LiveRoom {
   lastActivity: number;
   /** 自动开局倒计时；null = 未在倒计时 */
   autoStart: { at: number; timer: ReturnType<typeof setTimeout> } | null;
+  /** 二人房暗计时的下一档定时器（`at` = 它对应的触发时刻）；null = 没有要等的档 */
+  clock: { at: number; timer: ReturnType<typeof setTimeout> } | null;
 }
 
 export class RoomNotFound extends Error {
@@ -101,6 +106,17 @@ function samePlayer(a: PlayerRef, b: PlayerRef): boolean {
   return a.id === b.id && a.name === b.name && a.avatar === b.avatar;
 }
 
+/** 撤销 / 重做提示里「哪一步」的描述；房型不变，所以前后一定同型。未开局为 null。 */
+function revertedWhat(prev: RoomState, next: RoomState): string | null {
+  if (prev.kind === "ten" && next.kind === "ten") {
+    return prev.game && next.game ? describeTenRevert(prev.game.present, next.game.present) : null;
+  }
+  if (prev.kind === "yonma" && next.kind === "yonma") {
+    return prev.game && next.game ? describeRevert(prev.game.present, next.game.present) : null;
+  }
+  return null;
+}
+
 export class RoomRegistry {
   private readonly rooms = new Map<string, LiveRoom>();
 
@@ -113,22 +129,23 @@ export class RoomRegistry {
     private readonly autoStartMs: number = AUTO_START_MS,
   ) {}
 
-  createRoom(rules: RoomRules): LiveRoom {
+  createRoom(rules: RoomRules, kind: RoomKind = "yonma"): LiveRoom {
     const randomCode = () =>
       Array.from({ length: 6 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join("");
     let code = randomCode();
     while (this.roomsRepo.exists(code)) code = randomCode();
     const at = this.now();
-    this.roomsRepo.create(code, rules, at);
+    this.roomsRepo.create(code, kind, rules, at);
     const live: LiveRoom = {
       code,
-      state: createRoom(code, rules),
+      state: createRoom(code, rules, kind),
       seq: 0,
       clients: new Map(),
       ui: new Map(),
       music: null,
       lastActivity: at,
       autoStart: null,
+      clock: null,
     };
     this.rooms.set(code, live);
     return live;
@@ -144,7 +161,7 @@ export class RoomRegistry {
     const events = this.roomsRepo.events(code);
     let state: RoomState;
     try {
-      state = replay(createRoom(code, row.rules), events);
+      state = replay(createRoom(code, row.rules, row.kind), events);
     } catch (err) {
       throw new RoomCorrupt(code, err);
     }
@@ -157,6 +174,7 @@ export class RoomRegistry {
       music: null,
       lastActivity: row.updated_at,
       autoStart: null,
+      clock: null,
     };
     this.rooms.set(code, live);
     return live;
@@ -217,6 +235,36 @@ export class RoomRegistry {
     room.autoStart = { at: this.now() + this.autoStartMs, timer };
   }
 
+  /**
+   * 二人房暗计时：对局中且有人在线时，为「下一档」（剩 10 分 / 剩 5 分 / 时间到）排一个定时器，到点重新广播
+   * 房间视图（档位由视图按开局时刻现算，见 core `tenTimeMark`）。只提示、不自动终局。
+   * 目标时刻会变——重开一局重置开局时刻、终局后不再提示、撤销终局后恢复——所以与自动开局不同，
+   * 这里按目标时刻比对，变了就重排。没人在线不排：进房必经 `join`，视图届时现算。
+   */
+  private reconcileClock(room: LiveRoom): void {
+    const game = room.state.kind === "ten" ? room.state.game?.present : undefined;
+    const target =
+      game?.status === "playing" && room.clients.size > 0
+        ? nextTenMarkAt(game.startedAt, this.now())
+        : null;
+    if ((room.clock?.at ?? null) === target) return;
+    if (room.clock) clearTimeout(room.clock.timer);
+    room.clock = null;
+    if (target === null) return;
+    const timer = setTimeout(
+      () => {
+        room.clock = null;
+        if (this.rooms.get(room.code) !== room) return;
+        // setTimeout 可能略早触发：还没到点就不广播，下面的 reconcile 会按剩余时间重排同一档
+        if (this.now() >= target) this.broadcastState(room);
+        this.reconcileClock(room);
+      },
+      Math.max(0, target - this.now()),
+    );
+    timer.unref?.();
+    room.clock = { at: target, timer };
+  }
+
   private commit(room: LiveRoom, command: Command, actor: EventActor): RoomEvent {
     const event: RoomEvent = { seq: room.seq + 1, at: this.now(), actor, command };
     const prev = room.state;
@@ -233,20 +281,18 @@ export class RoomRegistry {
     room.lastActivity = event.at;
     if (STOPS_MUSIC[command.type]) room.music = null;
     this.reconcileAutoStart(room);
+    this.reconcileClock(room);
     this.broadcastState(room);
-    if (
-      (command.type === "undo" || command.type === "redo") &&
-      prev.kind === "yonma" &&
-      next.kind === "yonma" &&
-      prev.game &&
-      next.game
-    ) {
-      this.broadcast(room, {
-        type: "reverted",
-        op: command.type,
-        by: this.actorName(room, actor),
-        what: describeRevert(prev.game.present, next.game.present),
-      });
+    if (command.type === "undo" || command.type === "redo") {
+      const what = revertedWhat(prev, next);
+      if (what !== null) {
+        this.broadcast(room, {
+          type: "reverted",
+          op: command.type,
+          by: this.actorName(room, actor),
+          what,
+        });
+      }
     }
     return event;
   }
@@ -266,6 +312,8 @@ export class RoomRegistry {
   closeRoom(room: LiveRoom): void {
     if (room.autoStart) clearTimeout(room.autoStart.timer);
     room.autoStart = null;
+    if (room.clock) clearTimeout(room.clock.timer);
+    room.clock = null;
     for (const c of room.clients.values()) c.close(WS_CLOSE.dissolved, "dissolved");
     room.clients.clear();
     room.ui.clear();
@@ -365,6 +413,7 @@ export class RoomRegistry {
     // 在线状态变了，所有人都要刷新座位卡（档案同步已提交并广播过则不再重复）
     if (!synced) {
       this.reconcileAutoStart(room);
+      this.reconcileClock(room);
       this.broadcastState(room);
     }
     client.send(JSON.stringify({ type: "ui", intents: this.uiList(room) }));
@@ -375,6 +424,7 @@ export class RoomRegistry {
     if (room.ui.delete(clientId)) this.broadcastUi(room);
     room.lastActivity = this.now();
     this.reconcileAutoStart(room);
+    this.reconcileClock(room);
     this.broadcastState(room);
   }
 
@@ -437,6 +487,7 @@ export class RoomRegistry {
     for (const [code, room] of this.rooms) {
       if (room.clients.size === 0 && room.lastActivity < cutoff) {
         if (room.autoStart) clearTimeout(room.autoStart.timer);
+        if (room.clock) clearTimeout(room.clock.timer);
         this.rooms.delete(code);
         evicted += 1;
       }

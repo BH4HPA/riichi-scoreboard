@@ -1,8 +1,10 @@
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
+import { MLEAGUE_RULES } from "@riichi/core";
 import { MIGRATIONS, migrate, schemaVersion } from "./index";
 import { PlayersRepo } from "./players";
 import { RecognitionsRepo, type RecognitionRow } from "./recognitions";
+import { RoomsRepo } from "./rooms";
 
 describe("数据库迁移", () => {
   it("新库直接迁到最新版本", () => {
@@ -110,5 +112,23 @@ describe("数据库迁移", () => {
       source: "calc",
     });
     expect(db.prepare("SELECT COUNT(*) AS n FROM recognition_sessions").get()).toEqual({ n: 0 });
+  });
+
+  it("v6 库升级到 v7：历史房间都是四人房，新房间带着房型落库", () => {
+    const db = new DatabaseSync(":memory:");
+    for (const sql of MIGRATIONS.slice(0, 6)) db.exec(sql);
+    db.exec("PRAGMA user_version = 6");
+    db.prepare("INSERT INTO rooms (code, rules, created_at, updated_at) VALUES (?, ?, ?, ?)").run(
+      "OLD123",
+      JSON.stringify(MLEAGUE_RULES),
+      1,
+      1,
+    );
+    migrate(db);
+    expect(schemaVersion(db)).toBe(MIGRATIONS.length);
+    const repo = new RoomsRepo(db);
+    expect(repo.get("OLD123")).toMatchObject({ kind: "yonma", closed_at: null });
+    repo.create("TEN123", "ten", MLEAGUE_RULES, 2);
+    expect(repo.get("TEN123")?.kind).toBe("ten");
   });
 });

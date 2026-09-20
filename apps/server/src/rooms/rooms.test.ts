@@ -147,6 +147,31 @@ describe("rooms end-to-end", () => {
     expect(missing.status).toBe(404);
   });
 
+  it("REST：建房可带房型；不带就是四人房（旧前端），乱填 400", async () => {
+    const me = await register("选房型");
+    const create = (body: unknown) =>
+      app.request("/api/rooms", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${me.token}` },
+        body: JSON.stringify(body),
+      });
+    const ten = await create({ kind: "ten" });
+    expect(ten.status).toBe(201);
+    expect(((await ten.json()) as { room: RoomView }).room).toMatchObject({
+      kind: "ten",
+      seats: [null, null],
+      timeMark: 0,
+    });
+    const plain = await create({});
+    expect(((await plain.json()) as { room: RoomView }).room).toMatchObject({
+      kind: "yonma",
+      seats: [null, null, null, null],
+    });
+    const bad = await create({ kind: "sanma" });
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toMatchObject({ error: "kind" });
+  });
+
   it("REST：同一设备每小时建房数有上限（429）", async () => {
     const me = await register("刷房");
     const create = () =>
