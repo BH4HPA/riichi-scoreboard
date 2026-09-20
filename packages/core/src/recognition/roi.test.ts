@@ -86,9 +86,7 @@ describe("tightenCapture：线上实拍", () => {
       }
     }
     // 剩下的是牌河紧贴着指示牌的那几张：块里确实有没标注的牌，该送人工
-    console.log(
-      `有框没着落的记录：收紧前 ${before} 条，收紧后 ${after} 条；拒绝收紧 ${refused.join(" ")}`,
-    );
+    // 实测（2026-09-19 的 50 条）：收紧前 21 条，收紧后 5 条，其中 2 条被守卫拒绝
     expect(refused.length).toBeLessThanOrEqual(2);
     expect(before).toBeGreaterThanOrEqual(15);
     expect(after).toBeLessThanOrEqual(before / 3);
