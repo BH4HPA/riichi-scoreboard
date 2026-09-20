@@ -1,6 +1,12 @@
 import { DomainError } from "../types/errors";
 import { validateRules } from "../rules/validate";
-import { isGameCommand, type GameCommand, type LobbyCommand } from "../types/commands";
+import {
+  isGameCommand,
+  isTenCommand,
+  type GameCommand,
+  type LobbyCommand,
+  type TenCommand,
+} from "../types/commands";
 import type { RoomEvent } from "../types/events";
 import type { RoomRules } from "../types/rules";
 import {
@@ -14,6 +20,7 @@ import {
   type YonmaRoomState,
 } from "../types/state";
 import type { Seat } from "../types/tiles";
+import { applyTenCommand, createTenGame } from "../ten/reduce";
 import { applyGameCommand, createGame, declareRiichi } from "./game";
 import { createUndoable, push, redo, undo } from "./undoable";
 import { assertSeat } from "./validateCommand";
@@ -129,13 +136,10 @@ function startGame(room: RoomState, at: number): RoomState {
     if (!p) throw notFull(room);
     return p;
   }) as PlayerRef[];
-  if (room.kind === "ten") throw new DomainError("not_here", "二人麻将对局尚未开放");
-  return {
-    ...room,
-    phase: "playing",
-    game: createUndoable(createGame(room.rules, players, at)),
-    gameNo: room.gameNo + 1,
-  };
+  const started = { phase: "playing", gameNo: room.gameNo + 1 } as const;
+  return room.kind === "ten"
+    ? { ...room, ...started, game: createUndoable(createTenGame(players, at)) }
+    : { ...room, ...started, game: createUndoable(createGame(room.rules, players, at)) };
 }
 
 /** 纯函数：房间状态 + 事件 → 新房间状态（房型不变）。失败抛 DomainError / RulesError。 */
@@ -162,7 +166,12 @@ export function reduceRoom(room: RoomState, event: RoomEvent): RoomState {
   return room.kind === "ten" ? reduceTenGame(room, cmd, event) : reduceYonmaGame(room, cmd, event);
 }
 
-function reduceYonmaGame(room: YonmaRoomState, cmd: GameCommand, event: RoomEvent): YonmaRoomState {
+function reduceYonmaGame(
+  room: YonmaRoomState,
+  cmd: GameCommand | TenCommand,
+  event: RoomEvent,
+): YonmaRoomState {
+  if (isTenCommand(cmd)) throw new DomainError("not_here", "这是二人麻将的操作");
   const stack = room.game!;
 
   if (cmd.type === "declareRiichi") {
@@ -190,8 +199,37 @@ function reduceYonmaGame(room: YonmaRoomState, cmd: GameCommand, event: RoomEven
   return { ...room, game: push(stack, present), phase: phaseOf(present) };
 }
 
-function reduceTenGame(_room: TenRoomState, _cmd: GameCommand, _event: RoomEvent): TenRoomState {
-  throw new DomainError("not_here", "二人麻将对局尚未开放");
+function reduceTenGame(
+  room: TenRoomState,
+  cmd: GameCommand | TenCommand,
+  event: RoomEvent,
+): TenRoomState {
+  const stack = room.game!;
+
+  if (cmd.type === "undo") {
+    const game = undo(stack);
+    if (!game) throw new DomainError("nothing_to_undo", "暂无可撤销的操作");
+    return { ...room, game, phase: phaseOf(game.present) };
+  }
+  if (cmd.type === "redo") {
+    const game = redo(stack);
+    if (!game) throw new DomainError("nothing_to_redo", "暂无可重做的操作");
+    return { ...room, game, phase: phaseOf(game.present) };
+  }
+  if (!isTenCommand(cmd) && cmd.type !== "endGame") {
+    throw new DomainError("not_here", "这是四人麻将的操作");
+  }
+
+  const present = applyTenCommand(stack.present, cmd, {
+    seq: event.seq,
+    at: event.at,
+    names: seatNames(room),
+    rules: room.rules,
+  });
+  // 没有状态变化（重复的宣言）：原样返回，服务端据此不落库、不推进 seq
+  return present === stack.present
+    ? room
+    : { ...room, game: push(stack, present), phase: phaseOf(present) };
 }
 
 /** 房间阶段跟随当前局面：对局结束即 finished，否则 playing。 */

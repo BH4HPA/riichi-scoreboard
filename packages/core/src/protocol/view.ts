@@ -1,4 +1,5 @@
 import type { RoomRules } from "../types/rules";
+import { tenTimeMark, type TenTimeMark } from "../ten/clock";
 import type { TenGameState } from "../ten/state";
 import { isLocalPlayer, type GameState, type PlayerRef, type RoomState } from "../types/state";
 import type { Seat } from "../types/tiles";
@@ -37,6 +38,8 @@ export interface YonmaRoomView extends RoomViewShell {
 export interface TenRoomView extends RoomViewShell {
   kind: "ten";
   game: TenGameView | null;
+  /** 暗计时的提示档（广播时刻计，见 `ten/clock.ts`）；未在对局中为 0。只给档位、不给剩余时间 */
+  timeMark: TenTimeMark;
 }
 
 /** 以 `kind` 判别；旧服务端不发 `kind`，客户端一律 `kind === "ten" ? 二人 : 四人` */
@@ -76,6 +79,7 @@ export function toRoomView(
   onlinePlayerIds: ReadonlySet<string>,
   autoStartIn: number | null,
   music: MusicState | null,
+  now: number,
 ): RoomView {
   const shell: RoomViewShell = {
     code: state.code,
@@ -89,7 +93,12 @@ export function toRoomView(
     music,
     gameNo: state.gameNo,
   };
-  return state.kind === "ten"
-    ? { ...shell, kind: "ten", game: gameView(state.game) }
-    : { ...shell, kind: "yonma", game: gameView(state.game) };
+  if (state.kind !== "ten") return { ...shell, kind: "yonma", game: gameView(state.game) };
+  const playing = state.game?.present.status === "playing" ? state.game.present : null;
+  return {
+    ...shell,
+    kind: "ten",
+    game: gameView(state.game),
+    timeMark: playing ? tenTimeMark(playing.startedAt, now) : 0,
+  };
 }

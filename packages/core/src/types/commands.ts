@@ -1,6 +1,7 @@
 import type { RoomRules } from "./rules";
+import type { TenDrawReason } from "../ten/state";
 import type { AbortiveReason, HandInput, PlayerRef, WinValue } from "./state";
-import type { Seat } from "./tiles";
+import type { Seat, Tile } from "./tiles";
 
 /** 客户端提交的和牌价值：牌面形态尚未评估，由服务端补上 result 后变为 WinValue。 */
 export type ClientWinValue =
@@ -52,7 +53,19 @@ export type GameCommand<V = WinValue> =
   | { type: "endGame" }
   | { type: "newGame" };
 
-export type Command = LobbyCommand | GameCommand;
+/**
+ * 《天》二人麻将的对局命令（见 `ten/reduce.ts`）。撤销 / 重做 / 终局 / 重开沿用 `GameCommand` 里的同名命令。
+ * 宣言与指定也进撤销栈；和牌者恒为进攻方，所以 `tenTsumo` 不带座位。
+ */
+export type TenCommand<V = WinValue> =
+  /** 仅 Stage A。立直扣 1 根立直棒；`entries` = 按下时看到的历史条数，对不上即拒绝（不看 baseSeq） */
+  | { type: "tenDeclare"; seat: Seat; riichi: boolean; entries: number }
+  /** 仅 Stage B：防守方本轮指定的两张（基础牌码 1–34） */
+  | { type: "tenGuess"; tiles: [Tile, Tile] }
+  | { type: "tenDraw"; reason: TenDrawReason }
+  | { type: "tenTsumo"; value: V };
+
+export type Command = LobbyCommand | GameCommand | TenCommand;
 
 /** 客户端可提交的命令形态：牌面未评估；入座不带玩家对象；本地玩家只带 id；改规则不带准备重置标记。 */
 export type ClientCommand =
@@ -60,7 +73,19 @@ export type ClientCommand =
   | { type: "setRules"; rules: RoomRules }
   | { type: "sit"; seat: Seat }
   | { type: "sitLocal"; seat: Seat; playerId: string }
-  | GameCommand<ClientWinValue>;
+  | GameCommand<ClientWinValue>
+  | TenCommand<ClientWinValue>;
+
+const TEN_COMMAND_TYPES: ReadonlySet<string> = new Set([
+  "tenDeclare",
+  "tenGuess",
+  "tenDraw",
+  "tenTsumo",
+]);
+
+export function isTenCommand(cmd: { type: string }): cmd is TenCommand {
+  return TEN_COMMAND_TYPES.has(cmd.type);
+}
 
 export const GAME_COMMAND_TYPES: ReadonlySet<string> = new Set([
   "tsumo",
@@ -76,6 +101,7 @@ export const GAME_COMMAND_TYPES: ReadonlySet<string> = new Set([
   "newGame",
 ]);
 
-export function isGameCommand(cmd: { type: string }): cmd is GameCommand {
-  return GAME_COMMAND_TYPES.has(cmd.type);
+/** 对局命令（两种房型的都算）：不是它的就是大厅命令 */
+export function isGameCommand(cmd: { type: string }): cmd is GameCommand | TenCommand {
+  return GAME_COMMAND_TYPES.has(cmd.type) || TEN_COMMAND_TYPES.has(cmd.type);
 }

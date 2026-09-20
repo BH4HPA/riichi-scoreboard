@@ -56,7 +56,7 @@ describe("toRoomView", () => {
   it("带在线状态与自动开局剩余时间", () => {
     const state = lobby([device("a"), null, null, null], [false, false, false, false]);
     const music = { track: TRACK_A, seat: 0 as const, at: 1 };
-    const view = toRoomView(state, 3, new Set(["a"]), 1234, music);
+    const view = toRoomView(state, 3, new Set(["a"]), 1234, music, 0);
     expect(view.online).toEqual([true, false, false, false]);
     expect(view.autoStartIn).toBe(1234);
     expect(view.music).toBe(music);

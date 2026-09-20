@@ -34,6 +34,11 @@ export const STOPS_MUSIC: Record<Command["type"], boolean> = {
   syncProfile: false,
   undo: false,
   redo: true,
+  // 二人房：宣言就是放曲的同一下点击，指定时曲子接着放；记下一局的结果才停
+  tenDeclare: false,
+  tenGuess: false,
+  tenDraw: true,
+  tenTsumo: true,
 };
 
 /**
@@ -69,6 +74,11 @@ export const TOLERATES_STALE: Record<ClientCommand["type"], boolean> = {
   redo: false,
   endGame: false,
   newGame: false,
+  // 与 declareRiichi 同理：自带按下时的历史条数，且幂等；两人同时按，后到的得到「对方已宣言」而不是 stale
+  tenDeclare: true,
+  tenGuess: false,
+  tenDraw: false,
+  tenTsumo: false,
 };
 
 /** 服务端主动关闭连接的关闭码；除 idle 外客户端都不应重连。 */

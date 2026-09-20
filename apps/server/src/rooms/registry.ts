@@ -169,7 +169,14 @@ export class RoomRegistry {
 
   view(room: LiveRoom): RoomView {
     const autoStartIn = room.autoStart ? Math.max(0, room.autoStart.at - this.now()) : null;
-    return toRoomView(room.state, room.seq, this.onlineIds(room), autoStartIn, room.music);
+    return toRoomView(
+      room.state,
+      room.seq,
+      this.onlineIds(room),
+      autoStartIn,
+      room.music,
+      this.now(),
+    );
   }
 
   /** 形状校验 → 校验 baseSeq（大厅类命令豁免，见 TOLERATES_STALE）→ 按 actor 补全/鉴权 → reduce → 事务落库 → 广播。 */
@@ -316,6 +323,16 @@ export class RoomRegistry {
           ...cmd,
           wins: cmd.wins.map((w) => ({ ...w, value: this.evaluate(state, w.winner, w.value) })),
         } as GameCommand;
+      case "tenDeclare":
+        if (state.phase !== "playing") throw new DomainError("locked", "只有对局中才能宣言");
+        own(cmd.seat, "宣言");
+        return cmd;
+      case "tenTsumo": {
+        // 和牌者恒为进攻方：座位取自当前快照而不是客户端，先确认在 Stage B 再评估牌面
+        const stage = state.kind === "ten" ? state.game?.present.stage : undefined;
+        if (stage?.kind !== "B") throw new DomainError("not_stage", "还没有人宣言，不能和牌");
+        return { ...cmd, value: this.evaluate(state, stage.attacker, cmd.value) };
+      }
       default:
         return cmd;
     }
