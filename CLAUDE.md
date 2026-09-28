@@ -43,7 +43,9 @@ Yarn workspaces monorepo:
   `RoomView` derivation, `uiIntent` mirror intents + validation, `rest` DTOs). `DomainError` lives in
   `types/errors.ts`. No DOM, no wasm. Shared by server (authority) and web (pre-confirm preview).
 - `apps/server` — Hono + `@hono/node-ws` + `node:sqlite` + `riichi-rs-node` (hand → han/fu/yaku, server
-  only). Rooms are event-sourced: commands carry the client's `baseSeq` and are rejected as `stale` when it
+  only; meld tiles are checked with core `isLegalMeld` and sorted before the engine sees them — riichi-rs only
+  accepts an ascending chi, silently merges any other meld into the closed hand, ignores suits and panics on
+  honor runs; reported upstream as MahjongPantheon/riichi-rust#2). Rooms are event-sourced: commands carry the client's `baseSeq` and are rejected as `stale` when it
   lags, except for the commands listed in `TOLERATES_STALE` (seat commands, `start`, `dissolve`,
   `declareRiichi` —
   feasibility is decided from the current snapshot alone, so a broadcast still in flight must not
@@ -55,20 +57,28 @@ Yarn workspaces monorepo:
   which entry per core `describeRevert`) that every client shows as a notice. Transient UI intents (mirroring a phone's dialog on the TV) live in memory only.
   SQLite schema is versioned (`db/index.ts` `MIGRATIONS`, applied by `user_version`). User files go through
   `storage/ObjectStore`: local disk (served at `/api/objects/*`) or Tencent COS (`QCLOUD_*` env, `riichi/`
-  prefix, see `.env.template`). Abuse limits (`http/rateLimit.ts`, sliding windows): registration per IP
+  prefix, see `.env.template`); recognition photos (`hands/`, `samples/`, `isPrivateKey`) are private — COS
+  `ACL: private`, 404 from `/api/objects` — only avatars are public. Abuse limits (`http/rateLimit.ts`, sliding windows): registration per IP
   (`TRUST_PROXY=1` reads `X-Forwarded-For` behind the CDN), room creation per device, photo uploads per player
-  - global; the ws server's `maxPayload` equals the 16 KB application message cap. Serves the built web app
+  - global (capture photos 60/h, viewfinder sample frames a separate 60/h); the ws server's `maxPayload` equals the 16 KB application message cap. Serves the built web app
     with SPA fallback.
 - `apps/web` — Vite + React 19 + Tailwind v4 + radix primitives. Routes: `/` landing (device routing:
   desktop and tablet pick a room kind — `features/console/RoomKindPicker`, one button per kind that reads
   「继续 … 房间码」 + 「新建」 while this device's last console room of that kind is still open
   (`useSavedConsoleRooms`, one saved code per kind in `consoleRooms.ts`), 「创建」 when it is known to be gone, and just the kind name while that cannot be confirmed (probing, offline, 5xx) — the label never promises the wrong thing; tablet can also join as a player; phone gets QR scan + six-cell code input, plus 「返回房间」 when the room in `riichi.room.last` still
   exists), `/console?kind=yonma|ten` (no param = yonma; the lobby has 「返回首页」 because the kind is picked on the landing page; 「新建」 arrives with a one-shot `state.fresh` that skips reuse, and the saved code is replaced only after the room is created, so a failed create keeps 「继续」; a dissolved room sends the console back to `/` — it never auto-creates the next room; TV: two
-  columns ≥ 1280px with a draggable split — `features/console/split`, default scores 0.6, clamped by
-  per-column minimum widths, remembered in `riichi.console.split` — otherwise single column with history
-  drawer + QR dialog), `/r/:code` (phone), `/calc` (拍照算点数, see Photo recognition).
+  columns when both columns' minimum widths fit (`features/console/split/wideQuery`, ≥ 1280px at 100%) with a
+  draggable split — `features/console/split`, default scores 0.6, clamped by per-column minimum widths,
+  remembered in `riichi.console.split` — otherwise single column with history drawer + QR dialog; UI size
+  100/115/130% (`features/console/scale`, `riichi.console.scale`, in the lobby's button row and at the bottom
+  of the game's 操作 panel) sets the root font size while the console is mounted — tile images and fixed sizes
+  are rem so everything scales, phones stay at 16px, and the split's minimum widths and the two-column threshold
+  scale with it; the screen is kept awake while a room is open (`useWakeLock`, Screen Wake Lock API, silently
+  absent where unsupported); `ConnectionBadge variant="console"` shows in lobby and game), `/r/:code` (phone), `/calc` (拍照算点数, see Photo recognition).
   Settlement dialogs live in `features/settlement/dialogs/` (one file per dialog over a shared
   `SettlementDialog` shell; `useDeclaredRiichi` merges riichi declarations that arrive while a dialog is open).
+  Ron and tsumo share one order — winner (ron: then the loser, who excludes chosen winners) → riichi → value;
+  extra ron winners (double/triple) each get a bordered block and carry a stable `id` as React key.
   Generic confirmation is `ui/confirm-dialog`. Phone dialogs mirror to the TV as a full-screen modal
   (`features/mirror/SettlementMirror`, intents sent via `features/mirror/useMirror`),
   carrying the hand only once the engine has evaluated it. Looking up the 番符表/rules on a phone stays on the phone
@@ -101,7 +111,9 @@ named by role (see `features/*`). Server DTOs are passed through whole; conversi
   Tsumo/ron form state lives in `settlement/drafts` (memory only, keyed `roomCode:kind`, with a
   `generation` so late async writes cannot land in a newer draft): closing the dialog keeps it; the dialog
   closes itself with a notice when `draftStamp` (gameNo/kyoku/honba/status/history) changes under it, except
-  while its own submit is in flight.
+  while its own submit is in flight. `ValueDraft.evaluated` stores the hand stamp it was computed for and is
+  read only through `evaluationOf` (a result for another hand does not count; the same hand re-shot keeps its
+  result) — no edit path clears it by hand.
 - Room kinds (`RoomKind`, `rooms.kind`, migration v7, default `yonma`): the kind is the room's identity — it
   fixes the seat count (`SEAT_COUNT`) and the game model — so it is a column, not a field of `RoomRules` (rules
   can be overwritten wholesale in the lobby). `RoomState` / `RoomView` are unions discriminated by `kind`
@@ -140,7 +152,9 @@ noDeclare | guessed | exhausted}` (honba +1, dealer stays), `tenTsumo {value}` (
 - Presence: `RoomView.online[seat]` = the seat's device player has a live WebSocket in the room (locals are
   always online). Anyone may vacate an _offline_ device player's seat (`leave`), never ready it — this is how
   a phone that lost its token reclaims its old seat. Keepalive constants live in core `WS_KEEPALIVE`: client
-  pings every 5 s and reconnects after 8 s of silence; the server drops a connection idle for 20 s.
+  pings every 5 s and reconnects after 8 s of silence; a handshake with no outcome after 8 s is abandoned and
+  retried with the normal backoff; the server drops a connection idle for 20 s and logs one `[ws] open` /
+  `[ws] close` line per connection (room, client, player, IP, close code, duration — never the token).
 - Auto-start: when the lobby is full, everyone is ready, every device player is online and at least one
   device player is seated, the server starts a 3 s countdown (`RoomView.autoStartIn`, remaining ms) and commits `start` as
   the system actor; any change that breaks the condition cancels it. Four locals never auto-start.
@@ -171,8 +185,12 @@ noDeclare | guessed | exhausted}` (honba +1, dealer stays), `tenTsumo {value}` (
   lives only while the sheet is open. `autoCapture.ts` is the shutter gate: a sliding vote — the newest
   settled, non-`blocking` frame's `closed + winTile + melds` must equal the previous frame's and appear ≥ 3
   times in the last 5 frames (a single bad frame no longer resets the count; A-B-A-B-A never fires). The
-  viewfinder shows the real tile total (red above 14) and, once the same `blocking` warning has held for
-  3 frames, its message. On fire the worker takes the frame it last **finished** (`held` = source bitmap +
+  viewfinder shows the real tile total (accent below 14, red above), a centered countdown driven by the votes
+  (`camera/Countdown`, `countdownOf`: 2 → 1 → the capture flash; it adds no delay and holds at 1 while a full
+  vote waits for indicators) and, once the same kind (`code`) of `blocking` warning has held for 3 frames,
+  its latest message. A wrong total raises only `count`, worded as what to do (13 ⇒ is the win tile laid
+  sideways at one end; fewer ⇒ covered or out of frame; more ⇒ river/wall too close); the closed run's
+  3n+2 `bad_group` is raised only at 14 tiles (a back inside the run), so the gate at 14 is unchanged. On fire the worker takes the frame it last **finished** (`held` = source bitmap +
   detections + layout, swapped atomically), tightens the photo to the adopted tiles (`tightenCapture`:
   bbox + 0.35 tile, re-runs `layoutHand` on what is left and refuses if the hand changes — so the river never
   enters the photo and the record still aligns on export), encodes it as JPEG and returns photo, detections
@@ -187,7 +205,8 @@ noDeclare | guessed | exhausted}` (honba +1, dealer stays), `tenTsumo {value}` (
   permission/device, busy, or no `mediaDevices` outside a secure context) is explained inside `CameraSheet`,
   which then disables the shutter and offers the album; a detector load failure offers 「返回键盘录入」.
   Settlement shows `HandConfirm` (read-only strip + flag chips + tap-to-replace) when the result is
-  self-consistent, `TileKeyboard` otherwise (`settlement/hand/HandEditor.tsx`). Inference runs only on the
+  self-consistent, under one row of 「重新拍照 | 人工调整」 (the latter opens the keyboard for good until the next
+  recognition), `TileKeyboard` otherwise (`settlement/hand/HandEditor.tsx`). Inference runs only on the
   phone (a server engine was considered and dropped: phone WASM is fast enough); WebGPU is deliberately
   not used: WASM already runs <300 ms/frame on an iPhone 15, iOS "Chrome" is WKWebView so it cannot use
   Chromium's implementation anyway, and ORT's WebGPU path has an open crash report on iOS Safari
@@ -238,7 +257,8 @@ noDeclare | guessed | exhausted}` (honba +1, dealer stays), `tenTsumo {value}` (
   (`ml/scripts/e2e_detector.py`, a single `Constant` node) so the real camera → ORT → layout → gate →
   grab → evaluate → PATCH chain runs. No video fixture is needed: the detector ignores its input, so
   Chromium's built-in test pattern (`--use-fake-device-for-media-stream`) is enough, and because the
-  output is constant the gate always fires on the third frame and the whole frame is already `settled` — the
+  output is constant the gate always fires on the third frame and the whole frame is already `settled`
+  (`detector-13.onnx`, `--drop-win`, never fires: it drives the abandon → summary + sample upload path) — the
   vote window is covered by `camera/autoCapture.test.ts`, the second pass and tracking by
   `worker/runFrame.test.ts`, the rotation math by `camera/orientation/*.test.ts`.
   Landscape (`camera/orientation/`): `rotation` (0/90/270) = how far the chrome is turned relative to the
@@ -249,11 +269,21 @@ noDeclare | guessed | exhausted}` (honba +1, dealer stays), `tenTsumo {value}` (
   that rotates by itself needs nothing) — the gyroscope only speaks when its verdict changes, so whichever
   happened last wins. Motion permission is asked on open (Android/desktop grant silently, iOS refuses outside
   a gesture) and again on the button tap (iOS prompts here). Last rotation is kept in `riichi.camera.rotation`.
-  Session telemetry: closing the viewfinder posts one `RecognitionSessionSummary` (no photo) to
-  `POST /api/recognition-sessions` (`recognition_sessions`, migration v6, 120/h per player + 1200/h global;
-  `useSessionStats`, sent once on unmount or `pagehide` with `keepalive`) — frames, settled frames, second
-  passes, per-code `blocking` counts, key changes, max votes, outcome (`auto`/`manual`/`album`/`abandoned`),
-  rotation + source. Stored recognitions only ever show successful captures; this is where failures show up.
+  Session telemetry (`camera/session/`, assembled by `useRecognitionSession`): each viewfinder session has a
+  client-generated 16-hex id, sent as `?session=` with its capture (`recognitions.session_id`, migration v8)
+  and in the `RecognitionSessionSummary` posted on close to `POST /api/recognition-sessions`
+  (`recognition_sessions`, migration v6, 120/h per player + 1200/h global, idempotent per id; sent once on
+  unmount, or summary-only on `pagehide` with `keepalive`) — frames, settled frames, second passes, per-code
+  `blocking` counts, key changes, max votes, outcome (`auto`/`manual`/`album`/`abandoned`), rotation + source.
+  **Sample frames** show why a session failed: `sampler.ts` (pure) keeps up to `SAMPLE_MAX` = 6 whole frames —
+  a new one when the frame's state (unsettled / blocking code / hand key) changes, otherwise it refreshes the
+  last one, both at most every `SAMPLE_GAP_MS` = 1.5 s, the first frame always kept; the worker encodes its
+  `held` frame upright and untightened at full size (JPEG 0.85) through a `sample` message separate from
+  `grab`, and the detector is closed only after an in-flight sample settles (≤ 1 s). They are uploaded after the
+  summary (and after the capture's own upload) only when the session was abandoned or took more than
+  `SAMPLE_AFTER_MS` = 10 s from the first frame to the capture: `POST /api/recognition-sessions/:id/samples/:seq`
+  (multipart `photo` + `meta`, size-capped before parsing, 60/h per player + 600/h global separate from
+  captures, the session row need not exist, a repeated seq is a no-op) → `recognition_samples`.
 - Riichi music: `RoomView.music` (`{track, seat, at}`) is memory-only room state like `online`; a client
   sends `{type:"music", track: id | null}` (the section lives in the shared `settlement/controls/ControlButtons`, so the console
   can press it for local players with `seat: null`), the TV plays the track from the static bucket

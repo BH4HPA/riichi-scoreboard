@@ -97,6 +97,24 @@ uv run scripts/import_records.py records.ndjson      # 照片走 COS；本地库
 uv run scripts/remap.py                              # records 并入 merged
 ```
 
+**取景会话与采样帧（排查用，不进训练导出）**：每次打开取景页是一个会话（客户端生成的 16 位 id）。
+`recognition_sessions` 存摘要（帧数、各 blocking 挡了多少帧、结局……），定格记录的 `recognitions.session_id`
+指回它；放弃取景、或从首帧到定格超过 10 秒的会话，还会在 `recognition_samples` 里留下最多 6 帧整幅画面
+（`photo_key` 在 `samples/` 前缀下，`meta` 是那一帧的检测框、布局结果与告警）。三张表按 session id 串起来就是
+「这次为什么没拍成 / 为什么拖了这么久」。照片（`hands/`、`samples/`）都是私有对象，用带密钥的 coscmd 下载，
+与上面的回流脚本同一种方式。
+
+```sql
+SELECT s.id, s.outcome, s.summary, r.id AS capture, count(x.seq) AS samples
+FROM recognition_sessions s
+LEFT JOIN recognitions r ON r.session_id = s.id
+LEFT JOIN recognition_samples x ON x.session_id = s.id
+GROUP BY s.id ORDER BY s.created_at DESC;
+```
+
+> **口径变化（2026-09-28 起）**：张数不对时只报 `count`，「暗牌组不成 3n+2」的 `bad_group` 只在合计 14 张
+> （暗牌段夹着牌背）时才报；此前的会话里 `blocking.bad_group` 大多是张数不对的重复计数，跨版本比较时要分开看。
+
 导出把每条记录分成两队：
 
 - **auto** —— 改动确实是**逐位替换**（不是编辑态删一张再补一张那种整体错位）、指示牌张数两边完全相等、
