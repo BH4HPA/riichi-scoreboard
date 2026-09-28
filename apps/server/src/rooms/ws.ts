@@ -60,6 +60,8 @@ export function mountWebSocket(app: Hono, upgradeWebSocket: UpgradeWebSocket, de
       // 连接生命周期日志：CDN 故障时要能看出哪些连接根本没到源站、到了的活了多久。只记标识，不记 token 与消息内容
       const ip = clientIp(c, deps.trustProxy ?? false) ?? "-";
       let openedAt: number | null = null;
+      // 房间码原样来自查询串：只留房间码字符，免得 `%0A` 之类伪造出一行日志
+      const room4log = code.replace(/[^A-Z0-9]/g, "?").slice(0, 16) || "-";
       const log = (line: string) => {
         if (!deps.quiet) console.log(`[ws] ${line}`);
       };
@@ -94,7 +96,7 @@ export function mountWebSocket(app: Hono, upgradeWebSocket: UpgradeWebSocket, de
       return {
         onOpen(_evt, ws) {
           openedAt = Date.now();
-          log(`open room=${code} client=${clientId} player=${player?.id ?? "-"} ip=${ip}`);
+          log(`open room=${room4log} client=${clientId} player=${player?.id ?? "-"} ip=${ip}`);
           if (!player) {
             send(ws, {
               type: "error",
@@ -200,7 +202,7 @@ export function mountWebSocket(app: Hono, upgradeWebSocket: UpgradeWebSocket, de
         },
         onClose(evt) {
           const dur = openedAt === null ? "-" : ((Date.now() - openedAt) / 1000).toFixed(1);
-          log(`close room=${code} client=${clientId} code=${evt.code} dur=${dur}s`);
+          log(`close room=${room4log} client=${clientId} code=${evt.code} dur=${dur}s`);
           untouch();
           if (room) deps.registry.leave(room, clientId);
         },

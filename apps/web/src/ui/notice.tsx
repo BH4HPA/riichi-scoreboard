@@ -33,6 +33,7 @@ export function Notice() {
  */
 export function ConnectionBadge({ variant = "phone" }: { variant?: "phone" | "console" }) {
   const status = useRoomStore((s) => s.status);
+  const hadRoom = useRoomStore((s) => s.room !== null);
   if (status === "open") return null;
   const text = {
     idle: "未连接",
@@ -40,8 +41,9 @@ export function ConnectionBadge({ variant = "phone" }: { variant?: "phone" | "co
     reconnecting: "重新连接中…",
     closed: "连接已关闭",
   }[status];
-  // 看门狗掉线后的首次重连也是 connecting（退避计数为 0），同样是自动的
-  const auto = variant === "console" && (status === "connecting" || status === "reconnecting");
+  // 看门狗掉线后的首次重连也是 connecting（退避计数为 0），同样是自动的；首次连房（还没拿到过房间）不是重连
+  const auto =
+    variant === "console" && (status === "reconnecting" || (status === "connecting" && hadRoom));
   return (
     <span
       className={cn(

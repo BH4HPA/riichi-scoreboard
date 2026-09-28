@@ -160,8 +160,10 @@ export const SAMPLE_MAX = 6;
 export const SAMPLE_GAP_MS = 1500;
 /** 定格了的会话，从首帧出结果到定格超过这么久才上传采样帧；放弃的会话一律上传 */
 export const SAMPLE_AFTER_MS = 10_000;
-/** 整帧原尺寸编码（不缩小：要看的正是认不出来的那些细节）；超出照片字节上限时与定格照走同一条降质阶梯 */
+/** 整帧编码、不收紧（要看的正是认不出来的那些细节，长边见 SAMPLE_MAX_EDGE）；超出照片字节上限时与定格照走同一条降质阶梯 */
 export const SAMPLE_JPEG_QUALITY = 0.85;
+/** 采样帧长边上限：相机按 ideal 1920 要流，个别设备给得更大，这里封顶（检测框同比缩放） */
+export const SAMPLE_MAX_EDGE = 1920;
 
 /**
  * 采样帧的元数据（multipart 的 `meta` 字段）：与照片出自同一帧，检测框是照片（转正后整帧）的像素坐标。

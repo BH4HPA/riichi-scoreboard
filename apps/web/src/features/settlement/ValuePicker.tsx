@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { scoreTier, TIER_LABELS, yakumanLabel, type RoomRules, type Seat } from "@riichi/core";
 import { ChipGroup, Label, Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/controls";
+import { useRoomStore } from "@/ws/store";
 import { useSocket } from "@/ws/useRoom";
 import { CommandError } from "@/ws/socket";
 import { RECOGNITION_MODEL } from "@/features/recognition/modelUrl";
@@ -68,6 +69,13 @@ export function ValuePicker({
   }, [onChange]);
   const handKey = handStamp(draft.hand);
   const complete = isHandComplete(draft.hand);
+  // 评估请求撞上断线会被拒掉（连接已断开）：连回来后自动重算一次，不必改一张牌再改回来才能触发
+  const online = useRoomStore((s) => s.status === "open");
+  const lostRef = useRef(false);
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    if (online && lostRef.current) setRetry((n) => n + 1);
+  }, [online]);
   useEffect(() => {
     if (!complete || seat === null) return;
     const hand = JSON.parse(handKey) as ValueDraft["hand"];
@@ -78,6 +86,7 @@ export function ValuePicker({
     const timer = setTimeout(() => {
       setEvaluating(true);
       setEvalError(null);
+      lostRef.current = false;
       socket
         .evaluate(seat, hand)
         .then((result) => {
@@ -86,6 +95,7 @@ export function ValuePicker({
         })
         .catch((err: unknown) => {
           if (cancelled) return;
+          lostRef.current = err instanceof CommandError && err.code === "disconnected";
           setEvalError(err instanceof CommandError ? err.message : "计算失败");
         })
         .finally(() => {
@@ -97,7 +107,7 @@ export function ValuePicker({
       clearTimeout(timer);
       setEvaluating(false);
     };
-  }, [handKey, complete, seat, socket]);
+  }, [handKey, complete, seat, socket, retry]);
 
   return (
     <Tabs

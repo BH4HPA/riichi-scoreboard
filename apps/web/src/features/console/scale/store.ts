@@ -7,7 +7,7 @@ export type ConsoleScale = (typeof CONSOLE_SCALES)[number];
 
 const KEY = "riichi.console.scale";
 
-export function parseScale(raw: string | null): ConsoleScale {
+function parseScale(raw: string | null): ConsoleScale {
   const v = Number(raw);
   return CONSOLE_SCALES.find((s) => s === v) ?? 1;
 }

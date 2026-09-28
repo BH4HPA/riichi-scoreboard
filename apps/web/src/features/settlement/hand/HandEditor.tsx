@@ -52,6 +52,9 @@ export function HandEditor({
           : d.recognition,
     }));
 
+  /** 「人工调整」与指示牌空位共用：一直留在编辑态，直到下一次识别 */
+  const openKeyboard = () => onChange((d) => ({ ...d, editing: true }));
+
   if (!confirmable(draft)) {
     return (
       <>
@@ -82,11 +85,7 @@ export function HandEditor({
     <>
       <div className={camera ? "grid grid-cols-2 gap-2" : undefined}>
         {camera}
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={() => onChange((d) => ({ ...d, editing: true }))}
-        >
+        <Button variant="outline" className="w-full" onClick={openKeyboard}>
           <Pencil className="mr-1 h-4 w-4" />
           人工调整
         </Button>
@@ -104,7 +103,7 @@ export function HandEditor({
         showValue={showValue}
         onHandChange={(next) => setHand(next)}
         onTileClick={setPicking}
-        onEdit={() => onChange((d) => ({ ...d, editing: true }))}
+        onAddDora={openKeyboard}
       />
       <TileReplaceSheet
         hand={draft.hand}

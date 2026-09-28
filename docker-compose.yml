@@ -33,6 +33,12 @@ services:
       - riichi_data:/data
     init: true
     restart: unless-stopped
+    # 请求日志 + 每条 WS 的建立/断开：CDN 故障时的重连风暴会让日志涨得很快，2 GB 的机器上封个顶
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "-Y", "off", "http://127.0.0.1:8787/health"]
       interval: 15s

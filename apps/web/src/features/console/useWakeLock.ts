@@ -9,8 +9,11 @@ export function useWakeLock(active: boolean): void {
     if (!active || !("wakeLock" in navigator)) return;
     let lock: WakeLockSentinel | null = null;
     let disposed = false;
+    /** 申请在途：挂载时与回前台时的两次申请可能同时发出，拿到两把锁、先到的那把没人释放 */
+    let requesting = false;
     const request = async () => {
-      if (document.visibilityState !== "visible" || (lock && !lock.released)) return;
+      if (requesting || document.visibilityState !== "visible" || (lock && !lock.released)) return;
+      requesting = true;
       try {
         const next = await navigator.wakeLock.request("screen");
         // 申请在途时卸载：拿到了也立刻还回去
@@ -18,6 +21,8 @@ export function useWakeLock(active: boolean): void {
         else lock = next;
       } catch {
         // 省电模式、权限策略或不支持：不影响记分
+      } finally {
+        requesting = false;
       }
     };
     const onVisible = () => void request();

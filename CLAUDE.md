@@ -57,8 +57,10 @@ Yarn workspaces monorepo:
   which entry per core `describeRevert`) that every client shows as a notice. Transient UI intents (mirroring a phone's dialog on the TV) live in memory only.
   SQLite schema is versioned (`db/index.ts` `MIGRATIONS`, applied by `user_version`). User files go through
   `storage/ObjectStore`: local disk (served at `/api/objects/*`) or Tencent COS (`QCLOUD_*` env, `riichi/`
-  prefix, see `.env.template`); recognition photos (`hands/`, `samples/`, `isPrivateKey`) are private — COS
-  `ACL: private`, 404 from `/api/objects` — only avatars are public. Abuse limits (`http/rateLimit.ts`, sliding windows): registration per IP
+  prefix, see `.env.template`); only avatars are public (`isPublicKey` allowlist) — recognition photos
+  (`hands/`, `samples/`, and any new prefix) get COS `ACL: private` and a 404 from `/api/objects`. Behind a CDN
+  with private-bucket origin auth (the deployed static domain has it) object ACLs do not stop CDN reads; that
+  layer has to be blocked on the CDN by directory. Abuse limits (`http/rateLimit.ts`, sliding windows): registration per IP
   (`TRUST_PROXY=1` reads `X-Forwarded-For` behind the CDN), room creation per device, photo uploads per player
   - global (capture photos 60/h, viewfinder sample frames a separate 60/h); the ws server's `maxPayload` equals the 16 KB application message cap. Serves the built web app
     with SPA fallback.

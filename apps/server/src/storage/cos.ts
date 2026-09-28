@@ -1,5 +1,5 @@
 import COS from "cos-nodejs-sdk-v5";
-import { assertObjectKey, isPrivateKey, type ObjectStore } from "./index";
+import { assertObjectKey, isPublicKey, type ObjectStore } from "./index";
 
 export interface CosConfig {
   secretId: string;
@@ -54,7 +54,7 @@ export class CosStore implements ObjectStore {
 
   async put(key: string, bytes: Uint8Array, contentType: string): Promise<string> {
     assertObjectKey(key);
-    const secret = isPrivateKey(key);
+    const secret = !isPublicKey(key);
     await this.client.putObject({
       Bucket: this.config.bucket,
       Region: this.config.region,

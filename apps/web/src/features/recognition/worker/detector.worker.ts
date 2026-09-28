@@ -6,6 +6,7 @@ import {
   LOST,
   RECOGNITION_CLASSES,
   RECOGNITION_PHOTO_MAX_BYTES,
+  SAMPLE_MAX_EDGE,
   tightenCapture,
   type Box,
   type Detection,
@@ -197,15 +198,28 @@ async function sample(frameId: number, quality: number): Promise<void> {
   const { bitmap, rotation, ms, detections, layout, settled, passes } = held;
   // 转 0° 时 uprightSize 原样返回 bitmap 本身：只取宽高，否则回包会把整张位图克隆过去，JSON 化也是空的
   const { width, height } = uprightSize(bitmap, rotation);
-  const frame = { width, height };
-  const canvas = drawBox(bitmap, [0, 0, width, height], rotation);
+  // 长边封顶 SAMPLE_MAX_EDGE：相机给出更大的流时同比缩小，检测框跟着缩，照片与框仍对齐
+  const k = Math.min(1, SAMPLE_MAX_EDGE / Math.max(width, height));
+  const frame = { width: Math.round(width * k), height: Math.round(height * k) };
+  const canvas = new OffscreenCanvas(frame.width, frame.height);
+  drawUpright(canvas.getContext("2d")!, bitmap, [0, 0, width, height], rotation, {
+    x: 0,
+    y: 0,
+    ...frame,
+  });
   const blob = await encodeJpeg(canvas, quality);
   post({
     type: "sampled",
     frameId,
     blob,
     ms,
-    detections,
+    detections:
+      k === 1
+        ? detections
+        : detections.map((d) => ({
+            ...d,
+            box: [d.box[0] * k, d.box[1] * k, d.box[2] * k, d.box[3] * k] as Detection["box"],
+          })),
     hand: layout.hand,
     warnings: layout.warnings,
     settled,

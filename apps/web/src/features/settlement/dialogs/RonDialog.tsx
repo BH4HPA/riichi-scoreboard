@@ -228,7 +228,9 @@ function RonForm({ game, names, rules, mirror, mySeat, onDone }: SettlementFormP
   /** 荣和者的价值录入：与自摸表单同构 */
   const winnerValue = (w: RonWinDraftState, i: number) => (
     <>
+      {/* 带 id 作 key：第一位被移除、第二位顶上来时，局部状态（评估中、报错、在换的牌）不能沿用 */}
       <ValuePicker
+        key={w.id}
         draft={w.draft}
         onChange={(update) => updateDraft(i, update)}
         rules={rules}

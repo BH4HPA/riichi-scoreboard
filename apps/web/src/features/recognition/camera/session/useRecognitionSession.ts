@@ -54,7 +54,10 @@ export function useRecognitionSession(
     outcome: "abandoned" as RecognitionSessionOutcome,
     stats: createStats(),
     sampler: EMPTY_SAMPLER as SamplerState<PendingSample>,
-    sent: false,
+    /** 摘要发过了（pagehide 时先发）；采样帧另算——页面从往返缓存回来后还可能接着取景、放弃 */
+    summarySent: false,
+    /** 卸载收尾做过了（摘要补发 + 采样上传），只做一次 */
+    finished: false,
     closing: 0 as ReturnType<typeof setTimeout> | 0,
   });
   const closingRef = useRef(closing);
@@ -111,8 +114,8 @@ export function useRecognitionSession(
     // 也只发摘要——keepalive 请求限 64 KB，带不了照片
     const onHide = () => {
       const token = useSession.getState().token;
-      if (a.sent || !token) return;
-      a.sent = true;
+      if (a.summarySent || !token) return;
+      a.summarySent = true;
       void reportRecognitionSession(summarize(), token).catch(() => undefined);
     };
     window.addEventListener("pagehide", onHide);
@@ -120,9 +123,11 @@ export function useRecognitionSession(
       window.removeEventListener("pagehide", onHide);
       // 正常关闭取景页：还没身份的（算点数页第一次用就放弃）先注册再发
       a.closing = setTimeout(() => {
-        if (a.sent) return;
-        a.sent = true;
+        if (a.finished) return;
+        a.finished = true;
         const summary = summarize();
+        const sendSummary = !a.summarySent;
+        a.summarySent = true;
         void useSession
           .getState()
           .ensure()
@@ -130,6 +135,7 @@ export function useRecognitionSession(
             uploadSession(
               {
                 summary,
+                sendSummary,
                 samples: a.sampler.slots.map((s) => s.item),
                 firstFrameAt: a.firstFrameAt,
                 capturedAt: a.capturedAt,

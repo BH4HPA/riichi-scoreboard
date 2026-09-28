@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { CosStore, type CosClient } from "./cos";
-import { isPrivateKey } from "./index";
+import { isPublicKey } from "./index";
 import { LocalStore } from "./local";
 
 describe("LocalStore", () => {
@@ -21,13 +21,14 @@ describe("LocalStore", () => {
   });
 });
 
-describe("isPrivateKey", () => {
-  it("识别照片（定格照、采样帧）私有，头像公开", () => {
-    expect(isPrivateKey("hands/p1/a.jpg")).toBe(true);
-    expect(isPrivateKey("samples/p1/a.jpg")).toBe(true);
-    expect(isPrivateKey("avatars/p1/a.jpg")).toBe(false);
-    // 只认前缀，不认中间段
-    expect(isPrivateKey("avatars/hands/a.jpg")).toBe(false);
+describe("isPublicKey", () => {
+  it("白名单：只有头像公开，识别照片与任何新前缀默认私有；大小写变体也不放行", () => {
+    expect(isPublicKey("avatars/p1/a.jpg")).toBe(true);
+    expect(isPublicKey("hands/p1/a.jpg")).toBe(false);
+    expect(isPublicKey("samples/p1/a.jpg")).toBe(false);
+    expect(isPublicKey("HANDS/p1/a.jpg")).toBe(false);
+    expect(isPublicKey("Avatars/p1/a.jpg")).toBe(false);
+    expect(isPublicKey("hands/avatars/a.jpg")).toBe(false);
   });
 });
 

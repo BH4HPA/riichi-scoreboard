@@ -5,7 +5,7 @@ import { sniffImage } from "./avatars";
 
 /**
  * 识别照片：手机端编码好的 JPEG（编码时已按字节上限兜底），服务端只校验类型与大小。
- * 两类：`hands/` 定格照（收紧到手牌），`samples/` 采样帧（整幅画面）。都是私有对象，见 storage/isPrivateKey。
+ * 两类：`hands/` 定格照（收紧到手牌），`samples/` 采样帧（整幅画面）。都是私有对象，见 storage/isPublicKey。
  */
 export class PhotoError extends Error {
   constructor(

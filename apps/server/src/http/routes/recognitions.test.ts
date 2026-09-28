@@ -124,6 +124,10 @@ describe("POST /api/recognitions", () => {
     const key = row(id)!.photo_key;
     expect(fs.existsSync(path.join(dataDir, "objects", key))).toBe(true);
     expect((await ctx.app.request(`/api/objects/${key}`)).status).toBe(404);
+    // 大小写不敏感的文件系统（macOS）上，大写前缀会读到同一个文件：白名单挡住
+    expect((await ctx.app.request(`/api/objects/${key.replace("hands/", "HANDS/")}`)).status).toBe(
+      404,
+    );
     const avatar = path.join(dataDir, "objects", "avatars/p1/a.jpg");
     fs.mkdirSync(path.dirname(avatar), { recursive: true });
     fs.writeFileSync(avatar, JPEG);

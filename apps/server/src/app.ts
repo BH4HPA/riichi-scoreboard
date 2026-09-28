@@ -25,7 +25,7 @@ import { roomRoutes } from "./http/routes/rooms";
 import { mountStatic } from "./http/static";
 import { RoomRegistry } from "./rooms/registry";
 import { mountWebSocket } from "./rooms/ws";
-import { isPrivateKey, type ObjectStore } from "./storage";
+import { isPublicKey, type ObjectStore } from "./storage";
 import { CosStore } from "./storage/cos";
 import { LocalStore, LOCAL_OBJECTS_ROUTE } from "./storage/local";
 
@@ -56,13 +56,13 @@ const OBJECT_TYPES: Record<string, string> = {
 
 /**
  * 本地对象存储的托管路由：只认白名单扩展名，key 经 LocalStore 校验防穿越。
- * 私有对象（识别照片）与 COS 上一样读不到：一律 404，不透露存在与否。
+ * 只放行公开前缀（头像）；其余（识别照片）与 COS 上一样读不到：一律 404，不透露存在与否。
  */
 function mountLocalObjects(app: Hono, store: LocalStore): void {
   app.get(`${LOCAL_OBJECTS_ROUTE}/*`, (c) => {
     const key = c.req.path.slice(LOCAL_OBJECTS_ROUTE.length + 1);
     const type = OBJECT_TYPES[path.extname(key).slice(1)];
-    if (!type || isPrivateKey(key)) return c.notFound();
+    if (!type || !isPublicKey(key)) return c.notFound();
     let file: string;
     try {
       file = store.resolve(key);

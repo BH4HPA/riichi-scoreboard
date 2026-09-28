@@ -22,7 +22,7 @@ export function HandConfirm({
   showValue = true,
   onHandChange,
   onTileClick,
-  onEdit,
+  onAddDora,
 }: {
   hand: HandInput;
   rules: RoomRules;
@@ -38,7 +38,8 @@ export function HandConfirm({
   showValue?: boolean;
   onHandChange: (next: HandInput) => void;
   onTileClick: (loc: TileLoc) => void;
-  onEdit: () => void;
+  /** 宝牌指示行空位的「点这里补」：展开全键盘 */
+  onAddDora: () => void;
 }) {
   const showUra = rules.hand.uraDora && (hand.riichi || hand.doubleRiichi);
   return (
@@ -52,7 +53,7 @@ export function HandConfirm({
         showUra={showUra}
         scroll
         keepEmptyDora
-        onAddDora={onEdit}
+        onAddDora={onAddDora}
       />
       <FlagChips
         hand={hand}

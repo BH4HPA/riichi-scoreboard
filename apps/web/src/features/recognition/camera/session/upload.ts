@@ -4,7 +4,6 @@ import {
   type RecognitionSessionOutcome,
   type RecognitionSessionSummary,
 } from "@riichi/core";
-import { ApiError } from "@/api/client";
 import { reportRecognitionSession, uploadRecognitionSample } from "../../api";
 import { takeCaptureUpload } from "../../recognize";
 import type { Sampled } from "../../worker/protocol";
@@ -57,18 +56,21 @@ export function sampleMeta(
 export async function uploadSession(
   {
     summary,
+    sendSummary,
     samples,
     firstFrameAt,
     capturedAt,
   }: {
     summary: RecognitionSessionSummary & { id: string };
+    /** pagehide 时摘要已经发过（只能发摘要），这里只补采样 */
+    sendSummary: boolean;
     samples: PendingSample[];
     firstFrameAt: number | null;
     capturedAt: number | null;
   },
   token: string,
 ): Promise<void> {
-  await reportRecognitionSession(summary, token).catch(() => undefined);
+  if (sendSummary) await reportRecognitionSession(summary, token).catch(() => undefined);
   const capture = takeCaptureUpload(summary.id);
   if (firstFrameAt === null || !wantsSamples(summary.outcome, firstFrameAt, capturedAt)) return;
   await capture;
@@ -79,8 +81,9 @@ export async function uploadSession(
     const meta = sampleMeta(s, samples[i]!.at, firstFrameAt, summary.modelId);
     try {
       await uploadRecognitionSample(summary.id, seq, s.blob, meta, token);
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 429) return;
+    } catch {
+      // 限流、服务端没有这个接口（回滚）、坏请求：后面几帧多半同样失败，别再白传几 MB
+      return;
     }
     seq += 1;
   }

@@ -114,9 +114,6 @@ export function recognitionSessionRoutes(deps: Deps): Hono {
       const t = now();
       // 重传（上次其实已落库、只是响应没回来）：不再存一份照片，也不占额度
       if (deps.samples.has(sessionId, seq)) return c.body(null, 204);
-      if (!sampleLimiter.allow(player.id, t)) {
-        return c.json({ error: "too_many", message: "上传过多，请稍后再试" }, 429);
-      }
       const form = await c.req.parseBody({ all: true }).catch(() => null);
       const parsed = form ? await readSample(form) : { error: "请求体不是 multipart" };
       if ("error" in parsed) return c.json({ error: "bad_sample", message: parsed.error }, 400);
@@ -130,6 +127,10 @@ export function recognitionSessionRoutes(deps: Deps): Hono {
         if (err instanceof DomainError)
           return c.json({ error: err.code, message: err.message }, 400);
         throw err;
+      }
+      // 校验通过才计数（与定格照同一口径）：前端 meta 有 bug 时坏请求不该把额度耗光；体积已由 bodyLimit 封顶
+      if (!sampleLimiter.allow(player.id, t)) {
+        return c.json({ error: "too_many", message: "上传过多，请稍后再试" }, 429);
       }
       const key = await savePhoto(deps.store, player.id, parsed.photo, t, "samples");
       // 与另一个同序号的请求并发时后到的写不进去：照片成了孤儿对象，量极小，不值得为它加锁
