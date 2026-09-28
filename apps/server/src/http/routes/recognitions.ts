@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { DomainError, validateRecognitionPatch } from "@riichi/core";
+import { DomainError, isRecognitionSessionId, validateRecognitionPatch } from "@riichi/core";
 import { requirePlayer, type AuthEnv } from "../../auth/deviceToken";
 import type { PlayersRepo } from "../../db/players";
 import type { RecognitionsRepo } from "../../db/recognitions";
@@ -22,10 +22,15 @@ const PATCH_MAX_BYTES = 64 * 1024;
 export const UPLOADS_PER_HOUR = 60;
 export const UPLOADS_PER_HOUR_GLOBAL = 600;
 
-/** 每玩家 + 全局两级窗口；坏照片不计入（由调用方在校验通过后才计）。 */
+/** 每玩家 + 全局两级窗口；何时计数由调用方定（定格照在校验通过后才计）。采样帧另起一个实例，额度互不挤占。 */
 export class UploadLimiter {
-  private readonly perPlayer = new SlidingWindow(UPLOADS_PER_HOUR);
-  private readonly global = new SlidingWindow(UPLOADS_PER_HOUR_GLOBAL);
+  private readonly perPlayer: SlidingWindow;
+  private readonly global: SlidingWindow;
+
+  constructor(perPlayer = UPLOADS_PER_HOUR, global = UPLOADS_PER_HOUR_GLOBAL) {
+    this.perPlayer = new SlidingWindow(perPlayer);
+    this.global = new SlidingWindow(global);
+  }
 
   allow(playerId: string, now: number): boolean {
     return this.perPlayer.allow(playerId, now) && this.global.allow("*", now);
@@ -40,7 +45,8 @@ const tooLarge = (max: string) =>
 
 /**
  * 识别记录：
- * - POST /            原始 JPEG 体 → 存照片 + 建记录 → 201 {id}（推理在手机上跑）
+ * - POST /            原始 JPEG 体 → 存照片 + 建记录 → 201 {id}（推理在手机上跑）；
+ *                     query：source（来源）、session（取景会话 id，可选）
  * - PATCH /:id        手机端回填 {modelId, ms, detections, recognized}，结算后回填 {corrected}
  */
 export function recognitionRoutes(deps: Deps): Hono {
@@ -58,6 +64,12 @@ export function recognitionRoutes(deps: Deps): Hono {
     if (source !== "room" && source !== "label" && source !== "calc") {
       return c.json({ error: "bad_source", message: "来源只能是 room、label 或 calc" }, 400);
     }
+    // 哪次取景定格的：与会话摘要、采样帧串联。旧前端不带；带了却不合格式与坏来源一样拒收，
+    // 静默丢掉会让串联悄悄断掉，谁也发现不了
+    const session = c.req.query("session") ?? null;
+    if (session !== null && !isRecognitionSessionId(session)) {
+      return c.json({ error: "bad_session", message: "会话 id 无效" }, 400);
+    }
     const player = c.get("player");
     const t = now();
     const bytes = new Uint8Array(await c.req.arrayBuffer());
@@ -70,8 +82,8 @@ export function recognitionRoutes(deps: Deps): Hono {
     if (!limiter.allow(player.id, t)) {
       return c.json({ error: "too_many", message: "识别次数过多，请稍后再试" }, 429);
     }
-    const key = await savePhoto(deps.store, player.id, bytes, t);
-    const id = deps.recognitions.create(player.id, key, deps.modelId, source, t);
+    const key = await savePhoto(deps.store, player.id, bytes, t, "hands");
+    const id = deps.recognitions.create(player.id, key, deps.modelId, source, session, t);
     return c.json({ id }, 201);
   });
 

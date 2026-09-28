@@ -27,8 +27,8 @@ import {
 import { Countdown } from "./Countdown";
 import { LayoutGuide } from "./LayoutGuide";
 import { useRotation } from "./orientation/useRotation";
-import { useSessionStats } from "./useSessionStats";
 import { RoiOverlay } from "./RoiOverlay";
+import { useRecognitionSession } from "./session/useRecognitionSession";
 import { useCameraStream } from "./useCameraStream";
 import { useCanvasPreview } from "./useCanvasPreview";
 import { useLiveDetect } from "./useLiveDetect";
@@ -39,6 +39,8 @@ const IDLE_STOP_MS = 60_000;
 export interface Capture {
   blob: Blob;
   result: RecognitionResult;
+  /** 这次取景的会话 id：定格照上传时带上，与会话摘要、采样帧串起来 */
+  session: string;
 }
 
 /**
@@ -90,8 +92,13 @@ export function CameraSheet({
   const lost = useCallback(() => setPaused(true), []);
   const { videoRef, error: camError, ready } = useCameraStream(active, lost);
   const [area, setArea] = useState<HTMLDivElement | null>(null);
-  // 两个回调都是稳定引用：直接进依赖数组，不会让下面的订阅每次渲染都重建
-  const { onFrame: countFrame, finish: finishSession } = useSessionStats(mode, {
+  // 回调都是稳定引用：直接进依赖数组，不会让下面的订阅每次渲染都重建
+  const {
+    id: sessionId,
+    onFrame: countFrame,
+    finish: finishSession,
+    pending: pendingSamples,
+  } = useRecognitionSession(mode, detector, {
     rotation,
     rotationSource,
     viewport: area && { width: area.clientWidth, height: area.clientHeight },
@@ -107,9 +114,10 @@ export function CameraSheet({
       .catch((e: unknown) => !cancelled && setError(e instanceof Error ? e.message : "识别不可用"));
     return () => {
       cancelled = true;
-      closeDetector();
+      // 界面立刻关；线程等在途的采样编码完再销毁（最多 1 秒），放弃前的最后一帧才留得下
+      closeDetector(pendingSamples());
     };
-  }, []);
+  }, [pendingSamples]);
 
   // ready 之后才崩的会话（iOS 上的 ORT、推理抛错）：没有这条通道界面会一直显示正常
   useEffect(() => {
@@ -159,12 +167,16 @@ export function CameraSheet({
         if (!got || !modelId) return;
         const { blob, ms, detections, hand, warnings, provenance } = got;
         finishSession(how);
-        onCapture({ blob, result: { modelId, ms, detections, hand, warnings, provenance } });
+        onCapture({
+          blob,
+          result: { modelId, ms, detections, hand, warnings, provenance },
+          session: sessionId,
+        });
       } finally {
         grabbingRef.current = false;
       }
     },
-    [detector, onCapture, finishSession],
+    [detector, onCapture, finishSession, sessionId],
   );
 
   const onFrame = useCallback(
@@ -448,7 +460,7 @@ export function CameraSheet({
           {/* 最后一行：左边说明，右边相册与快门。min-h-8 按按钮高度留位，快门出现/消失时底栏不伸缩 */}
           <div className="flex min-h-8 items-center justify-between gap-3 text-xs text-white/70">
             <span className="flex min-w-0 items-center gap-3">
-              <span className="truncate">拍下的牌面照片会用来改进识别</span>
+              <span className="truncate">拍下或放弃时的整幅画面会用来改进识别</span>
               <button type="button" className="shrink-0 underline" onClick={() => setGuide(true)}>
                 怎么摆
               </button>

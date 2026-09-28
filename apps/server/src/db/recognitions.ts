@@ -12,6 +12,8 @@ export interface RecognitionRow {
   recognized: string | null;
   corrected: string | null;
   source: RecognitionSource;
+  /** 哪次取景定格的（与 recognition_sessions / recognition_samples 串联）；旧前端与历史记录为空 */
+  session_id: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -25,14 +27,15 @@ export class RecognitionsRepo {
     photoKey: string,
     modelId: string,
     source: RecognitionSource,
+    sessionId: string | null,
     now: number,
   ): string {
     const id = randomBytes(8).toString("hex");
     this.db
       .prepare(
-        "INSERT INTO recognitions (id, player_id, photo_key, model_id, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO recognitions (id, player_id, photo_key, model_id, source, session_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       )
-      .run(id, playerId, photoKey, modelId, source, now, now);
+      .run(id, playerId, photoKey, modelId, source, sessionId, now, now);
     return id;
   }
 

@@ -1,4 +1,5 @@
 import type { HandInput } from "../types/state";
+import type { FrameSize } from "./roi";
 
 /** 一张牌的检测框：类 id = manifest.classes 下标；box 是裁剪后照片的像素坐标 x1 y1 x2 y2。 */
 export interface Detection {
@@ -112,11 +113,19 @@ export const RECOGNITION_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 export type RecognitionSessionOutcome = "auto" | "manual" | "album" | "abandoned";
 
 /**
- * 一次取景会话的摘要（POST /api/recognition-sessions，取景页关闭时上报一条，**不含照片**）。
+ * 取景会话 id：16 位小写 hex，由手机端生成。摘要、采样帧、定格记录（`?session=`）都带它，
+ * 三者靠它串起来；摘要被限流挡掉时采样帧仍能留下，所以 id 不能等服务端发。
+ */
+export const RECOGNITION_SESSION_ID = /^[0-9a-f]{16}$/;
+
+/**
+ * 一次取景会话的摘要（POST /api/recognition-sessions，取景页关闭时上报一条，本身不含照片）。
  * 留存的识别记录全是「定格成功」的那一帧，认不稳、放弃的会话不留任何痕迹——这条摘要补的就是这个盲区：
  * 花了多久、跑了几帧、几帧算数、被哪条 blocking 挡了多少次、牌面跳了几次。
  */
 export interface RecognitionSessionSummary {
+  /** 见 RECOGNITION_SESSION_ID；旧前端不带，由服务端生成 */
+  id?: string;
   source: RecognitionSource;
   outcome: RecognitionSessionOutcome;
   modelId: string | null;
@@ -139,4 +148,40 @@ export interface RecognitionSessionSummary {
   /** 相机帧与取景区域的尺寸，"宽x高"；没出过帧时为 "0x0" */
   video: string;
   viewport: string;
+}
+
+/**
+ * 采样帧：放弃取景、或折腾很久才定格的会话，留几帧**整幅**画面（转正、不收紧）。
+ * 定格照只有认成功的那一帧；认不出的画面长什么样，只有这里看得见。
+ * 画面状态（没收紧 / 哪条 blocking / 牌面指纹）变了才新开一帧，没变就覆盖最后一帧（首帧除外）；
+ * 新开与覆盖都至少隔 SAMPLE_GAP_MS，超出 SAMPLE_MAX 时丢第二帧（首帧与最近的几帧最有信息量）。
+ */
+export const SAMPLE_MAX = 6;
+export const SAMPLE_GAP_MS = 1500;
+/** 定格了的会话，从首帧出结果到定格超过这么久才上传采样帧；放弃的会话一律上传 */
+export const SAMPLE_AFTER_MS = 10_000;
+/** 整帧原尺寸编码（不缩小：要看的正是认不出来的那些细节）；超出照片字节上限时与定格照走同一条降质阶梯 */
+export const SAMPLE_JPEG_QUALITY = 0.85;
+
+/**
+ * 采样帧的元数据（multipart 的 `meta` 字段）：与照片出自同一帧，检测框是照片（转正后整帧）的像素坐标。
+ * 与定格记录不同，这里的识别结果是没通过闸门的，暗牌可能远多于 14 张。
+ */
+export interface RecognitionSampleMeta {
+  /** 手机端实际使用的模型；摘要可能被限流挡掉，所以采样帧自己带着 */
+  modelId: string | null;
+  /** 距会话首帧出结果的毫秒数 */
+  t: number;
+  /** 这一帧的识别耗时（含第二遍） */
+  ms: number;
+  /** 照片尺寸 = 转正后的整帧 */
+  frame: FrameSize;
+  rotation: 0 | 90 | 270;
+  /** 这一帧已收紧到手牌周围（可计票） */
+  settled: boolean;
+  passes: number;
+  detections: Detection[];
+  hand: RecognizedHand;
+  /** 含 info：采样帧就是拿来看模型在哪儿犹豫的 */
+  warnings: RecognitionWarning[];
 }

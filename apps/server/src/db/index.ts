@@ -112,6 +112,23 @@ CREATE INDEX idx_recognitions_player ON recognitions (player_id, created_at);
   // v7：房型（四人麻将 yonma / 《天》二人麻将 ten）。它决定座位数与对局模型，是房间的身份，
   // 所以是 rooms 的一列而不是 rules 里的字段（规则在大厅可随时整份覆盖）。历史房间都是四人，默认值正好。
   `ALTER TABLE rooms ADD COLUMN kind TEXT NOT NULL DEFAULT 'yonma';`,
+  // v8：取景会话的采样帧（放弃、或折腾很久才定格时的几帧整幅画面），以及定格记录属于哪次取景。
+  // 会话 id 由手机端生成，采样帧不依赖会话行存在（摘要被限流挡掉时采样仍能留下），所以不加外键。
+  // (session_id, seq) 唯一：同一帧重传不会落两行。历史定格记录没有会话，session_id 留空。
+  `
+  ALTER TABLE recognitions ADD COLUMN session_id TEXT;
+  CREATE TABLE recognition_samples (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL,
+    player_id TEXT NOT NULL,
+    seq INTEGER NOT NULL,
+    photo_key TEXT NOT NULL,
+    meta TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    UNIQUE (session_id, seq)
+  );
+  CREATE INDEX idx_recognition_samples_created ON recognition_samples (created_at);
+  `,
 ];
 
 export type Database = DatabaseSync;

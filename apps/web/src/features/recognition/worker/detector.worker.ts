@@ -37,6 +37,8 @@ interface Held {
   detections: Detection[];
   layout: LayoutResult;
   crop: Box;
+  settled: boolean;
+  passes: number;
 }
 let held: Held | null = null;
 /** 取景时锁定的识别范围，跨帧沿用；手机一转坐标系就变了，作废重找 */
@@ -114,6 +116,8 @@ async function infer(
     detections: out.detections,
     layout: out.layout,
     crop: out.crop,
+    settled: out.settled,
+    passes: out.passes,
   };
   post({
     type: "result",
@@ -131,6 +135,28 @@ async function infer(
   });
 }
 
+/** 把帧里的一块（转正后坐标）画到一张同尺寸的画布上；同步完成，调用方可以随后放心 await */
+function drawBox(bitmap: ImageBitmap, box: Box, rotation: Rotation): OffscreenCanvas {
+  const [w, h] = [box[2] - box[0], box[3] - box[1]];
+  const canvas = new OffscreenCanvas(w, h);
+  drawUpright(canvas.getContext("2d")!, bitmap, box, rotation, { x: 0, y: 0, width: w, height: h });
+  return canvas;
+}
+
+/**
+ * 必须显式指定类型：convertToBlob 默认出 PNG，同尺寸能大 10 倍，会撞服务端 2 MB 的上限。
+ * 纹理密的画面（桌布、噪点）同尺寸 JPEG 也可能超：按字节兜底，逐级降质量，任何来源的帧都成立。
+ * 定格照与采样帧共用：两者上传时是同一个字节上限。
+ */
+async function encodeJpeg(canvas: OffscreenCanvas, quality: number): Promise<Blob> {
+  let blob = await canvas.convertToBlob({ type: "image/jpeg", quality });
+  for (const q of [0.7, 0.5, 0.3]) {
+    if (blob.size <= RECOGNITION_PHOTO_MAX_BYTES || q >= quality) continue;
+    blob = await canvas.convertToBlob({ type: "image/jpeg", quality: q });
+  }
+  return blob;
+}
+
 async function grab(quality: number): Promise<void> {
   if (!held) return post({ type: "grab-miss" });
   // 整个 held 一次取走：下面 await 编码时新帧会把它换掉，之后再读就会回出「新帧的结果 + 旧帧的像素」
@@ -146,16 +172,8 @@ async function grab(quality: number): Promise<void> {
       box: [d.box[0] - box[0], d.box[1] - box[1], d.box[2] - box[0], d.box[3] - box[1]],
     })) as Detection[],
   };
-  const [w, h] = [box[2] - box[0], box[3] - box[1]];
-  const canvas = new OffscreenCanvas(w, h);
-  drawUpright(canvas.getContext("2d")!, bitmap, box, rotation, { x: 0, y: 0, width: w, height: h });
-  // 必须显式指定类型：convertToBlob 默认出 PNG，同尺寸能大 10 倍，会撞服务端 2 MB 的上限。
-  // 纹理密的画面（桌布、噪点）同尺寸 JPEG 也可能超：按字节兜底，逐级降质量，任何来源的帧都成立
-  let blob = await canvas.convertToBlob({ type: "image/jpeg", quality });
-  for (const q of [0.7, 0.5, 0.3]) {
-    if (blob.size <= RECOGNITION_PHOTO_MAX_BYTES || q >= quality) continue;
-    blob = await canvas.convertToBlob({ type: "image/jpeg", quality: q });
-  }
+  const canvas = drawBox(bitmap, box, rotation);
+  const blob = await encodeJpeg(canvas, quality);
   const { hand, warnings, provenance } = shot.layout;
   post({
     type: "grabbed",
@@ -166,6 +184,34 @@ async function grab(quality: number): Promise<void> {
     hand,
     warnings,
     provenance,
+  });
+}
+
+/**
+ * 采样帧：整幅画面，只转正、不收紧——要看的正是没认出来的那些地方。
+ * 只采主线程点名的那一帧：它已被新帧换掉就回 miss，不拿别的帧顶替（采样的判断是按那一帧的结果做的）。
+ * 先同步画到画布上再 await 编码：编码期间新帧会把 held 换掉、并 close 它的 bitmap。
+ */
+async function sample(frameId: number, quality: number): Promise<void> {
+  if (!held || held.frameId !== frameId) return post({ type: "sample-miss", frameId });
+  const { bitmap, rotation, ms, detections, layout, settled, passes } = held;
+  // 转 0° 时 uprightSize 原样返回 bitmap 本身：只取宽高，否则回包会把整张位图克隆过去，JSON 化也是空的
+  const { width, height } = uprightSize(bitmap, rotation);
+  const frame = { width, height };
+  const canvas = drawBox(bitmap, [0, 0, width, height], rotation);
+  const blob = await encodeJpeg(canvas, quality);
+  post({
+    type: "sampled",
+    frameId,
+    blob,
+    ms,
+    detections,
+    hand: layout.hand,
+    warnings: layout.warnings,
+    settled,
+    passes,
+    rotation,
+    frame,
   });
 }
 
@@ -204,6 +250,12 @@ self.onmessage = (e: MessageEvent<ToWorker>) => {
         }
         case "grab":
           await grab(msg.quality);
+          return;
+        case "sample":
+          // 采样是顺带的：编码失败只丢这一帧，不能像推理出错那样把整个识别线程判死
+          await sample(msg.frameId, msg.quality).catch(() =>
+            post({ type: "sample-miss", frameId: msg.frameId }),
+          );
           return;
       }
     } catch (err) {

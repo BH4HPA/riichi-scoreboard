@@ -12,6 +12,7 @@ import { openDatabase, type Database } from "./db";
 import { PlayersRepo } from "./db/players";
 import { PresetsRepo } from "./db/presets";
 import { RecognitionsRepo } from "./db/recognitions";
+import { RecognitionSamplesRepo } from "./db/recognitionSamples";
 import { RecognitionSessionsRepo } from "./db/recognitionSessions";
 import { ResultsRepo } from "./db/results";
 import { RoomsRepo } from "./db/rooms";
@@ -24,7 +25,7 @@ import { roomRoutes } from "./http/routes/rooms";
 import { mountStatic } from "./http/static";
 import { RoomRegistry } from "./rooms/registry";
 import { mountWebSocket } from "./rooms/ws";
-import type { ObjectStore } from "./storage";
+import { isPrivateKey, type ObjectStore } from "./storage";
 import { CosStore } from "./storage/cos";
 import { LocalStore, LOCAL_OBJECTS_ROUTE } from "./storage/local";
 
@@ -53,12 +54,15 @@ const OBJECT_TYPES: Record<string, string> = {
   webp: "image/webp",
 };
 
-/** 本地对象存储的托管路由：只认白名单扩展名，key 经 LocalStore 校验防穿越。 */
+/**
+ * 本地对象存储的托管路由：只认白名单扩展名，key 经 LocalStore 校验防穿越。
+ * 私有对象（识别照片）与 COS 上一样读不到：一律 404，不透露存在与否。
+ */
 function mountLocalObjects(app: Hono, store: LocalStore): void {
   app.get(`${LOCAL_OBJECTS_ROUTE}/*`, (c) => {
     const key = c.req.path.slice(LOCAL_OBJECTS_ROUTE.length + 1);
     const type = OBJECT_TYPES[path.extname(key).slice(1)];
-    if (!type) return c.notFound();
+    if (!type || isPrivateKey(key)) return c.notFound();
     let file: string;
     try {
       file = store.resolve(key);
@@ -89,6 +93,7 @@ export function createApp({
   const presets = new PresetsRepo(db);
   const recognitions = new RecognitionsRepo(db);
   const sessions = new RecognitionSessionsRepo(db);
+  const samples = new RecognitionSamplesRepo(db);
   const registry = new RoomRegistry(rooms, results, players, Date.now, timings?.autoStartMs);
   const local = config.cos ? null : new LocalStore(path.join(config.dataDir, "objects"));
   const store: ObjectStore = config.cos ? new CosStore(config.cos) : local!;
@@ -121,7 +126,10 @@ export function createApp({
   app.route("/api/rooms", roomRoutes({ registry, players }));
   app.route("/api/evaluate", evaluateRoutes({ players }));
   app.route("/api/recognitions", recognitionRoutes({ players, recognitions, store, modelId }));
-  app.route("/api/recognition-sessions", recognitionSessionRoutes({ players, sessions }));
+  app.route(
+    "/api/recognition-sessions",
+    recognitionSessionRoutes({ players, sessions, samples, store }),
+  );
   if (local) mountLocalObjects(app, local);
   app.notFound((c) => c.json({ error: "not_found", message: "接口不存在" }, 404));
   app.onError((err, c) => {

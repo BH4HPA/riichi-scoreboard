@@ -39,8 +39,8 @@ async function register(app: ReturnType<typeof createApp>["app"]): Promise<strin
   return ((await res.json()) as { token: string }).token;
 }
 
-async function post(bytes: Uint8Array, tok = token, source?: string): Promise<Response> {
-  return ctx.app.request(`/api/recognitions${source ? `?source=${source}` : ""}`, {
+async function post(bytes: Uint8Array, tok = token, query = ""): Promise<Response> {
+  return ctx.app.request(`/api/recognitions${query ? `?${query}` : ""}`, {
     method: "POST",
     headers: tok ? { Authorization: `Bearer ${tok}` } : {},
     body: bytes,
@@ -94,15 +94,40 @@ describe("POST /api/recognitions", () => {
   });
 
   it("?source=calc / label 原样记下；非法值 → 400，不落库", async () => {
-    const calc = (await post(JPEG, token, "calc")).json() as Promise<{ id: string }>;
+    const calc = (await post(JPEG, token, "source=calc")).json() as Promise<{ id: string }>;
     expect(row((await calc).id)!.source).toBe("calc");
-    const ok = (await post(JPEG, token, "label")).json() as Promise<{ id: string }>;
+    const ok = (await post(JPEG, token, "source=label")).json() as Promise<{ id: string }>;
     expect(row((await ok).id)!.source).toBe("label");
     const before = ctx.db.prepare("SELECT COUNT(*) AS n FROM recognitions").get();
-    const bad = await post(JPEG, token, "nonsense");
+    const bad = await post(JPEG, token, "source=nonsense");
     expect(bad.status).toBe(400);
     expect(((await bad.json()) as { error: string }).error).toBe("bad_source");
     expect(ctx.db.prepare("SELECT COUNT(*) AS n FROM recognitions").get()).toEqual(before);
+  });
+
+  it("?session= 把定格记录挂到那次取景上；不带为空，格式不对 → 400，不落库", async () => {
+    const withSession = (await (
+      await post(JPEG, token, "source=calc&session=0123456789abcdef")
+    ).json()) as { id: string };
+    expect(row(withSession.id)).toMatchObject({ source: "calc", session_id: "0123456789abcdef" });
+    const plain = (await (await post(JPEG)).json()) as { id: string };
+    expect(row(plain.id)!.session_id).toBeNull();
+    const before = ctx.db.prepare("SELECT COUNT(*) AS n FROM recognitions").get();
+    const bad = await post(JPEG, token, "session=ABC");
+    expect(bad.status).toBe(400);
+    expect(((await bad.json()) as { error: string }).error).toBe("bad_session");
+    expect(ctx.db.prepare("SELECT COUNT(*) AS n FROM recognitions").get()).toEqual(before);
+  });
+
+  it("照片私有：本地对象路由对 hands/ 一律 404（文件确实在盘上），头像照常可读", async () => {
+    const { id } = (await (await post(JPEG)).json()) as { id: string };
+    const key = row(id)!.photo_key;
+    expect(fs.existsSync(path.join(dataDir, "objects", key))).toBe(true);
+    expect((await ctx.app.request(`/api/objects/${key}`)).status).toBe(404);
+    const avatar = path.join(dataDir, "objects", "avatars/p1/a.jpg");
+    fs.mkdirSync(path.dirname(avatar), { recursive: true });
+    fs.writeFileSync(avatar, JPEG);
+    expect((await ctx.app.request("/api/objects/avatars/p1/a.jpg")).status).toBe(200);
   });
 
   it("超过 2MB → 413 JSON（HTTPException 透传，不再变成 500）", async () => {

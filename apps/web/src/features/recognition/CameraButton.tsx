@@ -24,9 +24,10 @@ export function CameraButton({
 }) {
   const [open, setOpen] = useState(false);
 
-  const onCapture = ({ blob, result }: Capture) => {
+  const onCapture = (capture: Capture) => {
     setOpen(false);
-    const key = uploadRecognition(blob, result, "room", {
+    const { result } = capture;
+    const key = uploadRecognition(capture, "room", {
       onId: (id) => onChange((d) => attachRecognitionId(d, key, id)),
       onFail: () => useRoomStore.getState().notify("error", "照片留存失败，不影响结算"),
     });

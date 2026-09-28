@@ -25,11 +25,12 @@ export function useCalcShot(rules: RoomRules) {
   const [shot, setShot] = useState<{ photo: Blob; detections: Detection[] } | null>(null);
   const confirms = useRef<Promise<void>>(Promise.resolve());
 
-  const onCapture = ({ blob, result }: Capture) => {
+  const onCapture = (capture: Capture) => {
+    const { blob, result } = capture;
     setShooting(false);
     setShot({ photo: blob, detections: result.detections });
     setPhase("review");
-    const key = uploadRecognition(blob, result, "calc", {
+    const key = uploadRecognition(capture, "calc", {
       onId: (id) => setDraft((d) => attachRecognitionId(d, key, id)),
       onFail: () => useRoomStore.getState().notify("error", "照片留存失败，不影响算点数"),
     });
