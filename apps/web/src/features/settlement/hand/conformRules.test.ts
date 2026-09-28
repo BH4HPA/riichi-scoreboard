@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AKA, MLEAGUE_RULES, TILE, type RoomRules } from "@riichi/core";
-import { createValueDraft, type ValueDraft } from "../valueDraft";
+import { createValueDraft, evaluationOf, handStamp, type ValueDraft } from "../valueDraft";
 import { conformDraftToRules } from "./conformRules";
 
 const withHand = (patch: Partial<RoomRules["hand"]>): RoomRules => ({
@@ -43,8 +43,13 @@ describe("conformDraftToRules", () => {
   });
 
   it("无赤、无杠宝、无里宝、无一发：赤五折回（和张跟着折）、指示牌截断、清里宝与一发", () => {
+    const d = draft();
+    d.evaluated = {
+      hand: handStamp(d.hand),
+      result: { han: 1, fu: 30, yakuman: 0, yaku: {}, isAgari: true },
+    };
     const next = conformDraftToRules(
-      draft(),
+      d,
       withHand({ akaCount: 0, kanDora: false, uraDora: false, ippatsu: false }),
     );
     expect(next.hand.closed.at(-1)).toBe(TILE.P5);
@@ -54,7 +59,7 @@ describe("conformDraftToRules", () => {
     expect(next.hand.uraIndicators).toEqual([]);
     expect(next.hand.ippatsu).toBe(false);
     expect(next.hand.riichi).toBe(true);
-    expect(next.evaluated).toBeNull();
+    expect(evaluationOf(next)).toBeNull();
     // 截掉的第二张宝牌指示牌不留悬空记号；赤 0 全折不打记号
     expect(next.recognition!.uncertain).toEqual([{ area: "closed", i: 0 }]);
   });

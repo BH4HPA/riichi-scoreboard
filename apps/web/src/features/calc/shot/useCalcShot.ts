@@ -71,7 +71,6 @@ export function useCalcShot(rules: RoomRules) {
               ...d,
               // 岭上/抢杠、海底/河底、天地/人和随荣和自摸互换含义：留着会悄悄变成另一个役
               hand: { ...d.hand, tsumo, afterKan: false, lastTile: false, firstTake: false },
-              evaluated: null,
             },
       ),
   };

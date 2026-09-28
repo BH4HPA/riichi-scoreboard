@@ -10,7 +10,7 @@ import { draftWithRiichi } from "./riichiSync";
 const CameraButton = lazy(() =>
   import("@/features/recognition/CameraButton").then((m) => ({ default: m.CameraButton })),
 );
-import { isHandComplete, type ValueDraft } from "./valueDraft";
+import { evaluationOf, handStamp, isHandComplete, type ValueDraft } from "./valueDraft";
 import { writeValueMode } from "./valueModePref";
 
 const HAN_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((n) => ({
@@ -59,30 +59,29 @@ export function ValuePicker({
       : "normal";
   const maxYakuman = rules.scoring.yakumanStacking ? 6 : 1;
 
-  // 牌面完整即自动算番；回包只在手牌快照未变时写回（防乱序与覆盖期间改动）。
+  // 牌面完整即自动算番；结果盖上这手牌的戳写回（戳对不上的结果 evaluationOf 不认，乱序回包也无害）。
   // onChange 走 ref，不进 effect 依赖：调用方可以传每次渲染新建的函数。
   const onChangeRef = useRef(onChange);
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
-  const handKey = JSON.stringify(draft.hand);
+  const handKey = handStamp(draft.hand);
   const complete = isHandComplete(draft.hand);
   useEffect(() => {
     if (!complete || seat === null) return;
     const hand = JSON.parse(handKey) as ValueDraft["hand"];
     let cancelled = false;
-    // 座位或手牌变了，旧结果立即失效
+    // 依赖变了才会走到这里：和牌者换了的话旧结果（按另一个座位算的）戳仍对得上，必须清掉；
+    // 同一手牌重拍不改 handKey，不会进来，结果保留
     onChangeRef.current((d) => (d.evaluated ? { ...d, evaluated: null } : d));
     const timer = setTimeout(() => {
       setEvaluating(true);
       setEvalError(null);
       socket
         .evaluate(seat, hand)
-        .then((evaluated) => {
+        .then((result) => {
           if (cancelled) return;
-          onChangeRef.current((d) =>
-            JSON.stringify(d.hand) === handKey ? { ...d, evaluated } : d,
-          );
+          onChangeRef.current((d) => ({ ...d, evaluated: { hand: handKey, result } }));
         })
         .catch((err: unknown) => {
           if (cancelled) return;
@@ -159,7 +158,7 @@ export function ValuePicker({
           onChange={change}
           rules={rules}
           riichiLocked={riichiLock !== undefined}
-          evaluated={draft.evaluated}
+          evaluated={evaluationOf(draft)}
           evaluating={evaluating}
           evalError={seat === null && complete ? "先选和牌者" : evalError}
           isDealer={seat === dealer}

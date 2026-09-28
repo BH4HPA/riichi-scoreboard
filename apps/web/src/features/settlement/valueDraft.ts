@@ -8,7 +8,8 @@ export interface ValueDraft {
   fu: number | null;
   yakuman: number;
   hand: HandInput;
-  evaluated: EvaluatedHand | null;
+  /** 最近一次评估；只对盖戳那手牌有效，读取一律走 `evaluationOf` */
+  evaluated: Evaluation | null;
   /** 牌面来自拍照识别时的记录信息；手工录入为 null */
   recognition: DraftRecognition | null;
   /** 立直是识别里宝后系统替用户勾上的：确认态给这个旗标打记号，让「为什么亮着」看得见 */
@@ -17,6 +18,26 @@ export interface ValueDraft {
   editing: boolean;
   /** 取消立直时暂存的里宝指示牌：重新勾上立直就还原，误点一下不丢识别结果 */
   uraStash: Tile[];
+}
+
+/**
+ * 评估结果连同它算的是哪手牌（`handStamp`）一起存：牌面一变戳就对不上、结果自然作废，牌面没变（同一手牌重拍）
+ * 结果照样有效。不再靠各个改牌入口记得手动清空——漏一处就是「显示着旧番数」或「清了却不再重算、卡在还需选择」。
+ */
+export interface Evaluation {
+  hand: string;
+  result: EvaluatedHand;
+}
+
+/** 牌面指纹：所有手牌都派生自 `emptyHand`，键顺序固定，JSON 即可比较 */
+export function handStamp(hand: HandInput): string {
+  return JSON.stringify(hand);
+}
+
+/** 当前牌面的评估结果；没评估过或评估的是另一手牌时为 null */
+export function evaluationOf(draft: Pick<ValueDraft, "hand" | "evaluated">): EvaluatedHand | null {
+  const e = draft.evaluated;
+  return e && e.hand === handStamp(draft.hand) ? e.result : null;
 }
 
 export function emptyHand(tsumo: boolean): HandInput {
@@ -105,7 +126,7 @@ export function missingValue(draft: ValueDraft): string[] {
 /** 草稿 → 可计算的番符值；手填未选齐、牌面未评估或非和牌形时为 null。 */
 export function draftValue(draft: ValueDraft): HandValue | null {
   if (draft.mode === "manual") return manualValue(draft);
-  const e = draft.evaluated;
+  const e = evaluationOf(draft);
   return e && e.isAgari ? { han: e.han, fu: e.fu, yakuman: e.yakuman } : null;
 }
 

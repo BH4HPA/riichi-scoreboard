@@ -42,7 +42,6 @@ export function HandEditor({
   const setHand = (next: HandInput, clear?: TileLoc) =>
     onChange((d) => ({
       ...withHandEdit(d, next),
-      evaluated: null,
       // 换完这一张就别再提示它了；增删牌会让下标失配，那时整批清掉（在 TileKeyboard 那条路上）
       recognition:
         d.recognition && clear
@@ -59,7 +58,6 @@ export function HandEditor({
           onChange={(hand) =>
             onChange((d) => ({
               ...withHandEdit(d, hand),
-              evaluated: null,
               // 增删牌之后下标全错位，记号宁可全清也不能钉在别的牌上
               recognition: d.recognition ? { ...d.recognition, uncertain: [] } : null,
             }))
