@@ -206,7 +206,10 @@ test("截图：iPad 尺寸下三档界面大小的大厅、对局与操作面板
         const dlg = tv.getByRole("dialog");
         await dlg.getByLabel("新建本地玩家").fill(`本地${seat + 1}`);
         await dlg.getByRole("button", { name: "创建并入座" }).click();
-        await tv.getByTestId(`seat-${seat}`).getByText(`本地${seat + 1}`).waitFor();
+        await tv
+          .getByTestId(`seat-${seat}`)
+          .getByText(`本地${seat + 1}`)
+          .waitFor();
       }
       await tv.getByRole("button", { name: "开局", exact: true }).click();
       await tv.getByTestId("points-0").waitFor();
