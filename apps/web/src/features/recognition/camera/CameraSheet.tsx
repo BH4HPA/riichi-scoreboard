@@ -16,7 +16,15 @@ import { warningsUnder } from "../applyRecognized";
 import { loadPhoto } from "../photoFile";
 import { fitLongEdge, STILL_MAX_EDGE, viewportOf } from "./viewport";
 import { DetectionOverlay } from "./DetectionOverlay";
-import { EMPTY_CAPTURE, feedFrame, reasonOf, STABLE_FRAMES, votesOf } from "./autoCapture";
+import {
+  countdownOf,
+  EMPTY_CAPTURE,
+  feedFrame,
+  reasonOf,
+  STABLE_FRAMES,
+  votesOf,
+} from "./autoCapture";
+import { Countdown } from "./Countdown";
 import { LayoutGuide } from "./LayoutGuide";
 import { useRotation } from "./orientation/useRotation";
 import { useSessionStats } from "./useSessionStats";
@@ -251,6 +259,7 @@ export function CameraSheet({
     ? `${total}/14 · ${Math.min(STABLE_FRAMES, votesOf(gate))}/${STABLE_FRAMES}`
     : null;
   const reason = reasonOf(gate);
+  const countdown = countdownOf(gate);
   /**
    * 手机横持而页面没跟着转时，把关闭键、进度、底栏这些整体转过去：一个与屏幕同心、宽高互换的容器。
    * 画面与检测框不转——屏幕本身已经横过来了。
@@ -335,6 +344,8 @@ export function CameraSheet({
             对准手牌，牌河留在画面上方
           </p>
         )}
+        {/* 定格的预兆：票数一起来就给倒计时，免得人正要按快门时被自动定格吓一跳 */}
+        {!paused && !reason && countdown && <Countdown {...countdown} />}
         {paused && (
           <button
             type="button"

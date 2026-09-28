@@ -37,6 +37,19 @@ export function votesOf(state: CaptureState): number {
   return last == null ? 0 : state.keys.filter((k) => k === last).length;
 }
 
+/**
+ * 中央倒计时：跟着票数走，不额外等待（第 STABLE_FRAMES 票就定格，闪光就是「咔嚓」），所以只数得出 2 → 1。
+ * 票满了却还没定格（在等指示牌认回来、或最新两帧不一致）停在 1、环是满的；没有票时不显示。
+ */
+export function countdownOf(state: CaptureState): { digit: number; progress: number } | null {
+  const votes = votesOf(state);
+  if (votes === 0) return null;
+  return {
+    digit: Math.max(1, STABLE_FRAMES - votes),
+    progress: Math.min(1, votes / STABLE_FRAMES),
+  };
+}
+
 /** 该告诉用户的原因：同一类 blocking 已经连续挡了 REASON_FRAMES 帧 */
 export function reasonOf(state: CaptureState): string | null {
   return state.blocked && state.blocked.frames >= REASON_FRAMES ? state.blocked.message : null;

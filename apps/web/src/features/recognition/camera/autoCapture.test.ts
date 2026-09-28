@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RecognitionWarning, RecognizedHand } from "@riichi/core";
 import {
+  countdownOf,
   EMPTY_CAPTURE,
   feedFrame,
   handKey,
@@ -111,6 +112,22 @@ describe("指示牌", () => {
   it("窗口里始终没见过指示牌，照常定格；见过的那一帧滑出窗口以后也不再等", () => {
     expect(run([A, A, A]).fires.at(-1)).toBe(true);
     expect(run([withDora, A, A, A, A, A]).fires.at(-1)).toBe(true);
+  });
+});
+
+describe("countdownOf", () => {
+  it("跟票数走：1 票显示 2、2 票显示 1，定格那一帧就是闪光", () => {
+    expect(countdownOf(EMPTY_CAPTURE)).toBeNull();
+    expect(countdownOf(run([A]).state)).toEqual({ digit: 2, progress: 1 / 3 });
+    expect(countdownOf(run([A, A]).state)).toEqual({ digit: 1, progress: 2 / 3 });
+  });
+
+  it("票满却不定格（在等指示牌认回来）：停在 1、环是满的，不出现 0 或负数", () => {
+    const withDora = frame(hand({ doraIndicators: [5] }));
+    const { fires, state } = run([withDora, A, A, A, A]);
+    expect(fires.some(Boolean)).toBe(false);
+    expect(votesOf(state)).toBe(5);
+    expect(countdownOf(state)).toEqual({ digit: 1, progress: 1 });
   });
 });
 
