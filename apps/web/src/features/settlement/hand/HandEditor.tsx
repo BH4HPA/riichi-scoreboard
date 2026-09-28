@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Pencil } from "lucide-react";
+import { Button } from "@/ui/button";
 import type { EvaluatedHand, HandInput, RoomRules, Tile } from "@riichi/core";
 import { withoutLoc, type TileLoc } from "@/features/hand/tileLoc";
 import { confirmable, withHandEdit, type ValueDraft } from "../valueDraft";
@@ -9,7 +11,7 @@ import { TileReplaceSheet } from "./TileReplaceSheet";
 
 /**
  * 牌面页的装配：识别结果自洽就收起键盘只展示牌（确认态），否则展开全键盘（编辑态）。
- * 点过「改牌」就一直留在编辑态，直到下一次识别把 recognition 换掉：用户的显式选择优先于自动判定。
+ * 点过「人工调整」就一直留在编辑态，直到下一次识别把 recognition 换掉：用户的显式选择优先于自动判定。
  */
 export function HandEditor({
   draft,
@@ -29,6 +31,7 @@ export function HandEditor({
   evaluated: EvaluatedHand | null;
   evaluating: boolean;
   evalError: string | null;
+  /** 「拍照识别 / 重新拍照」；没有发布模型或不在房间里（算点数页另有重新拍）时为空 */
   camera: React.ReactNode;
   /** 算点数页核对阶段不算番：不显示番符与役种那一块，免得永远停在「计算中…」 */
   showValue?: boolean;
@@ -77,7 +80,17 @@ export function HandEditor({
 
   return (
     <>
-      {camera}
+      <div className={camera ? "grid grid-cols-2 gap-2" : undefined}>
+        {camera}
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => onChange((d) => ({ ...d, editing: true }))}
+        >
+          <Pencil className="mr-1 h-4 w-4" />
+          人工调整
+        </Button>
+      </div>
       <HandConfirm
         hand={draft.hand}
         rules={rules}

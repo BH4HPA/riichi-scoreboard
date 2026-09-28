@@ -1,6 +1,4 @@
-import { Pencil } from "lucide-react";
 import type { EvaluatedHand, HandInput, RoomRules } from "@riichi/core";
-import { Button } from "@/ui/button";
 import { HandView } from "@/features/hand/HandView";
 import type { TileLoc } from "@/features/hand/tileLoc";
 import { FlagChips } from "./FlagChips";
@@ -9,6 +7,7 @@ import { ValueResult } from "./ValueResult";
 /**
  * 识别通过时的结算界面：像主控台一样把牌摆出来，键盘收起。
  * 没把握的那张牌自己带记号，点任意一张就能换或者改和张；旗标压成一行常驻 chips。
+ * 展开全键盘的「人工调整」在 HandEditor 顶部，与「重新拍照」同一行。
  */
 export function HandConfirm({
   hand,
@@ -66,10 +65,6 @@ export function HandConfirm({
       {showValue && (
         <ValueResult complete evaluated={evaluated} evaluating={evaluating} evalError={evalError} />
       )}
-      <Button variant="ghost" size="sm" className="w-full" onClick={onEdit}>
-        <Pencil className="mr-1 h-3.5 w-3.5" />
-        改牌
-      </Button>
     </div>
   );
 }

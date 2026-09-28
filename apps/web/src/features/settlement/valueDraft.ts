@@ -14,7 +14,7 @@ export interface ValueDraft {
   recognition: DraftRecognition | null;
   /** 立直是识别里宝后系统替用户勾上的：确认态给这个旗标打记号，让「为什么亮着」看得见 */
   riichiAuto: boolean;
-  /** 用户在确认态点过「改牌」：此后一直留在编辑态，直到下一次识别 */
+  /** 用户在确认态点过「人工调整」：此后一直留在编辑态，直到下一次识别 */
   editing: boolean;
   /** 取消立直时暂存的里宝指示牌：重新勾上立直就还原，误点一下不丢识别结果 */
   uraStash: Tile[];
@@ -99,7 +99,7 @@ export function withHandEdit(draft: ValueDraft, hand: HandInput): ValueDraft {
 }
 
 /**
- * 能不能收起键盘只看结果：来自识别、牌面录满、没有 blocking 提示，且用户没主动点过「改牌」。
+ * 能不能收起键盘只看结果：来自识别、牌面录满、没有 blocking 提示，且用户没主动点过「人工调整」。
  * 宝牌指示牌为空不拦（用户拍板），确认态会把那一栏留空位提醒。
  */
 export function confirmable(draft: ValueDraft): boolean {

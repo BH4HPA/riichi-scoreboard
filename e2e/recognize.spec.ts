@@ -204,6 +204,10 @@ test("连拍两张：第二次打开取景框仍能识别（模型字节被转�
   expect(again.uncovered).toBe(false);
   await expect(dialog.getByTestId("hand-confirm")).toBeVisible();
   await expect(dialog.getByTestId("recognize-button")).toHaveText("重新拍照");
+  // 同一手牌重拍：上一次的番符照样有效，不会清空后卡在「还需选择：牌面」（9-27 实战里的 bug）
+  await expect(dialog.getByText(/^\d+ 番 \d+ 符$/)).toBeVisible();
+  await expect(p.getByText(/还需选择/)).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: "确认荣和" })).toBeEnabled();
 });
 
 test("模型加载失败 → 取景页给出错误，牌面不变", async ({ browser }) => {
@@ -285,7 +289,7 @@ test("相机不可用 → 取景页仍能打开：说明原因、不出快门、
   await expect(p.getByText("照片留存失败，不影响结算")).toHaveCount(0);
 });
 
-test("确认态：点牌替换、改和张、改牌展开全键盘后不再自动收回", async ({ browser }) => {
+test("确认态：点牌替换、改和张、人工调整展开全键盘后不再自动收回", async ({ browser }) => {
   const { phone: p, dialog } = await openRonHandTab(browser, withDetector());
   await shoot(p, dialog);
 
@@ -313,8 +317,8 @@ test("确认态：点牌替换、改和张、改牌展开全键盘后不再自�
     .click();
   await expect(dialog.getByText(/^\d+ 番 \d+ 符$/)).toBeVisible();
 
-  // 改牌 → 全键盘；牌面仍然完整，但不会自己收回确认态
-  await confirm.getByRole("button", { name: "改牌" }).click();
+  // 人工调整（与重新拍照同一行）→ 全键盘；牌面仍然完整，但不会自己收回确认态
+  await dialog.getByRole("button", { name: "人工调整" }).click();
   await expect(dialog.getByTestId("tile-keyboard")).toBeVisible();
   await expect(dialog.getByTestId("hand-confirm")).toHaveCount(0);
 });

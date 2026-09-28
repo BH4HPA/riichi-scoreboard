@@ -3,6 +3,7 @@ import { scoreTier, TIER_LABELS, yakumanLabel, type RoomRules, type Seat } from 
 import { ChipGroup, Label, Tabs, TabsContent, TabsList, TabsTrigger } from "@/ui/controls";
 import { useSocket } from "@/ws/useRoom";
 import { CommandError } from "@/ws/socket";
+import { RECOGNITION_MODEL } from "@/features/recognition/modelUrl";
 import { HandEditor } from "./hand/HandEditor";
 import { draftWithRiichi } from "./riichiSync";
 
@@ -163,9 +164,11 @@ export function ValuePicker({
           evalError={seat === null && complete ? "先选和牌者" : evalError}
           isDealer={seat === dealer}
           camera={
-            <Suspense fallback={null}>
-              <CameraButton draft={draft} onChange={change} rules={rules} />
-            </Suspense>
+            RECOGNITION_MODEL && (
+              <Suspense fallback={null}>
+                <CameraButton draft={draft} onChange={change} rules={rules} />
+              </Suspense>
+            )
           }
         />
       </TabsContent>

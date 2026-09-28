@@ -90,7 +90,7 @@ describe("confirmable", () => {
     );
   });
 
-  it("点过「改牌」之后一直留在编辑态", () => {
+  it("点过「人工调整」之后一直留在编辑态", () => {
     expect(confirmable(recognized({ editing: true }))).toBe(false);
   });
 
