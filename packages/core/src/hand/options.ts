@@ -1,5 +1,6 @@
 import { kyokuWind } from "../format/round";
 import { DomainError } from "../types/errors";
+import { isLegalMeld } from "./meld";
 import type { RoomRules } from "../types/rules";
 import { dealerOf, type EvaluatedHand, type HandInput } from "../types/state";
 import {
@@ -209,6 +210,7 @@ export function validateHandInput(hand: HandInput, rules: RoomRules): void {
     if (m.tiles.length !== 3 && m.tiles.length !== 4)
       throw new DomainError("bad_meld", "副露必须是 3 或 4 张");
     if (m.tiles.length === 3 && !m.open) throw new DomainError("bad_meld", "3 张的副露必须是明的");
+    if (!isLegalMeld(m.tiles)) throw new DomainError("bad_meld", "副露不是合法的吃、碰或杠");
   }
   const total = hand.closed.length + hand.melds.length * MELD_TILE_COUNT;
   if (total !== 14) throw new DomainError("bad_count", "暗牌与副露合计应为 14 张（含和张）");
@@ -271,7 +273,8 @@ export function toEngineInput(hand: HandInput, ctx: HandContext, rules: RoomRule
 
   return {
     closed_part: closed.map(baseTile),
-    open_part: hand.melds.map((m) => [m.open, m.tiles.map(baseTile)]),
+    // 引擎只按给出的顺序判吃（见 isLegalMeld）：摆放顺序（横置那张在前）必须在这里排好
+    open_part: hand.melds.map((m) => [m.open, m.tiles.map(baseTile).sort((a, b) => a - b)]),
     options: {
       dora,
       aka_count: akaCount(hand),

@@ -1,13 +1,5 @@
-import {
-  akaOf,
-  baseTile,
-  isAka,
-  isHonor,
-  TILE,
-  tileSuit,
-  type Meld,
-  type Tile,
-} from "../types/tiles";
+import { akaOf, baseTile, isAka, isHonor, TILE, type Meld, type Tile } from "../types/tiles";
+import { isLegalMeld } from "../hand/meld";
 import { tileOfClassId } from "./classes";
 import type {
   Detection,
@@ -184,13 +176,10 @@ function isMeldSegment(g: Item[]): boolean {
       g.length === 4 && faces.length === 3 && bases.every((b) => b === TILE.Haku) && sides <= 2
     );
   }
+  if (!isLegalMeld(bases)) return false;
+  // 刻子 / 杠恰一张横置（加杠两张）；吃恰一张
   if (bases.every((b) => b === bases[0])) return sides === 1 || (g.length === 4 && sides === 2);
-  if (g.length !== 3 || sides !== 1 || isHonor(bases[0]!)) return false;
-  return (
-    tileSuit(bases[0]!) === tileSuit(bases[2]!) &&
-    bases[1] === bases[0]! + 1 &&
-    bases[2] === bases[0]! + 2
-  );
+  return sides === 1;
 }
 
 /** 暗牌段：3n+2 张牌面，至多一张横置（和张）。 */
