@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { readLocal, writeLocal } from "@/lib/localStore";
+import { useScale } from "../scale/store";
 import { clampSplit, DEFAULT_SPLIT, HANDLE_PX } from "./clampSplit";
 
 const KEY = "riichi.console.split";
@@ -9,11 +10,12 @@ function readSplit(): number {
   return v > 0 && v < 1 ? v : DEFAULT_SPLIT;
 }
 
-/** 宽屏对局页比分/历史的分隔比例：本机记忆，按容器实际宽度夹在两栏最小宽度之间。 */
+/** 宽屏对局页比分/历史的分隔比例：本机记忆，按容器实际宽度夹在两栏最小宽度（随界面大小放大）之间。 */
 export function useSplit() {
   const [container, setContainer] = useState<HTMLElement | null>(null);
   const [width, setWidth] = useState(0);
   const [ratio, setRatio] = useState(readSplit);
+  const scale = useScale();
 
   useEffect(() => {
     if (!container) return;
@@ -28,14 +30,14 @@ export function useSplit() {
   return {
     /** 作为回调 ref 挂到两栏的网格容器上 */
     attach: setContainer,
-    ratio: clampSplit(ratio, width),
+    ratio: clampSplit(ratio, width, scale),
     /** 指针横坐标 → 比例 */
     ratioAt: (clientX: number) =>
       container && width > 0
         ? (clientX - container.getBoundingClientRect().left - HANDLE_PX / 2) / width
         : ratio,
     set: (next: number) => {
-      const v = clampSplit(next, width);
+      const v = clampSplit(next, width, scale);
       setRatio(v);
       writeLocal(KEY, String(v));
     },

@@ -145,7 +145,7 @@ export function StatsPanel() {
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "pos" | "neg" }) {
   return (
     <div className="rounded-lg bg-surface-2 px-2 py-2">
-      <div className="text-[11px] text-muted">{label}</div>
+      <div className="text-[0.6875rem] text-muted">{label}</div>
       <div
         className={cn(
           "text-lg font-semibold tabular",

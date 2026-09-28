@@ -17,6 +17,3 @@ export function useMediaQuery(query: string): boolean {
   }, [query]);
   return useSyncExternalStore(store.subscribe, store.getSnapshot, () => false);
 }
-
-/** 主控台双栏布局的最小宽度；以下（iPad 横屏 1024）走单栏 + 抽屉。 */
-export const WIDE_CONSOLE_QUERY = "(min-width: 1280px)";

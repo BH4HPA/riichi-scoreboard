@@ -38,7 +38,7 @@ function CellBody({
       <span className={cn("font-semibold tabular", tv ? "text-2xl" : "text-base")}>
         {cell.ron === null ? "—" : formatPoints(cell.ron)}
       </span>
-      <span className={cn("tabular text-muted", tv ? "text-sm" : "text-[11px]")}>
+      <span className={cn("tabular text-muted", tv ? "text-sm" : "text-[0.6875rem]")}>
         {tsumoText(cell, role)}
       </span>
     </div>
@@ -61,7 +61,7 @@ export function PointsTable({
   const th = cn("px-2 py-1.5 text-center font-medium text-accent", tv ? "text-base" : "text-xs");
   const td = cn("border-t border-border px-1 py-1 text-center", tv ? "py-2" : "");
   return (
-    <div className={cn("grid gap-3", tv ? "grid-cols-[1fr_180px]" : "grid-cols-1")}>
+    <div className={cn("grid gap-3", tv ? "grid-cols-[1fr_11.25rem]" : "grid-cols-1")}>
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
         <table className="w-full border-collapse">
           <thead className="bg-surface-2">
@@ -96,7 +96,7 @@ export function PointsTable({
             ))}
           </tbody>
         </table>
-        <p className={cn("px-3 py-2 text-muted", tv ? "text-sm" : "text-[11px]")}>
+        <p className={cn("px-3 py-2 text-muted", tv ? "text-sm" : "text-[0.6875rem]")}>
           每格第一行为荣和时收取点数；第二行为自摸时
           {role === "oya" ? "每家支付点数" : "分别收取【闲家，庄家】点数"}。
           {rules.scoring.kiriageMangan ? "含切上满贯。" : ""}

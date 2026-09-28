@@ -2,7 +2,7 @@ import type { Tile } from "@riichi/core";
 import { cn } from "@/lib/utils";
 import { tileUrl } from "./tileAsset";
 import { tileLabel } from "./tileLabel";
-import { TILE_PX, type TileSize } from "./tileSize";
+import { TILE_SIZE, type TileSize } from "./tileSize";
 
 export type { TileSize } from "./tileSize";
 
@@ -32,7 +32,7 @@ export function TileFace({
   onClick?: (() => void) | undefined;
   className?: string;
 }) {
-  const { w, h } = TILE_PX[size];
+  const { w, h } = TILE_SIZE[size];
   const label = back ? "牌背" : tileLabel(tile);
   const badge = mark ? (
     <span

@@ -183,7 +183,7 @@ export function RulesEditor({
                 <div key={field.path} className="flex items-center justify-between gap-3 px-3 py-2">
                   <div className="min-w-0">
                     <div className="text-sm">{field.label}</div>
-                    {field.hint && <div className="text-[11px] text-muted">{field.hint}</div>}
+                    {field.hint && <div className="text-[0.6875rem] text-muted">{field.hint}</div>}
                   </div>
                   {editable ? (
                     <FieldControl field={field} rules={value} onChange={onChange} />

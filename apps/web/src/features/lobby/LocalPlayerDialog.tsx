@@ -173,7 +173,7 @@ function LocalPlayerPanel({
                           );
                       }}
                     />
-                    <div className="mt-0.5 text-[11px] text-muted">
+                    <div className="mt-0.5 text-[0.6875rem] text-muted">
                       {l.games} 局{seated ? " · 已入座" : ""}
                     </div>
                   </div>

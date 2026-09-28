@@ -10,6 +10,7 @@ import {
 } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Badge } from "@/ui/controls";
+import { ConnectionBadge } from "@/ui/notice";
 import { useRoomStore } from "@/ws/store";
 import { useCommand } from "@/ws/useRoom";
 import { cn } from "@/lib/utils";
@@ -111,7 +112,8 @@ export function ConsoleLobby({
     </div>
   );
   const actions = (
-    <div className="flex items-center gap-3">
+    // 放大界面后窄屏一行放不下（开局、强制开局、页脚、界面大小、返回首页、解散），允许折行
+    <div className="flex flex-wrap items-center gap-3">
       <Button
         size="lg"
         variant="accent"
@@ -148,7 +150,7 @@ export function ConsoleLobby({
     <div
       className={cn(
         "h-dvh",
-        wide ? "grid grid-cols-[minmax(320px,2fr)_3fr] gap-8 p-8" : "flex flex-col gap-4 p-4",
+        wide ? "grid grid-cols-[minmax(20rem,2fr)_3fr] gap-8 p-8" : "flex flex-col gap-4 p-4",
       )}
     >
       {wide ? (
@@ -158,6 +160,7 @@ export function ConsoleLobby({
             <p className="text-center text-sm text-muted">
               手机扫码加入，{ten ? "两" : "四"}人都点「准备」后即可开局。
             </p>
+            <ConnectionBadge variant="console" />
           </div>
           <div className="flex items-center justify-between gap-4">
             <SiteFooter />
@@ -173,6 +176,7 @@ export function ConsoleLobby({
             </span>
           </span>
           <RoomQrDialog code={room.code} open={qrOpen} onOpenChange={setQrOpen} />
+          <ConnectionBadge variant="console" />
           <Button variant="ghost" size="sm" className="ml-auto" onClick={() => openLocals(null)}>
             <Users className="h-4 w-4" /> 本地玩家
           </Button>

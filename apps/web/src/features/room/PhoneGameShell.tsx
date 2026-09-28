@@ -73,7 +73,7 @@ export function PhoneGameShell({
               type="button"
               onClick={() => setSheet(key)}
               aria-pressed={sheet === key}
-              className="flex flex-col items-center gap-0.5 pb-1 pt-2 text-[11px] text-muted hover:text-fg aria-pressed:text-fg"
+              className="flex flex-col items-center gap-0.5 pb-1 pt-2 text-[0.6875rem] text-muted hover:text-fg aria-pressed:text-fg"
             >
               <Icon className="h-5 w-5" />
               {label}
@@ -82,7 +82,7 @@ export function PhoneGameShell({
         </div>
         {/* 信息行借用 Home 指示条上方的安全区（纯文本不可点）：底部留白封顶 18px，高过指示条顶端（约 13px）又不被 34px 的安全区撑满。
             min-h-5 = 连接徽标的高度：断线重连时这一行不变高，上面的 tab 不跳 */}
-        <div className="mx-auto flex min-h-5 max-w-md items-center gap-2 pl-4 pr-3 text-[11px] text-muted">
+        <div className="mx-auto flex min-h-5 max-w-md items-center gap-2 pl-4 pr-3 text-[0.6875rem] text-muted">
           <span className="shrink-0">
             房间 <span className="font-semibold tabular text-fg">{code}</span>
           </span>

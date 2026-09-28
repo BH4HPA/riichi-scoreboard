@@ -4,6 +4,7 @@ import { Button } from "@/ui/button";
 import { Dialog, DialogContent } from "@/ui/dialog";
 import { ConnectionBadge } from "@/ui/notice";
 import { RoomQrDialog } from "./RoomQr";
+import { ScaleControl } from "./scale/ScaleControl";
 import { HANDLE_PX } from "./split/clampSplit";
 import { SplitHandle } from "./split/SplitHandle";
 import { useSplit } from "./split/useSplit";
@@ -49,7 +50,7 @@ export function ConsoleGameShell({
     <div className={wide ? "flex h-dvh flex-col gap-4 p-6" : "flex min-h-dvh flex-col gap-3 p-4"}>
       <header className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">{header}</div>
-        <ConnectionBadge />
+        <ConnectionBadge variant="console" />
         {wide && (
           <span className="text-sm text-muted">
             房间 <span className="font-semibold tabular text-fg">{code}</span>
@@ -115,6 +116,8 @@ export function ConsoleGameShell({
           className="sm:max-w-2xl"
         >
           {panel(() => setPanelOpen(false))}
+          {/* 两种房型的操作面板共用：由壳统一追加在最后 */}
+          <ScaleControl className="mt-2 border-t border-border pt-4" />
         </DialogContent>
       </Dialog>
     </div>

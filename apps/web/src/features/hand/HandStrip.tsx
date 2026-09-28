@@ -153,7 +153,7 @@ export function IndicatorRow({
   // 没给 area 就是纯展示：不匹配记号也不可点，免得里宝拿表宝的下标去比对
   const loc = (i: number): TileLoc | null => (area ? { area, i } : null);
   return (
-    <div className={cn("flex items-center gap-1.5 text-[11px] text-muted", className)}>
+    <div className={cn("flex items-center gap-1.5 text-[0.6875rem] text-muted", className)}>
       <span>{label}</span>
       <div className="flex items-end gap-px">
         {tiles.map((t, i) => {

@@ -6,7 +6,7 @@ import { SiteBrand } from "./SiteFooter";
 export function SiteTicker({ className }: { className?: string }) {
   const brand = (
     <SiteBrand
-      className="gap-1 whitespace-nowrap text-[11px] font-medium"
+      className="gap-1 whitespace-nowrap text-[0.6875rem] font-medium"
       iconClassName="h-3.5 w-3.5 rounded"
     />
   );

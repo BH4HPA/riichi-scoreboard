@@ -27,7 +27,7 @@ export function DialogContent({
         className={cn(
           "fixed z-50 flex flex-col overflow-hidden bg-surface text-fg shadow-2xl outline-none",
           side === "right"
-            ? "inset-y-0 right-0 w-[min(600px,92vw)] animate-drawer-in"
+            ? "inset-y-0 right-0 w-[min(37.5rem,92vw)] animate-drawer-in"
             : "bottom-0 left-0 max-h-[92dvh] w-full rounded-t-2xl sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-w-lg sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl",
           className,
         )}
