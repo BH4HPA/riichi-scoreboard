@@ -182,10 +182,10 @@ test("主控台建房 → 四人扫码入座 → 开局 → 手机结算同步�
   // 牌面形态：手机 2 荣和手机 3，平和 1 番 30 符 = 1000
   await phones[2]!.getByRole("button", { name: "荣和", exact: true }).click();
   const ron = phones[2]!.getByRole("dialog");
-  await ron.getByRole("combobox").first().click();
+  await ron.getByRole("combobox").nth(1).click();
   await phones[2]!.getByRole("option", { name: "北家" }).click();
   // 西家视角：北家是下家，立直情况在番符/牌面之上
-  await expect(ron.getByRole("combobox").first()).toHaveText("北家下家");
+  await expect(ron.getByRole("combobox").nth(1)).toHaveText("北家下家");
   const riichiRows = ron.getByText("立直情况").locator("..").getByRole("checkbox");
   // 预勾的立直手动取消：之后不会被勾回
   await expect(riichiRows.nth(1)).toBeChecked();

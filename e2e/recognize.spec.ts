@@ -20,7 +20,7 @@ async function phone(browser: Browser, code: string, setup?: Setup): Promise<Pag
 }
 
 /**
- * 开房、四台手机入座准备、自动开局，返回手机 2 已打开的荣和对话框（放铳者北家、牌面页）。
+ * 开房、四台手机入座准备、自动开局，返回手机 2 已打开的荣和对话框（放铳者北家、牌面页）。荣和者默认本机、排第一，放铳者是第二个下拉框。
  * setup 在手机 2 进房间之前装路由：进房间就会预热模型，拦截必须先于导航。
  */
 async function openRonHandTab(
@@ -47,7 +47,7 @@ async function openRonHandTab(
   const p = phones[2]!;
   await p.getByRole("button", { name: "荣和", exact: true }).click();
   const dialog = p.getByRole("dialog");
-  await dialog.getByRole("combobox").first().click();
+  await dialog.getByRole("combobox").nth(1).click();
   await p.getByRole("option", { name: "北家" }).click();
   await dialog.getByRole("tab", { name: "牌面" }).click();
   return { phone: p, dialog };

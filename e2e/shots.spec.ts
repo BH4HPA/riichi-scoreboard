@@ -63,7 +63,7 @@ test("截图：番符表与主控台", async ({ browser }) => {
   // 手机 2 牌面荣和
   await phones[2]!.getByRole("button", { name: "荣和", exact: true }).click();
   const ron = phones[2]!.getByRole("dialog");
-  await ron.getByRole("combobox").first().click();
+  await ron.getByRole("combobox").nth(1).click();
   await phones[2]!.getByRole("option", { name: "老王" }).click();
   await ron.getByRole("tab", { name: "牌面" }).click();
   const keyboard = ron.getByTestId("tile-keyboard");
@@ -265,7 +265,7 @@ test("截图：取景框、确认态与算点数页", async ({ browser }) => {
   await p.getByTestId("points-0").waitFor();
   await p.getByRole("button", { name: "荣和", exact: true }).click();
   const dialog = p.getByRole("dialog");
-  await dialog.getByRole("combobox").first().click();
+  await dialog.getByRole("combobox").nth(1).click();
   await p.getByRole("option", { name: "老王" }).click();
   await dialog.getByRole("tab", { name: "牌面" }).click();
   await dialog.getByTestId("recognize-button").click();

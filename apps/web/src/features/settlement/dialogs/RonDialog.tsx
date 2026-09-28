@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { dealerOf, formatDiff, type Seat } from "@riichi/core";
+import { newId } from "@/lib/utils";
 import { Button } from "@/ui/button";
 import { DialogFooter } from "@/ui/dialog";
 import { useCommand } from "@/ws/useRoom";
@@ -41,6 +42,8 @@ export function RonDialog({ open, onOpenChange, game, names, ...rest }: Settleme
 }
 
 interface RonWinDraftState {
+  /** 稳定的 React key：移除第一位后，后面各位的局部状态（取景、评估中）不能串到别人身上 */
+  id: string;
   winner: Seat | null;
   draft: ValueDraft;
   pao: Seat | null;
@@ -64,6 +67,7 @@ function RonForm({ game, names, rules, mirror, mySeat, onDone }: SettlementFormP
       loser: null,
       wins: [
         {
+          id: newId(),
           winner: mySeat,
           draft: draftWithRiichi(
             createValueDraft(false, readValueMode()),
@@ -195,21 +199,67 @@ function RonForm({ game, names, rules, mirror, mySeat, onDone }: SettlementFormP
   const addWin = () =>
     setWins((ws) => [
       ...ws,
-      { winner: null, draft: createValueDraft(false, readValueMode()), pao: null },
+      { id: newId(), winner: null, draft: createValueDraft(false, readValueMode()), pao: null },
     ]);
   /** 评估结果异步回来时用函数式更新，避免覆盖期间的改动 */
   const updateDraft = (i: number, update: (d: ValueDraft) => ValueDraft) =>
     setWins((ws) => ws.map((w, k) => (k === i ? { ...w, draft: update(w.draft) } : w)));
 
+  /** 荣和者的选择行：多人时带「移除」（移除第一位后第二位顶上来） */
+  const winnerSelect = (w: RonWinDraftState, i: number) => (
+    <div className="flex items-end gap-2">
+      <div className="flex-1">
+        <SeatSelect
+          mySeat={mySeat}
+          label={`荣和者${wins.length > 1 ? ` ${i + 1}` : ""}`}
+          names={names}
+          value={w.winner}
+          onChange={(winner) => changeWinner(i, winner)}
+          exclude={loser === null ? [] : [loser]}
+        />
+      </div>
+      {wins.length > 1 && (
+        <Button variant="ghost" size="sm" onClick={() => removeWin(i)}>
+          移除
+        </Button>
+      )}
+    </div>
+  );
+  /** 荣和者的价值录入：与自摸表单同构 */
+  const winnerValue = (w: RonWinDraftState, i: number) => (
+    <>
+      <ValuePicker
+        draft={w.draft}
+        onChange={(update) => updateDraft(i, update)}
+        rules={rules}
+        seat={w.winner}
+        dealer={dealerOf(game.kyoku)}
+      />
+      {drafts[i]!.paoAllowed && w.winner !== null && (
+        <PaoPicker
+          names={names}
+          mySeat={mySeat}
+          winner={w.winner}
+          value={w.pao}
+          onChange={(pao) => setWin(i, { pao })}
+        />
+      )}
+    </>
+  );
+  const [first, ...others] = wins;
+
+  // 与自摸同一个顺序：谁和了 → （放铳者）→ 立直 → 牌面；双响/三响追加的荣和者各自一个框
   return (
     <>
       <div className="space-y-3">
+        {winnerSelect(first!, 0)}
         <SeatSelect
           label="放铳者"
           names={names}
           mySeat={mySeat}
           value={loser}
           onChange={(l) => form.update((st) => ({ ...st, loser: l }))}
+          exclude={chosen}
         />
         <SeatFlags
           label="立直情况"
@@ -218,45 +268,11 @@ function RonForm({ game, names, rules, mirror, mySeat, onDone }: SettlementFormP
           value={flags}
           onChange={changeRiichi}
         />
-        {wins.map((w, i) => (
-          <div key={i} className="rounded-lg border border-border p-2.5">
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
-                <SeatSelect
-                  mySeat={mySeat}
-                  label={`荣和者${wins.length > 1 ? ` ${i + 1}` : ""}`}
-                  names={names}
-                  value={w.winner}
-                  onChange={(winner) => changeWinner(i, winner)}
-                  exclude={loser === null ? [] : [loser]}
-                />
-              </div>
-              {wins.length > 1 && (
-                <Button variant="ghost" size="sm" onClick={() => removeWin(i)}>
-                  移除
-                </Button>
-              )}
-            </div>
-            <div className="mt-2">
-              <ValuePicker
-                draft={w.draft}
-                onChange={(update) => updateDraft(i, update)}
-                rules={rules}
-                seat={w.winner}
-                dealer={dealerOf(game.kyoku)}
-              />
-            </div>
-            {drafts[i]!.paoAllowed && w.winner !== null && (
-              <div className="mt-2">
-                <PaoPicker
-                  names={names}
-                  mySeat={mySeat}
-                  winner={w.winner}
-                  value={w.pao}
-                  onChange={(pao) => setWin(i, { pao })}
-                />
-              </div>
-            )}
+        {winnerValue(first!, 0)}
+        {others.map((w, k) => (
+          <div key={w.id} className="space-y-3 rounded-lg border border-border p-2.5">
+            {winnerSelect(w, k + 1)}
+            {winnerValue(w, k + 1)}
           </div>
         ))}
         {wins.length < maxWins && (
