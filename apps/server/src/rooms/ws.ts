@@ -12,6 +12,7 @@ import {
 } from "@riichi/core";
 import type { PlayersRepo } from "../db/players";
 import { evaluateHand } from "../engine/evaluate";
+import { clientIp } from "../http/rateLimit";
 import {
   describeError,
   RoomClosed,
@@ -25,6 +26,10 @@ interface Deps {
   players: PlayersRepo;
   /** 多久没收到客户端消息就断开（默认见 WS_KEEPALIVE）；测试可缩短 */
   idleMs?: number | undefined;
+  /** 经 CDN/反代部署：日志里的 IP 取 X-Forwarded-For 首项（与限流同一口径） */
+  trustProxy?: boolean;
+  /** 测试时关闭连接生命周期日志 */
+  quiet?: boolean;
 }
 
 /** 单条消息上限：一手牌面 + 元数据远小于此。同时作为 ws 服务器的 maxPayload。 */
@@ -52,6 +57,12 @@ export function mountWebSocket(app: Hono, upgradeWebSocket: UpgradeWebSocket, de
       const token = c.req.query("token") ?? "";
       const player = token ? deps.players.byToken(token) : null;
       const clientId = randomBytes(6).toString("hex");
+      // 连接生命周期日志：CDN 故障时要能看出哪些连接根本没到源站、到了的活了多久。只记标识，不记 token 与消息内容
+      const ip = clientIp(c, deps.trustProxy ?? false) ?? "-";
+      let openedAt: number | null = null;
+      const log = (line: string) => {
+        if (!deps.quiet) console.log(`[ws] ${line}`);
+      };
       let room: LiveRoom | null = null;
       let client: RoomClient | null = null;
       // 空闲看门狗：手机被系统杀掉/断网时不会发 close 帧，靠它把"在线"状态收回
@@ -82,6 +93,8 @@ export function mountWebSocket(app: Hono, upgradeWebSocket: UpgradeWebSocket, de
 
       return {
         onOpen(_evt, ws) {
+          openedAt = Date.now();
+          log(`open room=${code} client=${clientId} player=${player?.id ?? "-"} ip=${ip}`);
           if (!player) {
             send(ws, {
               type: "error",
@@ -185,7 +198,9 @@ export function mountWebSocket(app: Hono, upgradeWebSocket: UpgradeWebSocket, de
               send(ws, { type: "error", id: null, code: "bad_message", message: "未知消息类型" });
           }
         },
-        onClose() {
+        onClose(evt) {
+          const dur = openedAt === null ? "-" : ((Date.now() - openedAt) / 1000).toFixed(1);
+          log(`close room=${code} client=${clientId} code=${evt.code} dur=${dur}s`);
           untouch();
           if (room) deps.registry.leave(room, clientId);
         },

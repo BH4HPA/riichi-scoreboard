@@ -132,7 +132,13 @@ export function createApp({
   });
 
   if (upgradeWebSocket) {
-    mountWebSocket(app, upgradeWebSocket, { registry, players, idleMs: timings?.wsIdleMs });
+    mountWebSocket(app, upgradeWebSocket, {
+      registry,
+      players,
+      idleMs: timings?.wsIdleMs,
+      trustProxy: config.trustProxy,
+      quiet,
+    });
   }
   // 拆分托管（前端在别的域名）时不托管静态产物；CORS 白名单第一项就是前端站点，误入者 302 过去
   mountStatic(app, { webDist: config.webDist, redirectTo: config.corsOrigins[0] ?? null });
