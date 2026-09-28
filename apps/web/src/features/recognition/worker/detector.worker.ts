@@ -91,7 +91,9 @@ async function infer(
 ): Promise<void> {
   if (!ort || !session) return bitmap.close();
   const t0 = performance.now();
-  const frame = uprightSize(bitmap, rotation);
+  // 只取宽高：转 0° 时 uprightSize 原样返回 bitmap，整个放进回包会让每帧都把整张位图克隆回主线程
+  const { width, height } = uprightSize(bitmap, rotation);
+  const frame = { width, height };
   if (!still && rotation !== trackRotation) {
     track = LOST;
     trackRotation = rotation;
