@@ -60,7 +60,8 @@ Yarn workspaces monorepo:
   prefix, see `.env.template`); only avatars are public (`isPublicKey` allowlist) — recognition photos
   (`hands/`, `samples/`, and any new prefix) get COS `ACL: private` and a 404 from `/api/objects`. Behind a CDN
   with private-bucket origin auth (the deployed static domain has it) object ACLs do not stop CDN reads; that
-  layer has to be blocked on the CDN by directory. Abuse limits (`http/rateLimit.ts`, sliding windows): registration per IP
+  is accepted (user's call, 2026-09-28): photo keys carry a random part and are never sent to any client, and
+  old sample frames are to be cleaned up periodically. Abuse limits (`http/rateLimit.ts`, sliding windows): registration per IP
   (`TRUST_PROXY=1` reads `X-Forwarded-For` behind the CDN), room creation per device, photo uploads per player
   - global (capture photos 60/h, viewfinder sample frames a separate 60/h); the ws server's `maxPayload` equals the 16 KB application message cap. Serves the built web app
     with SPA fallback.

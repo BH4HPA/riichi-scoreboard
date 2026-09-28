@@ -21,8 +21,8 @@ export function assertObjectKey(key: string): void {
  * 只供训练回流（带密钥下载），存成私有对象。用白名单而不是私有前缀黑名单：新加一类对象默认私有；
  * 大小写不敏感的文件系统上 `HANDS/…` 也绕不过去。
  *
- * 注意：COS 桶私有 + CDN 开了「私有存储桶回源鉴权」时，CDN 会带凭证回源，对象 ACL 挡不住经 CDN 的访问——
- * 那一层要在 CDN 上按目录拦。
+ * 注意：COS 桶私有 + CDN 开了「私有存储桶回源鉴权」时，CDN 会带凭证回源，对象 ACL 挡不住经 CDN 的访问。
+ * 线上接受这一点：照片 key 带随机串、从不下发给客户端，采样帧另行定期清理。
  */
 const PUBLIC_PREFIXES = ["avatars/"];
 
