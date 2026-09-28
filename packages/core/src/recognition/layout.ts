@@ -73,6 +73,16 @@ const MAX_MELDS = 4;
 const FAR = 1e9;
 const MAX_INDICATORS = 5;
 
+/**
+ * 张数不对时告诉用户**该怎么办**，而不是「应为 14 张」：取景框与结算页都直接显示这句。
+ * 差一张最常见的是和张忘了横放在手牌一端（线上 9-27 实拍里最长的几次取景都卡在这里）。
+ */
+export function countMessage(total: number): string {
+  if (total === 13) return "只认出 13 张：和了牌横放在手牌一端了吗？";
+  if (total < 13) return `只认出 ${total} 张，还差 ${14 - total} 张：有牌被挡住或拍出画面了吗？`;
+  return `认出 ${total} 张，多了 ${total - 14} 张：牌河或牌山离手牌太近了吗？`;
+}
+
 /** 补出来的牌（暗杠只露中间两张、杠里一张认成牌背）没有对应的框 */
 const NO_DET = -1;
 
@@ -471,8 +481,8 @@ export function layoutHand(
     closedSeg = [];
   }
   const scale = scaleOf(closedSeg);
-  if (closedSeg.length % 3 !== 2)
-    warn("bad_group", "blocking", `暗牌组应为 3n+2 张，实际 ${closedSeg.length} 张`);
+  // 暗牌段不成 3n+2：张数不对时它只是 count 的推论，留到最后只报 count（用户看得懂、知道该补哪张）
+  const closedMisshapen = closedSeg.length % 3 !== 2;
   let droppedBacks = parts.get(closedGroup)?.dropped ?? 0;
   // 采信的框：暗牌组整组（含被忽略的牌背，它们也是照片里的实物）
   const used = new Set<number>(closedSeg.map((i) => i.detIndex));
@@ -678,7 +688,9 @@ export function layoutHand(
     return swap ? [y1, x1, y2, x2] : [x1, y1, x2, y2];
   };
 
-  if (total !== 14) warn("count", "blocking", `暗牌与副露合计应为 14 张，实际 ${total} 张`);
+  if (total !== 14) warn("count", "blocking", countMessage(total));
+  // 合计 14 而暗牌段仍不成形，只能是段里夹着牌背（暗牌不计牌背）
+  else if (closedMisshapen) warn("bad_group", "blocking", "手牌里夹着牌背，暗牌凑不成形");
 
   return {
     hand: { closed, melds, winTile, doraIndicators, uraIndicators },

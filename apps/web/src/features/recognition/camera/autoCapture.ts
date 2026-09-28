@@ -3,7 +3,7 @@ import type { Meld, RecognitionWarning, RecognizedHand } from "@riichi/core";
 /** 最近 WINDOW_FRAMES 帧里有 STABLE_FRAMES 帧认出同一副牌就定格（<300 ms/帧下约 1–1.5 秒） */
 export const STABLE_FRAMES = 3;
 export const WINDOW_FRAMES = 5;
-/** 同一条 blocking 连着出现这么多帧才告诉用户：闪一下就消失的不值得打扰 */
+/** 同一类 blocking 连着出现这么多帧才告诉用户：闪一下就消失的不值得打扰 */
 export const REASON_FRAMES = 3;
 
 export interface CaptureState {
@@ -11,8 +11,11 @@ export interface CaptureState {
   keys: readonly (string | null)[];
   /** 与 keys 逐位对应：那一帧认出了几张指示牌 */
   indicators: readonly number[];
-  /** 正在挡着定格的那条 blocking，及它已经连续出现了几帧 */
-  blocked: { message: string; frames: number } | null;
+  /**
+   * 正在挡着定格的那类 blocking（按 code 计，文案取最新一帧）及它已经连续出现了几帧。
+   * 按文案计的话，张数在 12/13 之间跳一下文案就变、计数清零，提示永远出不来。
+   */
+  blocked: { code: RecognitionWarning["code"]; message: string; frames: number } | null;
 }
 
 export const EMPTY_CAPTURE: CaptureState = { keys: [], indicators: [], blocked: null };
@@ -34,7 +37,7 @@ export function votesOf(state: CaptureState): number {
   return last == null ? 0 : state.keys.filter((k) => k === last).length;
 }
 
-/** 该告诉用户的原因：同一条 blocking 已经连续挡了 REASON_FRAMES 帧 */
+/** 该告诉用户的原因：同一类 blocking 已经连续挡了 REASON_FRAMES 帧 */
 export function reasonOf(state: CaptureState): string | null {
   return state.blocked && state.blocked.frames >= REASON_FRAMES ? state.blocked.message : null;
 }
@@ -63,8 +66,9 @@ export function feedFrame(
     ? state.blocked
     : block
       ? {
+          code: block.code,
           message: block.message,
-          frames: state.blocked?.message === block.message ? state.blocked.frames + 1 : 1,
+          frames: state.blocked?.code === block.code ? state.blocked.frames + 1 : 1,
         }
       : null;
   const next: CaptureState = { keys, indicators, blocked };

@@ -245,7 +245,7 @@ export function CameraSheet({
   const camBroken = camError !== null;
   const canShoot = detector !== null && ready && painted && live !== null && !camBroken;
   const downloading = !detector && !error && progress < 1;
-  /** 右上角的小字进度：认出几张（副露按 3 张折算，多认了照实显示）· 最近几帧里有几帧一致 */
+  /** 右上角的小字进度：认出几张（副露按 3 张折算，多认了照实显示；少于 14 张 accent、多了红）· 最近几帧里有几帧一致 */
   const total = live ? live.hand.closed.length + live.hand.melds.length * 3 : 0;
   const progressText = live
     ? `${total}/14 · ${Math.min(STABLE_FRAMES, votesOf(gate))}/${STABLE_FRAMES}`
@@ -357,7 +357,7 @@ export function CameraSheet({
         </button>
         {progressText && !paused && (
           <span
-            className={`pointer-events-none absolute right-3 top-4 text-xs tabular drop-shadow ${total > 14 ? "text-neg" : "text-white/80"}`}
+            className={`pointer-events-none absolute right-3 top-4 text-xs tabular drop-shadow ${total > 14 ? "text-neg" : total < 14 ? "text-accent" : "text-white/80"}`}
             data-testid="camera-progress"
           >
             {progressText}
@@ -406,7 +406,8 @@ export function CameraSheet({
           )}
           {/* 固定高度（一行手牌 + 一行指示牌）：模型下载进度、认出/没认出来回切换都在这一格里，
             底栏不能伸缩，否则画面下沿跟着跳 */}
-          <div className="h-[70px] overflow-hidden" data-testid="camera-live">
+          {/* 高度用 rem：主控台放大界面时牌图跟着放大，写死 px 会把指示牌那一行裁掉 */}
+          <div className="h-[4.375rem] overflow-hidden" data-testid="camera-live">
             {downloading ? (
               <div>
                 <p className="text-xs">

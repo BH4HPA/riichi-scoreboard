@@ -115,12 +115,21 @@ describe("指示牌", () => {
 });
 
 describe("reasonOf", () => {
-  it("同一条 blocking 连着挡了几帧才告诉用户；一帧好的就收回", () => {
+  it("同一类 blocking 连着挡了几帧才告诉用户；一帧好的就收回", () => {
     const few = run(Array.from({ length: REASON_FRAMES - 1 }, () => BAD)).state;
     expect(reasonOf(few)).toBeNull();
     const stuck = run(Array.from({ length: REASON_FRAMES }, () => BAD)).state;
     expect(reasonOf(stuck)).toBe("合计 17 张");
     expect(reasonOf(feedFrame(stuck, A).state)).toBeNull();
+  });
+
+  it("同一类 blocking 文案在变（张数在 12/13 之间跳）也连续计数，显示最新一帧的文案", () => {
+    const n = (k: number) =>
+      frame(hand(), [{ code: "count", message: `只认出 ${k} 张`, severity: "blocking" }]);
+    const { state } = run([n(13), n(12), n(13)]);
+    expect(reasonOf(state)).toBe("只认出 13 张");
+    const other = frame(hand(), [{ code: "bad_group", message: "夹着牌背", severity: "blocking" }]);
+    expect(reasonOf(feedFrame(state, other).state)).toBeNull();
   });
 
   it("粗检那一遍夹在中间不打断计数：它的提示不作数", () => {
