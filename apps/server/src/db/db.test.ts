@@ -4,6 +4,7 @@ import { MLEAGUE_RULES } from "@riichi/core";
 import { MIGRATIONS, migrate, schemaVersion } from "./index";
 import { PlayersRepo } from "./players";
 import { RecognitionsRepo, type RecognitionRow } from "./recognitions";
+import { RecognitionSamplesRepo, type RecognitionSampleRow } from "./recognitionSamples";
 import { RoomsRepo } from "./rooms";
 
 describe("数据库迁移", () => {
@@ -80,13 +81,23 @@ describe("数据库迁移", () => {
     const db = new DatabaseSync(":memory:");
     migrate(db);
     const repo = new RecognitionsRepo(db);
-    const id = repo.create("p1", "hands/p1/x.jpg", "model-1", "room", 100);
-    const labelled = repo.create("p1", "hands/p1/y.jpg", "model-1", "label", 100);
+    const id = repo.create("p1", "hands/p1/x.jpg", "model-1", "room", null, 100);
+    const labelled = repo.create(
+      "p1",
+      "hands/p1/y.jpg",
+      "model-1",
+      "label",
+      "0123456789abcdef",
+      100,
+    );
     const get = () =>
       db.prepare("SELECT * FROM recognitions WHERE id = ?").get(id) as unknown as RecognitionRow;
     expect(get()).toMatchObject({ player_id: "p1", ms: null, detections: null, source: "room" });
-    expect(db.prepare("SELECT source FROM recognitions WHERE id = ?").get(labelled)).toMatchObject({
+    expect(
+      db.prepare("SELECT source, session_id FROM recognitions WHERE id = ?").get(labelled),
+    ).toMatchObject({
       source: "label",
+      session_id: "0123456789abcdef",
     });
     expect(get()).not.toHaveProperty("engine");
     const detections = [
@@ -105,7 +116,10 @@ describe("数据库迁移", () => {
     const db = new DatabaseSync(":memory:");
     for (const sql of MIGRATIONS.slice(0, 5)) db.exec(sql);
     db.exec("PRAGMA user_version = 5");
-    const id = new RecognitionsRepo(db).create("p1", "hands/p1/a.jpg", "m", "calc", 1);
+    db.prepare(
+      "INSERT INTO recognitions (id, player_id, photo_key, model_id, source, created_at, updated_at) VALUES ('r5', 'p1', 'hands/p1/a.jpg', 'm', 'calc', 1, 1)",
+    ).run();
+    const id = "r5";
     migrate(db);
     expect(schemaVersion(db)).toBe(MIGRATIONS.length);
     expect(db.prepare("SELECT source FROM recognitions WHERE id = ?").get(id)).toEqual({
@@ -130,5 +144,45 @@ describe("数据库迁移", () => {
     expect(repo.get("OLD123")).toMatchObject({ kind: "yonma", closed_at: null });
     repo.create("TEN123", "ten", MLEAGUE_RULES, 2);
     expect(repo.get("TEN123")?.kind).toBe("ten");
+  });
+
+  it("v7 库升级到 v8：定格记录补 session_id（历史为空），多出采样帧表，同一会话同一序号只落一行", () => {
+    const db = new DatabaseSync(":memory:");
+    for (const sql of MIGRATIONS.slice(0, 7)) db.exec(sql);
+    db.exec("PRAGMA user_version = 7");
+    db.prepare(
+      "INSERT INTO recognitions (id, player_id, photo_key, model_id, source, created_at, updated_at) VALUES ('r7', 'p1', 'hands/p1/a.jpg', 'm', 'room', 1, 1)",
+    ).run();
+    migrate(db);
+    expect(schemaVersion(db)).toBe(MIGRATIONS.length);
+    expect(db.prepare("SELECT session_id FROM recognitions WHERE id = 'r7'").get()).toEqual({
+      session_id: null,
+    });
+    const samples = new RecognitionSamplesRepo(db);
+    const meta = {
+      modelId: null,
+      t: 0,
+      ms: 1,
+      frame: { width: 1080, height: 1920 },
+      rotation: 0 as const,
+      settled: false,
+      passes: 1,
+      detections: [],
+      hand: { closed: [], melds: [], winTile: 0, doraIndicators: [], uraIndicators: [] },
+      warnings: [],
+    };
+    expect(samples.has("0123456789abcdef", 0)).toBe(false);
+    expect(samples.create("0123456789abcdef", 0, "p1", "samples/p1/a.jpg", meta, 2)).toBe(true);
+    expect(samples.has("0123456789abcdef", 0)).toBe(true);
+    expect(samples.create("0123456789abcdef", 0, "p1", "samples/p1/b.jpg", meta, 3)).toBe(false);
+    expect(samples.create("0123456789abcdef", 1, "p1", "samples/p1/c.jpg", meta, 3)).toBe(true);
+    const rows = db
+      .prepare("SELECT seq, photo_key, meta FROM recognition_samples ORDER BY seq")
+      .all() as unknown as RecognitionSampleRow[];
+    expect(rows.map((r) => [r.seq, r.photo_key])).toEqual([
+      [0, "samples/p1/a.jpg"],
+      [1, "samples/p1/c.jpg"],
+    ]);
+    expect(JSON.parse(rows[0]!.meta)).toEqual(meta);
   });
 });

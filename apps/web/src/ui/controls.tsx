@@ -44,7 +44,7 @@ export function Badge({
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-md font-medium leading-none",
-        size === "md" ? "px-2 py-1 text-sm" : "px-1.5 py-0.5 text-[11px]",
+        size === "md" ? "px-2 py-1 text-sm" : "px-1.5 py-0.5 text-[0.6875rem]",
         tones[tone],
         className,
       )}
@@ -109,7 +109,7 @@ export function Switch({ className, ...props }: ComponentProps<typeof SwitchPrim
       )}
       {...props}
     >
-      <SwitchPrimitive.Thumb className="block h-5 w-5 translate-x-0.5 rounded-full bg-white shadow transition-transform data-[state=checked]:translate-x-[18px]" />
+      <SwitchPrimitive.Thumb className="block h-5 w-5 translate-x-0.5 rounded-full bg-white shadow transition-transform data-[state=checked]:translate-x-4.5" />
     </SwitchPrimitive.Root>
   );
 }

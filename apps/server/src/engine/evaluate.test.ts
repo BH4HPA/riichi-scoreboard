@@ -37,6 +37,26 @@ function hand(partial: Partial<HandInput> = {}): HandInput {
 }
 
 describe("evaluateHand (riichi-rs-node)", () => {
+  it("副露按摆放顺序送来也按副露算：线上 9-27 南 1 局那手吃牌自摸不再多出门前清", () => {
+    // 678m 567s 西西 白白白（自摸白） + 吃 [6s 赤5s 4s]（识别给出的摆放顺序）；和牌者座位 2（西家），庄家座位 0
+    const r = evaluateHand(
+      hand({
+        closed: [30, 30, 23, 24, 25, 32, 32, 6, 7, 8, 32],
+        melds: [{ open: true, tiles: [24, 37, 22] }],
+        winTile: 32,
+        tsumo: true,
+        doraIndicators: [18],
+      }),
+      { seat: 2, dealer: 0, roundWind: 1 },
+      MLEAGUE_RULES,
+    );
+    expect(r.isAgari).toBe(true);
+    expect(r.yaku[String(YAKU_ID.Menzentsumo)]).toBeUndefined();
+    expect(r.yaku[String(YAKU_ID.Haku)]).toBe(1);
+    expect(r.yaku[String(YAKU_ID.Akadora)]).toBe(1);
+    expect([r.han, r.fu]).toEqual([2, 40]);
+  });
+
   it("门清荣和平和：1 番 30 符", () => {
     const r = evaluateHand(hand(), { seat: 1, dealer: 0, roundWind: 0 }, MLEAGUE_RULES);
     expect(r.isAgari).toBe(true);

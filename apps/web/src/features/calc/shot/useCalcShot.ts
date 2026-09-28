@@ -25,11 +25,12 @@ export function useCalcShot(rules: RoomRules) {
   const [shot, setShot] = useState<{ photo: Blob; detections: Detection[] } | null>(null);
   const confirms = useRef<Promise<void>>(Promise.resolve());
 
-  const onCapture = ({ blob, result }: Capture) => {
+  const onCapture = (capture: Capture) => {
+    const { blob, result } = capture;
     setShooting(false);
     setShot({ photo: blob, detections: result.detections });
     setPhase("review");
-    const key = uploadRecognition(blob, result, "calc", {
+    const key = uploadRecognition(capture, "calc", {
       onId: (id) => setDraft((d) => attachRecognitionId(d, key, id)),
       onFail: () => useRoomStore.getState().notify("error", "照片留存失败，不影响算点数"),
     });
@@ -71,7 +72,6 @@ export function useCalcShot(rules: RoomRules) {
               ...d,
               // 岭上/抢杠、海底/河底、天地/人和随荣和自摸互换含义：留着会悄悄变成另一个役
               hand: { ...d.hand, tsumo, afterKan: false, lastTile: false, firstTake: false },
-              evaluated: null,
             },
       ),
   };

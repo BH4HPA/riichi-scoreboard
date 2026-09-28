@@ -1,5 +1,6 @@
 import {
   WS_CLOSE,
+  WS_KEEPALIVE,
   type ClientCommand,
   type ClientMessage,
   type EvaluatedHand,
@@ -23,6 +24,9 @@ export class CommandError extends Error {
   }
 }
 
+/** 握手超时：与心跳看门狗同一阈值——这么久连一个字节都没收到，就不必再等这条连接 */
+export const HANDSHAKE_TIMEOUT_MS: number = WS_KEEPALIVE.staleMs;
+
 /** 服务端主动关闭且不应重连的关闭码（定义在 core 协议里） */
 const TERMINAL_CLOSE: Record<number, "unauthorized" | "not_found" | "dissolved"> = {
   [WS_CLOSE.unauthorized]: "unauthorized",
@@ -37,6 +41,7 @@ type Pending =
 /**
  * 房间 WebSocket：自动重连、命令带 baseSeq、评估请求、镜像意图（按来源合并，取最近打开的）。
  * 保活：5 s 心跳 + 回包看门狗（CDN 会静默回收空闲连接，见 heartbeat.ts）；页面回前台时立即重连。
+ * 握手超时：CDN 故障时新连接可能既不 open 也不 close，超时后按失败处理、走退避重连。
  */
 export class RoomSocket {
   private ws: WebSocket | null = null;
@@ -47,13 +52,13 @@ export class RoomSocket {
   private lastSent = "";
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private handshakeTimer: ReturnType<typeof setTimeout> | null = null;
   private lastSeenAt = 0;
   private readonly onVisible = () => {
     if (document.visibilityState !== "visible" || this.closedByUser) return;
     const state = this.ws?.readyState;
+    // 正在握手的交给握手超时处理，不在这里另起一条
     if (state === WebSocket.OPEN || state === WebSocket.CONNECTING) return;
-    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-    this.reconnectTimer = null;
     this.connect();
   };
 
@@ -66,11 +71,17 @@ export class RoomSocket {
 
   connect(): void {
     this.closedByUser = false;
+    // 任何入口（回前台、看门狗、退避到点）发起新连接时，挂着的退避都作废，免得一次失败连出两条
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    this.clearHandshake();
     useRoomStore.getState().set({ status: this.retry === 0 ? "connecting" : "reconnecting" });
     const ws = new WebSocket(wsUrl(this.code, this.token));
     this.ws = ws;
+    this.handshakeTimer = setTimeout(() => this.abandonHandshake(ws), HANDSHAKE_TIMEOUT_MS);
     ws.onopen = () => {
       if (this.ws !== ws) return;
+      this.clearHandshake();
       this.retry = 0;
       useRoomStore.getState().set({ status: "open" });
       this.lastSent = "";
@@ -100,13 +111,7 @@ export class RoomSocket {
         useRoomStore.getState().set({ status: "closed", closedReason: reason ?? null });
         return;
       }
-      const delay = Math.min(1000 * 2 ** this.retry, 10_000);
-      this.retry += 1;
-      useRoomStore.getState().set({ status: "reconnecting" });
-      this.reconnectTimer = setTimeout(() => {
-        this.reconnectTimer = null;
-        if (!this.closedByUser && this.ws === ws) this.connect();
-      }, delay);
+      this.scheduleReconnect();
     };
     ws.onerror = () => {
       /* onclose 会跟着触发 */
@@ -125,8 +130,9 @@ export class RoomSocket {
     useRoomStore.getState().set({ status: "closed" });
   }
 
-  /** 停心跳、拒绝在途请求；连接本身由调用方处理。 */
+  /** 停心跳与握手计时、拒绝在途请求；连接本身由调用方处理。 */
   private teardown(): void {
+    this.clearHandshake();
     if (this.heartbeat) clearInterval(this.heartbeat);
     this.heartbeat = null;
     for (const p of this.pending.values()) p.reject(new CommandError("disconnected", "连接已断开"));
@@ -144,6 +150,35 @@ export class RoomSocket {
     ws.close();
     useRoomStore.getState().set({ status: "reconnecting" });
     this.connect();
+  }
+
+  /**
+   * 握手超时：这条连接当作失败丢弃，和 onclose 一样按退避重连（而不是像看门狗那样立刻重连）。
+   * 握手卡住多半是 CDN 边缘出了问题，每次尝试本身已耗掉超时时长，再叠退避让长时间故障下的尝试逐渐放缓；
+   * 退避计数只在 onopen 时清零，所以连续卡住会一路退到上限。旧连接迟到的 onopen/onclose 因 this.ws 已变而被忽略。
+   */
+  private abandonHandshake(ws: WebSocket): void {
+    if (this.ws !== ws) return;
+    this.teardown();
+    this.ws = null;
+    ws.close();
+    this.scheduleReconnect();
+  }
+
+  private clearHandshake(): void {
+    if (this.handshakeTimer) clearTimeout(this.handshakeTimer);
+    this.handshakeTimer = null;
+  }
+
+  /** 按指数退避（1 s 起，封顶 10 s）安排下一次连接。 */
+  private scheduleReconnect(): void {
+    const delay = Math.min(1000 * 2 ** this.retry, 10_000);
+    this.retry += 1;
+    useRoomStore.getState().set({ status: "reconnecting" });
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (!this.closedByUser) this.connect();
+    }, delay);
   }
 
   private raw(msg: ClientMessage): boolean {

@@ -109,6 +109,18 @@ body {
   animation-delay: -10s;
 }
 
+/* 取景倒计时：每跳一个数字弹一下 */
+@keyframes riichi-pop {
+  from {
+    transform: scale(1.35);
+    opacity: 0.4;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 /* 取景框定格的视觉回执：iOS 全系没有 navigator.vibrate，只靠震动等于没有反馈 */
 @keyframes riichi-flash {
   from {

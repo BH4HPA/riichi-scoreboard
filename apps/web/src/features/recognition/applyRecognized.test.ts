@@ -9,8 +9,10 @@ import {
   type RoomRules,
 } from "@riichi/core";
 import { locKey } from "../hand/tileLoc";
-import { createValueDraft } from "../settlement/valueDraft";
+import { createValueDraft, evaluationOf, handStamp } from "../settlement/valueDraft";
 import { applyRecognized } from "./applyRecognized";
+
+const AGARI = { han: 1, fu: 30, yakuman: 0, yaku: { 36: 1 }, isAgari: true };
 
 const box = (n: number): Detection["box"] => [n, 0, n + 40, 56];
 /** 与下面 hand 逐位对应的框：赤5筒（下标 1）置信度低，明杠里的 5索（下标 3）也低。 */
@@ -46,8 +48,9 @@ const result: RecognitionResult = {
 
 describe("applyRecognized", () => {
   it("切到牌面模式、替换牌、清空评估；旗标保留；认出里宝即勾选立直并提示", () => {
-    const draft = { ...createValueDraft(true, "manual"), evaluated: null };
+    const draft = createValueDraft(true, "manual");
     draft.hand.afterKan = true;
+    draft.evaluated = { hand: handStamp(draft.hand), result: AGARI };
     const next = applyRecognized(draft, result, MLEAGUE_RULES, "k1");
     expect(next.mode).toBe("hand");
     expect(next.hand.closed).toEqual([TILE.M1, AKA.P5, TILE.M9]);
@@ -57,9 +60,18 @@ describe("applyRecognized", () => {
     expect(next.hand.doraIndicators).toEqual([TILE.S6, TILE.S3]);
     expect(next.hand.uraIndicators).toEqual([TILE.P8]);
     expect(next.hand.riichi).toBe(true);
-    expect(next.evaluated).toBeNull();
+    // 换了一手牌：旧结果的戳对不上，不再作数
+    expect(evaluationOf(next)).toBeNull();
     expect(next.recognition).toMatchObject({ key: "k1", id: null, ms: 812 });
     expect(next.recognition!.warnings.map((w) => w.code)).toEqual(["count", "extra_rows"]);
+  });
+
+  it("同一手牌重拍：上一次的评估结果照样有效（不再清空后等一个永远不来的重算，卡在「还需选择：牌面」）", () => {
+    const first = applyRecognized(createValueDraft(true, "manual"), result, MLEAGUE_RULES, "k1");
+    const evaluated = { ...first, evaluated: { hand: handStamp(first.hand), result: AGARI } };
+    const again = applyRecognized(evaluated, result, MLEAGUE_RULES, "k2");
+    expect(again.hand).toEqual(first.hand);
+    expect(evaluationOf(again)).toBe(AGARI);
   });
 
   it("已勾立直时里宝照常保留，不重复提示", () => {

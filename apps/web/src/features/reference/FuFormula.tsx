@@ -45,7 +45,7 @@ function Lines({ lines, tv }: { lines: FuLine[]; tv: boolean }) {
         <li key={l.item} className="flex items-baseline justify-between gap-3">
           <span>
             {l.item}
-            {l.note && <span className="ml-1 text-[11px] text-muted">{l.note}</span>}
+            {l.note && <span className="ml-1 text-[0.6875rem] text-muted">{l.note}</span>}
           </span>
           <span className="font-semibold tabular">{l.fu}</span>
         </li>

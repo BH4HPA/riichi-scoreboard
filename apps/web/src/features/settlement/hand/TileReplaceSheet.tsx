@@ -47,7 +47,7 @@ export function TileReplaceSheet({
       <DialogContent
         title={current === null ? "选一张牌" : `换掉 ${tileLabel(current)}`}
         description={
-          isMeld ? "副露里只能改赤宝标记；要改牌型请用下面的全键盘" : "点一张牌替换这个位置"
+          isMeld ? "副露里只能改赤宝标记；要改牌型请点「人工调整」" : "点一张牌替换这个位置"
         }
       >
         {canSetWin && loc && (

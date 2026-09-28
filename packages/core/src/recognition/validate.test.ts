@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { validateRecognitionSession, validateRecognitionPatch } from "./validate";
+import {
+  isRecognitionSessionId,
+  validateRecognitionPatch,
+  validateRecognitionSample,
+  validateRecognitionSession,
+} from "./validate";
 
 const hand = {
   closed: [1, 2, 3, 13, 36, 15, 25, 26, 27, 7, 8, 11, 11, 9],
@@ -110,5 +115,67 @@ describe("validateRecognitionSession", () => {
 
   it("多出来的字段不落库", () => {
     expect(validateRecognitionSession({ ...summary, photo: "x" })).toEqual(summary);
+  });
+
+  it("会话 id 可选（旧前端不带）；带了就必须是 16 位小写 hex", () => {
+    const id = "0123456789abcdef";
+    expect(validateRecognitionSession({ ...summary, id })).toEqual({ ...summary, id });
+    expect(validateRecognitionSession(summary)).not.toHaveProperty("id");
+    for (const bad of ["0123456789ABCDEF", "0123456789abcde", "../../etc/passwd", 42, null])
+      expect(() => validateRecognitionSession({ ...summary, id: bad })).toThrow(/会话 id/);
+    expect(isRecognitionSessionId(id)).toBe(true);
+    expect(isRecognitionSessionId(`${id}0`)).toBe(false);
+  });
+});
+
+describe("validateRecognitionSample", () => {
+  const meta = {
+    modelId: "d1ec564d-e44a-404e-9140-cf9ea22d1366",
+    t: 4_200,
+    ms: 280,
+    frame: { width: 1080, height: 1920 },
+    rotation: 0,
+    settled: false,
+    passes: 2,
+    detections: [{ cls: 0, conf: 0.9, box: [10, 20, 50, 76] }],
+    // 没过闸门：一整排牌都可能被当成暗牌
+    hand: {
+      closed: Array.from({ length: 20 }, (_, i) => (i % 34) + 1),
+      melds: [],
+      winTile: 20,
+      doraIndicators: [],
+      uraIndicators: [],
+    },
+    warnings: [{ code: "count", message: "认出 20 张，多了 6 张", severity: "blocking" }],
+  };
+
+  it("原样通过；多出来的字段不落库", () => {
+    expect(validateRecognitionSample(meta)).toEqual(meta);
+    expect(validateRecognitionSample({ ...meta, seq: 3 })).toEqual(meta);
+    expect(validateRecognitionSample({ ...meta, modelId: null }).modelId).toBeNull();
+  });
+
+  const warning = { code: "count", message: "x", severity: "info" };
+  it.each([
+    ["不是对象", null],
+    ["暗牌超过 34 张", { hand: { ...meta.hand, closed: Array<number>(35).fill(1) } }],
+    [
+      "检测框超过上限",
+      { detections: Array.from({ length: 301 }, () => ({ cls: 0, conf: 1, box: [0, 0, 1, 1] })) },
+    ],
+    ["告警超过 20 条", { warnings: Array<unknown>(21).fill(warning) }],
+    ["不认识的告警码", { warnings: [{ ...warning, code: "whatever" }] }],
+    ["告警文案过长", { warnings: [{ ...warning, message: "长".repeat(201) }] }],
+    ["告警级别", { warnings: [{ ...warning, severity: "fatal" }] }],
+    ["画面尺寸为 0", { frame: { width: 0, height: 1920 } }],
+    ["画面尺寸离谱", { frame: { width: 100_000, height: 1920 } }],
+    ["方向", { rotation: 180 }],
+    ["settled 不是布尔", { settled: 1 }],
+    ["推理遍数", { passes: -1 }],
+    ["耗时非整数", { ms: 1.5 }],
+    ["时刻为负", { t: -1 }],
+    ["模型 id", { modelId: "v1" }],
+  ])("拒收：%s", (_, over) => {
+    expect(() => validateRecognitionSample(over === null ? null : { ...meta, ...over })).toThrow();
   });
 });

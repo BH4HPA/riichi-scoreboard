@@ -1,3 +1,4 @@
+import fs from "node:fs/promises";
 import path from "node:path";
 import { devices, test, type Browser, type Page } from "@playwright/test";
 import { newContext } from "./helpers";
@@ -63,7 +64,7 @@ test("截图：番符表与主控台", async ({ browser }) => {
   // 手机 2 牌面荣和
   await phones[2]!.getByRole("button", { name: "荣和", exact: true }).click();
   const ron = phones[2]!.getByRole("dialog");
-  await ron.getByRole("combobox").first().click();
+  await ron.getByRole("combobox").nth(1).click();
   await phones[2]!.getByRole("option", { name: "老王" }).click();
   await ron.getByRole("tab", { name: "牌面" }).click();
   const keyboard = ron.getByTestId("tile-keyboard");
@@ -185,6 +186,60 @@ test("截图：Pad 横屏/竖屏的大厅与对局页", async ({ browser }) => {
   }
 });
 
+test("截图：iPad 尺寸下三档界面大小的大厅、对局与操作面板", async ({ browser }) => {
+  for (const [w, h, tag] of [
+    [1180, 820, "ipad-air"],
+    [1366, 1024, "ipad-pro"],
+  ] as const) {
+    for (const scale of ["1", "1.15", "1.3"]) {
+      const ctx = await newContext(browser, { viewport: { width: w, height: h } });
+      await ctx.addInitScript((s) => localStorage.setItem("riichi.console.scale", s), scale);
+      const tv = await ctx.newPage();
+      await tv.goto("/console");
+      await tv.getByText("扫码加入").waitFor();
+      // 双栏时二维码常驻左栏，没有弹窗可关
+      const close = tv.getByRole("button", { name: "关闭" });
+      if (await close.isVisible()) await close.click();
+      await tv.screenshot({ path: `${OUT}/${tag}-${scale}-lobby.png` });
+      for (const seat of [0, 1, 2, 3] as const) {
+        await tv.getByTestId(`seat-${seat}`).getByRole("button", { name: "添加本地玩家" }).click();
+        const dlg = tv.getByRole("dialog");
+        await dlg.getByLabel("新建本地玩家").fill(`本地${seat + 1}`);
+        await dlg.getByRole("button", { name: "创建并入座" }).click();
+        await tv
+          .getByTestId(`seat-${seat}`)
+          .getByText(`本地${seat + 1}`)
+          .waitFor();
+      }
+      await tv.getByRole("button", { name: "开局", exact: true }).click();
+      await tv.getByTestId("points-0").waitFor();
+      await tv.screenshot({ path: `${OUT}/${tag}-${scale}-game.png` });
+      await tv.getByRole("button", { name: "操作" }).click();
+      await tv.getByRole("dialog").waitFor();
+      await tv.waitForTimeout(300);
+      await tv.screenshot({ path: `${OUT}/${tag}-${scale}-panel.png` });
+      await ctx.close();
+    }
+  }
+});
+
+test("截图：只认出 13 张时取景框的提示", async ({ browser }) => {
+  const ctx = await newContext(browser, { viewport: { width: 400, height: 860 } });
+  const calc = await ctx.newPage();
+  await calc.route("**/riichi/models/*.onnx", (route) =>
+    route.fulfill({
+      path: path.join(import.meta.dirname, "fixtures/detector-13.onnx"),
+      contentType: "application/octet-stream",
+    }),
+  );
+  await calc.route("**/api/recognition-sessions**", (route) => route.fulfill({ status: 204 }));
+  await calc.goto("/calc");
+  await calc.getByRole("button", { name: /开始拍/ }).click();
+  await calc.getByTestId("camera-reason").waitFor({ timeout: 30_000 });
+  await calc.screenshot({ path: `${OUT}/phone-viewfinder-13.png` });
+  await ctx.close();
+});
+
 test("截图：取景框、确认态与算点数页", async ({ browser }) => {
   const DETECTOR = path.join(import.meta.dirname, "fixtures/detector.onnx");
   const withDetector = async (page: Page) => {
@@ -211,13 +266,35 @@ test("截图：取景框、确认态与算点数页", async ({ browser }) => {
   await calc.waitForTimeout(200);
   await calc.screenshot({ path: `${OUT}/phone-calc-rules.png` });
   await calc.getByRole("button", { name: "取消" }).click();
+  // 抢在自动定格之前拍一张中央倒计时：它只亮两帧（约 0.4 s），等不及截图就会定格。
+  // 倒计时一画出来就在页面里 debugger 停住，经 CDP 截下当前画面再放行
+  const cdp = await calcCtx.newCDPSession(calc);
+  await cdp.send("Debugger.enable");
+  const paused = new Promise<void>((resolve) =>
+    cdp.once("Debugger.paused", () => {
+      void cdp
+        .send("Page.captureScreenshot", { format: "png" })
+        .then(({ data }) => fs.writeFile(`${OUT}/phone-calc-countdown.png`, data, "base64"))
+        .finally(() => void cdp.send("Debugger.resume").then(() => resolve()));
+    }),
+  );
+  await calc.evaluate(() => {
+    const seen = new MutationObserver(() => {
+      if (!document.querySelector("[data-testid=camera-countdown]")) return;
+      seen.disconnect();
+      // 等它真画到屏幕上再停
+      requestAnimationFrame(() =>
+        setTimeout(() => {
+          // eslint-disable-next-line no-debugger
+          debugger;
+        }, 30),
+      );
+    });
+    seen.observe(document.body, { subtree: true, childList: true });
+  });
   await calc.getByRole("button", { name: /开始拍/ }).click();
-  const sheet = calc.getByTestId("camera-sheet");
-  await sheet.waitFor();
-  // 抢在自动定格之前拍一张取景中的样子；来不及就只留核对态
-  await calc.waitForTimeout(120);
-  if ((await sheet.count()) > 0)
-    await calc.screenshot({ path: `${OUT}/phone-calc-viewfinder.png` });
+  await Promise.race([paused, calc.waitForTimeout(15_000)]);
+  await cdp.send("Debugger.disable");
   await calc.getByTestId("hand-confirm").waitFor({ timeout: 30_000 });
   await calc.getByTestId("annotated-shot").waitFor({ timeout: 15_000 });
   await calc.screenshot({ path: `${OUT}/phone-calc-review.png`, fullPage: true });
@@ -265,7 +342,7 @@ test("截图：取景框、确认态与算点数页", async ({ browser }) => {
   await p.getByTestId("points-0").waitFor();
   await p.getByRole("button", { name: "荣和", exact: true }).click();
   const dialog = p.getByRole("dialog");
-  await dialog.getByRole("combobox").first().click();
+  await dialog.getByRole("combobox").nth(1).click();
   await p.getByRole("option", { name: "老王" }).click();
   await dialog.getByRole("tab", { name: "牌面" }).click();
   await dialog.getByTestId("recognize-button").click();

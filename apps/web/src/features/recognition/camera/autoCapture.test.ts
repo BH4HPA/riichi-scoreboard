@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RecognitionWarning, RecognizedHand } from "@riichi/core";
 import {
+  countdownOf,
   EMPTY_CAPTURE,
   feedFrame,
   handKey,
@@ -114,13 +115,38 @@ describe("指示牌", () => {
   });
 });
 
+describe("countdownOf", () => {
+  it("跟票数走：1 票显示 2、2 票显示 1，定格那一帧就是闪光", () => {
+    expect(countdownOf(EMPTY_CAPTURE)).toBeNull();
+    expect(countdownOf(run([A]).state)).toEqual({ digit: 2, progress: 1 / 3 });
+    expect(countdownOf(run([A, A]).state)).toEqual({ digit: 1, progress: 2 / 3 });
+  });
+
+  it("票满却不定格（在等指示牌认回来）：停在 1、环是满的，不出现 0 或负数", () => {
+    const withDora = frame(hand({ doraIndicators: [5] }));
+    const { fires, state } = run([withDora, A, A, A, A]);
+    expect(fires.some(Boolean)).toBe(false);
+    expect(votesOf(state)).toBe(5);
+    expect(countdownOf(state)).toEqual({ digit: 1, progress: 1 });
+  });
+});
+
 describe("reasonOf", () => {
-  it("同一条 blocking 连着挡了几帧才告诉用户；一帧好的就收回", () => {
+  it("同一类 blocking 连着挡了几帧才告诉用户；一帧好的就收回", () => {
     const few = run(Array.from({ length: REASON_FRAMES - 1 }, () => BAD)).state;
     expect(reasonOf(few)).toBeNull();
     const stuck = run(Array.from({ length: REASON_FRAMES }, () => BAD)).state;
     expect(reasonOf(stuck)).toBe("合计 17 张");
     expect(reasonOf(feedFrame(stuck, A).state)).toBeNull();
+  });
+
+  it("同一类 blocking 文案在变（张数在 12/13 之间跳）也连续计数，显示最新一帧的文案", () => {
+    const n = (k: number) =>
+      frame(hand(), [{ code: "count", message: `只认出 ${k} 张`, severity: "blocking" }]);
+    const { state } = run([n(13), n(12), n(13)]);
+    expect(reasonOf(state)).toBe("只认出 13 张");
+    const other = frame(hand(), [{ code: "bad_group", message: "夹着牌背", severity: "blocking" }]);
+    expect(reasonOf(feedFrame(state, other).state)).toBeNull();
   });
 
   it("粗检那一遍夹在中间不打断计数：它的提示不作数", () => {

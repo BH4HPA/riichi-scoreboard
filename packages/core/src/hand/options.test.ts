@@ -95,6 +95,35 @@ describe("toEngineInput", () => {
     expect(() => validateHandInput(hand({ closed: hand().closed.slice(1) }), R)).toThrow(/14 张/);
   });
 
+  it("副露按牌排好序送引擎：识别给出的是摆放顺序（横置那张在前），引擎只认升序的吃", () => {
+    const closed = hand().closed.slice(3);
+    const h = hand({ closed, melds: [{ open: true, tiles: [TILE.M3, AKA.M5, TILE.M4] }] });
+    const input = toEngineInput(h, { seat: 1, dealer: 0, roundWind: 0 }, R);
+    expect(input.open_part).toEqual([[true, [TILE.M3, TILE.M4, TILE.M5]]]);
+    expect(input.options.aka_count).toBe(1);
+  });
+
+  it("不合法的副露直接报错，不交给引擎静默并进暗牌（跨花色的吃、字牌顺子、杂牌）", () => {
+    const closed = hand().closed.slice(3);
+    for (const tiles of [
+      [TILE.M9, TILE.P1, TILE.P2],
+      [TILE.East, TILE.South, TILE.West],
+      [TILE.Haku, TILE.Hatsu, TILE.Chun],
+      [TILE.M1, TILE.M2, TILE.M4],
+      [TILE.P5, TILE.P5, TILE.P6],
+    ]) {
+      expect(() => validateHandInput(hand({ closed, melds: [{ open: true, tiles }] }), R)).toThrow(
+        /合法/,
+      );
+    }
+    expect(() =>
+      validateHandInput(
+        hand({ closed, melds: [{ open: true, tiles: [TILE.S7, TILE.S5, TILE.S6] }] }),
+        R,
+      ),
+    ).not.toThrow();
+  });
+
   it("赤五：折回普通五送引擎，张数计入 aka_count，和张为赤五时同样折回", () => {
     const closed = [...hand().closed];
     closed[closed.indexOf(TILE.P5)] = AKA.P5;

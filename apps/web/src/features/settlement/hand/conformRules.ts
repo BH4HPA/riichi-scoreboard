@@ -75,7 +75,6 @@ export function conformDraftToRules(draft: ValueDraft, rules: RoomRules): ValueD
   return {
     ...draft,
     hand,
-    evaluated: null,
     recognition: rec && {
       ...rec,
       // 截掉的指示牌不留悬空记号

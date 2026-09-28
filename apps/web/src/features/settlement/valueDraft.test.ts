@@ -7,6 +7,8 @@ import {
   createValueDraft,
   draftToClientValue,
   draftValue,
+  evaluationOf,
+  handStamp,
   isHandComplete,
   missingValue,
   withHandEdit,
@@ -42,6 +44,25 @@ describe("closedCapacity / isHandComplete", () => {
   });
 });
 
+describe("评估结果按牌面盖戳", () => {
+  const AGARI = { han: 2, fu: 40, yakuman: 0, yaku: {}, isAgari: true };
+
+  it("戳对得上才作数：同一手牌（哪怕是重拍来的新对象）结果有效，改一张就失效", () => {
+    const d = recognized();
+    const done = { ...d, evaluated: { hand: handStamp(d.hand), result: AGARI } };
+    expect(evaluationOf(done)).toBe(AGARI);
+    expect(draftValue(done)).toEqual({ han: 2, fu: 40, yakuman: 0 });
+    expect(missingValue(done)).toEqual([]);
+
+    const same = { ...done, hand: { ...done.hand, closed: [...CLOSED14] } };
+    expect(evaluationOf(same)).toBe(AGARI);
+
+    const changed = { ...done, hand: { ...done.hand, riichi: true } };
+    expect(evaluationOf(changed)).toBeNull();
+    expect(missingValue(changed)).toEqual(["牌面"]);
+  });
+});
+
 describe("confirmable", () => {
   it("识别来的完整牌面收起键盘", () => {
     expect(confirmable(recognized())).toBe(true);
@@ -69,7 +90,7 @@ describe("confirmable", () => {
     );
   });
 
-  it("点过「改牌」之后一直留在编辑态", () => {
+  it("点过「人工调整」之后一直留在编辑态", () => {
     expect(confirmable(recognized({ editing: true }))).toBe(false);
   });
 

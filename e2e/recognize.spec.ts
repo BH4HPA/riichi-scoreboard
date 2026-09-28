@@ -4,6 +4,8 @@ import { newContext } from "./helpers";
 
 /** 假检测器（ml/scripts/e2e_detector.py）：恒定输出下面这副手牌的检测框，链路其余部分都是真的 */
 const DETECTOR = path.join(import.meta.dirname, "fixtures/detector.onnx");
+/** 同一副牌去掉和张（`e2e_detector.py --drop-win`）：恒定 13 张，永远不会定格 */
+const DETECTOR_13 = path.join(import.meta.dirname, "fixtures/detector-13.onnx");
 
 /** 123m 4筒 赤5筒 6筒 789s 789m 22p，和张 9m：平和 + 赤宝牌 = 2 番 30 符 */
 const CLOSED = [1, 2, 3, 13, 36, 15, 25, 26, 27, 7, 8, 11, 11, 9];
@@ -20,7 +22,7 @@ async function phone(browser: Browser, code: string, setup?: Setup): Promise<Pag
 }
 
 /**
- * 开房、四台手机入座准备、自动开局，返回手机 2 已打开的荣和对话框（放铳者北家、牌面页）。
+ * 开房、四台手机入座准备、自动开局，返回手机 2 已打开的荣和对话框（放铳者北家、牌面页）。荣和者默认本机、排第一，放铳者是第二个下拉框。
  * setup 在手机 2 进房间之前装路由：进房间就会预热模型，拦截必须先于导航。
  */
 async function openRonHandTab(
@@ -47,7 +49,7 @@ async function openRonHandTab(
   const p = phones[2]!;
   await p.getByRole("button", { name: "荣和", exact: true }).click();
   const dialog = p.getByRole("dialog");
-  await dialog.getByRole("combobox").first().click();
+  await dialog.getByRole("combobox").nth(1).click();
   await p.getByRole("option", { name: "北家" }).click();
   await dialog.getByRole("tab", { name: "牌面" }).click();
   return { phone: p, dialog };
@@ -204,6 +206,10 @@ test("连拍两张：第二次打开取景框仍能识别（模型字节被转�
   expect(again.uncovered).toBe(false);
   await expect(dialog.getByTestId("hand-confirm")).toBeVisible();
   await expect(dialog.getByTestId("recognize-button")).toHaveText("重新拍照");
+  // 同一手牌重拍：上一次的番符照样有效，不会清空后卡在「还需选择：牌面」（9-27 实战里的 bug）
+  await expect(dialog.getByText(/^\d+ 番 \d+ 符$/)).toBeVisible();
+  await expect(p.getByText(/还需选择/)).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: "确认荣和" })).toBeEnabled();
 });
 
 test("模型加载失败 → 取景页给出错误，牌面不变", async ({ browser }) => {
@@ -254,7 +260,7 @@ test("相机不可用 → 取景页仍能打开：说明原因、不出快门、
   // 快门不能点就不出现
   await expect(sheet.getByTestId("camera-shutter")).toHaveCount(0);
   await expect(sheet.getByLabel("从相册选一张")).toBeVisible();
-  await expect(sheet.getByText("拍下的牌面照片会用来改进识别")).toBeVisible();
+  await expect(sheet.getByText("拍下或放弃时的整幅画面会用来改进识别")).toBeVisible();
   await sheet.getByRole("button", { name: "怎么摆" }).click();
   await expect(sheet.getByText("手牌连成一排", { exact: false })).toBeVisible();
   await sheet.getByRole("button", { name: "知道了" }).click();
@@ -285,7 +291,7 @@ test("相机不可用 → 取景页仍能打开：说明原因、不出快门、
   await expect(p.getByText("照片留存失败，不影响结算")).toHaveCount(0);
 });
 
-test("确认态：点牌替换、改和张、改牌展开全键盘后不再自动收回", async ({ browser }) => {
+test("确认态：点牌替换、改和张、人工调整展开全键盘后不再自动收回", async ({ browser }) => {
   const { phone: p, dialog } = await openRonHandTab(browser, withDetector());
   await shoot(p, dialog);
 
@@ -313,8 +319,8 @@ test("确认态：点牌替换、改和张、改牌展开全键盘后不再自�
     .click();
   await expect(dialog.getByText(/^\d+ 番 \d+ 符$/)).toBeVisible();
 
-  // 改牌 → 全键盘；牌面仍然完整，但不会自己收回确认态
-  await confirm.getByRole("button", { name: "改牌" }).click();
+  // 人工调整（与重新拍照同一行）→ 全键盘；牌面仍然完整，但不会自己收回确认态
+  await dialog.getByRole("button", { name: "人工调整" }).click();
   await expect(dialog.getByTestId("tile-keyboard")).toBeVisible();
   await expect(dialog.getByTestId("hand-confirm")).toHaveCount(0);
 });
@@ -344,7 +350,7 @@ test("算点数页：设场况 → 拍 → 重新拍 → 识别正确出番符�
   await p.getByRole("button", { name: /开始拍/ }).click();
   const sheet = p.getByTestId("camera-sheet");
   await expect(sheet).toBeVisible();
-  await expect(sheet.getByText("拍下的牌面照片会用来改进识别")).toBeVisible();
+  await expect(sheet.getByText("拍下或放弃时的整幅画面会用来改进识别")).toBeVisible();
   // 相册入口在算点数页常驻（房间里就地拍一张的成本已经接近零）
   await expect(p.getByTestId("camera-album")).toBeAttached();
   // 算点数页才画检测框；每个框贴一张同款牌图当标签。框一出现基本就到第三帧了，
@@ -472,6 +478,70 @@ test("横屏：倾斜过 15° 才自动切、手动按钮随时能改、下次�
   await expect(p.getByTestId("camera-sheet")).toHaveCount(0);
   await p.getByRole("button", { name: /开始拍/ }).click();
   await expect(p.getByTestId("camera-chrome")).toHaveAttribute("data-rotation", "90");
+  await ctx.close();
+});
+
+test("放弃取景：13 张时直说缺什么、不出倒计时；关掉后上报摘要与整幅画面的采样帧", async ({
+  browser,
+}) => {
+  const ctx = await newContext(browser, { viewport: { width: 400, height: 800 } });
+  const p = await ctx.newPage();
+  // 恒定 13 张（去掉了和张）的假检测器：永远凑不满 14 张，也就永远不会定格
+  await p.route("**/riichi/models/*.onnx", (route) =>
+    route.fulfill({ path: DETECTOR_13, contentType: "application/octet-stream" }),
+  );
+  const summaries: Record<string, unknown>[] = [];
+  const samples: { url: string; status: number | undefined }[] = [];
+  p.on("request", (r) => {
+    if (r.method() === "POST" && r.url().endsWith("/api/recognition-sessions"))
+      summaries.push(r.postDataJSON() as Record<string, unknown>);
+  });
+  p.on("response", (res) => {
+    const r = res.request();
+    if (
+      r.method() === "POST" &&
+      /\/api\/recognition-sessions\/[0-9a-f]{16}\/samples\/\d$/.test(r.url())
+    )
+      samples.push({ url: r.url(), status: res.status() });
+  });
+
+  await p.goto("/calc");
+  await p.getByRole("button", { name: /开始拍/ }).click();
+  const sheet = p.getByTestId("camera-sheet");
+  await expect(sheet.getByText("拍下或放弃时的整幅画面会用来改进识别")).toBeVisible();
+  // 取景期间逐帧看倒计时有没有出现过：票数一直为 0，它不该露面
+  const countdownSeen = p.evaluate(
+    () =>
+      new Promise<boolean>((resolve) => {
+        let seen = false;
+        const tick = () => {
+          seen ||= document.querySelector('[data-testid="camera-countdown"]') !== null;
+          if (!document.querySelector('[data-testid="camera-sheet"]')) return resolve(seen);
+          requestAnimationFrame(tick);
+        };
+        tick();
+      }),
+  );
+  await expect(sheet.getByTestId("camera-reason")).toHaveText(
+    "只认出 13 张：和了牌横放在手牌一端了吗？",
+    { timeout: 30_000 },
+  );
+  await expect(sheet.getByTestId("camera-progress")).toHaveText(/^13\/14 · 0\/3$/);
+  // 多等一个采样间隔：首帧之后还会再采一帧
+  await p.waitForTimeout(1_600);
+  await sheet.getByRole("button", { name: "关闭取景" }).click();
+  await expect(sheet).toHaveCount(0);
+  expect(await countdownSeen).toBe(false);
+
+  await expect.poll(() => summaries.length, { timeout: 15_000 }).toBe(1);
+  const summary = summaries[0]!;
+  expect(summary).toMatchObject({ source: "calc", outcome: "abandoned" });
+  expect(summary.id).toMatch(/^[0-9a-f]{16}$/);
+  // 采样帧挂在同一个会话 id 下，序号从 0 连续，服务端全部收下
+  await expect.poll(() => samples.length, { timeout: 15_000 }).toBeGreaterThanOrEqual(2);
+  const sorted = samples.map((s) => s.url).sort();
+  expect(sorted[0]).toContain(`/api/recognition-sessions/${String(summary.id)}/samples/0`);
+  expect(samples.every((s) => s.status === 201)).toBe(true);
   await ctx.close();
 });
 

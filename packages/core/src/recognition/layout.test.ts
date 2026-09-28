@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AKA, TILE } from "../types/tiles";
 import { RECOGNITION_CLASSES, tileOfClassId } from "./classes";
-import { layoutHand } from "./layout";
+import { countMessage, layoutHand } from "./layout";
 import type { Detection } from "./types";
 
 const W = 40;
@@ -472,7 +472,31 @@ describe("layoutHand", () => {
     const { hand: h, warnings } = layoutHand(pon.dets);
     expect(h.closed).toEqual([]);
     expect(h.melds).toEqual([{ open: true, tiles: [TILE.M3, TILE.M3, TILE.M3] }]);
-    expect(warnings.map((w) => w.code)).toEqual(["bad_group", "count"]);
+    expect(warnings.map((w) => w.code)).toEqual(["count"]);
+  });
+
+  it("张数不对只报 count，文案说该怎么办：13 张问和张横放、少了问遮挡、多了问牌河", () => {
+    const messages = (tiles: string[]) =>
+      layoutHand(row(tiles, 10, 200).dets).warnings.filter((w) => w.severity === "blocking");
+    // 忘了把和张横放进来：13 张，暗牌段不成 3n+2 但不再另报 bad_group
+    expect(messages(CLOSED13)).toEqual([
+      { code: "count", severity: "blocking", message: "只认出 13 张：和了牌横放在手牌一端了吗？" },
+    ]);
+    expect(messages([...CLOSED13.slice(0, 11), "9m~"])[0]!.message).toBe(
+      "只认出 12 张，还差 2 张：有牌被挡住或拍出画面了吗？",
+    );
+    expect(countMessage(15)).toBe("认出 15 张，多了 1 张：牌河或牌山离手牌太近了吗？");
+  });
+
+  it("合计 14 张但暗牌段里夹着牌背：仍然 blocking（bad_group），闸门不放松", () => {
+    // 牌背夹在拆不开的段里（这里多一张横放）才会走到兜底、整段当暗牌；能拆开的牌背会被当作间隔丢掉
+    const tiles = ["1m", "2m", "3m", "back", "4p~", ...CLOSED13.slice(4), "9m~"];
+    const { hand: h, warnings } = layoutHand(row(tiles, 10, 200).dets);
+    expect(h.closed).toHaveLength(14);
+    const blocking = warnings.filter((w) => w.severity === "blocking");
+    expect(blocking.map((w) => [w.code, w.message])).toEqual([
+      ["bad_group", "手牌里夹着牌背，暗牌凑不成形"],
+    ]);
   });
 
   it("永不抛错、有界耗时：对抗连排（300 张同种牌每三张一横）与随机/退化框", () => {
@@ -566,7 +590,8 @@ describe("layoutHand", () => {
     // 每个 code 都要被下面的场景覆盖到，漏一个就说明清单和实现对不上
     const scenes: Detection[][] = [
       [],
-      row([...CLOSED13.slice(0, 11), "9m~"], 10, 200).dets, // count + bad_group
+      row([...CLOSED13.slice(0, 11), "9m~"], 10, 200).dets, // count
+      row(["1m", "2m", "3m", "back", "4p~", ...CLOSED13.slice(4), "9m~"], 10, 200).dets, // bad_group
       (() => {
         const d = row([...CLOSED13, "9m~"], 10, 200).dets;
         return [...d, { ...det("8p", 120, 120), box: [120, 120, 140, 176] } as Detection];

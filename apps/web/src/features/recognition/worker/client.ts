@@ -1,10 +1,13 @@
 import { RECOGNITION_MODEL } from "../modelUrl";
 import { loadBytes, type LoadProgress } from "./bytes";
 import type { Rotation } from "../camera/orientation/upright";
-import type { FrameResult, FromWorker, Grabbed, ToWorker } from "./protocol";
+import { SAMPLE_JPEG_QUALITY } from "@riichi/core";
+import type { FrameResult, FromWorker, Grabbed, Sampled, ToWorker } from "./protocol";
 
 /** 定格帧编码成 JPEG 的质量，与既有的上传照片一致 */
 const JPEG_QUALITY = 0.85;
+/** 关掉取景页时，在途的采样最多再等这么久才销毁线程（界面不等，立刻关） */
+const DRAIN_MS = 1000;
 
 export interface Detector {
   /**
@@ -14,6 +17,11 @@ export interface Detector {
   infer(bitmap: ImageBitmap, view: "still" | { rotation: Rotation; known: boolean }): number;
   /** 取 Worker 手上最近跑完的那一帧：收紧到手牌的 JPEG，连同同一帧的检测框与识别结果 */
   grab(): Promise<Grabbed | null>;
+  /**
+   * 采样 frameId 那一帧的整幅画面；它已被新帧换掉、编码失败或线程关了都是 null。
+   * 与 grab 各走各的：采样在途时定格照样能取，互不顶掉。
+   */
+  sample(frameId: number): Promise<Sampled | null>;
   /** 一帧跑完；r 为 null 表示它被背压丢掉了，调用方据此复位自己的闸门 */
   onResult(fn: (r: FrameResult | null) => void): () => void;
   /** ready 之后才发生的失败（会话崩了、推理抛错）；否则界面会一直显示正常 */
@@ -48,6 +56,16 @@ function spawn(modelId: string, imgsz: number, onProgress?: LoadProgress): Promi
     const results = new Set<(r: FrameResult | null) => void>();
     const errors = new Set<(message: string) => void>();
     let grabbing: ((v: Grabbed | null) => void) | null = null;
+    /** 在途的采样，按 frameId 对应回包 */
+    const sampling = new Map<number, (v: Sampled | null) => void>();
+    const settleSample = (id: number, v: Sampled | null) => {
+      sampling.get(id)?.(v);
+      sampling.delete(id);
+    };
+    const dropSamples = () => {
+      sampling.forEach((resolve) => resolve(null));
+      sampling.clear();
+    };
     let frameId = 0;
     let dead: string | null = null;
 
@@ -57,6 +75,7 @@ function spawn(modelId: string, imgsz: number, onProgress?: LoadProgress): Promi
         dead = message;
         grabbing?.(null);
         grabbing = null;
+        dropSamples();
         worker.terminate();
         release();
         // ready 之后 reject 是空操作，所以失败必须另有出口，否则取景页照旧像正常工作一样
@@ -84,6 +103,10 @@ function spawn(modelId: string, imgsz: number, onProgress?: LoadProgress): Promi
             grabbing?.(null);
             grabbing = null;
             return;
+          case "sampled":
+            return settleSample(msg.frameId, msg);
+          case "sample-miss":
+            return settleSample(msg.frameId, null);
         }
       };
       // **两份字节都只能克隆，不能转移**：它们同属 bytes.ts 里那个永不清空的下载缓存，
@@ -131,6 +154,16 @@ function spawn(modelId: string, imgsz: number, onProgress?: LoadProgress): Promi
           worker.postMessage(msg);
         });
       },
+      sample(id) {
+        if (dead) return Promise.resolve(null);
+        // 同一帧重复点名：前一个先结掉，免得它的 Promise 永远挂着
+        settleSample(id, null);
+        return new Promise((resolve) => {
+          sampling.set(id, resolve);
+          const msg: ToWorker = { type: "sample", frameId: id, quality: SAMPLE_JPEG_QUALITY };
+          worker.postMessage(msg);
+        });
+      },
       onResult(fn) {
         results.add(fn);
         return () => results.delete(fn);
@@ -146,6 +179,7 @@ function spawn(modelId: string, imgsz: number, onProgress?: LoadProgress): Promi
         errors.clear();
         grabbing?.(null);
         grabbing = null;
+        dropSamples();
         worker.terminate();
         release();
       },
@@ -166,10 +200,25 @@ export function openDetector(onProgress?: LoadProgress): Promise<Detector> {
   return handle;
 }
 
-/** 关掉识别线程（取景页卸载时调用）；还在建的那一轮见到代次变了会自行收摊。 */
-export function closeDetector(): void {
+/**
+ * 关掉识别线程（取景页卸载时调用）；还在建的那一轮见到代次变了会自行收摊。
+ * 单例立刻让出（马上再打开会建新线程），旧线程等 after（在途的采样）结束、最多 DRAIN_MS 再销毁：
+ * 采样编码要几十毫秒，立刻 terminate 会把「放弃前最后一帧」这张最有用的照片丢掉。
+ */
+export function closeDetector(after?: Promise<unknown>): void {
   const current = handle;
   handle = null;
   epoch += 1;
-  void current?.then((d) => d.close()).catch(() => undefined);
+  const drained = after
+    ? Promise.race([
+        after.catch(() => undefined),
+        new Promise((resolve) => setTimeout(resolve, DRAIN_MS)),
+      ])
+    : Promise.resolve();
+  void current
+    ?.then(async (d) => {
+      await drained;
+      d.close();
+    })
+    .catch(() => undefined);
 }

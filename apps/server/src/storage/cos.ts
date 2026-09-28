@@ -1,5 +1,5 @@
 import COS from "cos-nodejs-sdk-v5";
-import { assertObjectKey, type ObjectStore } from "./index";
+import { assertObjectKey, isPublicKey, type ObjectStore } from "./index";
 
 export interface CosConfig {
   secretId: string;
@@ -23,6 +23,8 @@ export interface CosClient {
     Body: Buffer;
     ContentType: string;
     CacheControl: string;
+    /** 对象 ACL；不给则继承桶（本项目的桶是公有读） */
+    ACL?: "private";
   }): Promise<unknown>;
   deleteObject(params: { Bucket: string; Region: string; Key: string }): Promise<unknown>;
 }
@@ -52,13 +54,18 @@ export class CosStore implements ObjectStore {
 
   async put(key: string, bytes: Uint8Array, contentType: string): Promise<string> {
     assertObjectKey(key);
+    const secret = !isPublicKey(key);
     await this.client.putObject({
       Bucket: this.config.bucket,
       Region: this.config.region,
       Key: this.prefix + key,
       Body: Buffer.from(bytes),
       ContentType: contentType,
-      CacheControl: "public, max-age=31536000, immutable",
+      // 私有对象不许 CDN 与中间代理缓存：public 的缓存头会让 CDN 把它当公开资源留存
+      CacheControl: secret
+        ? "private, max-age=31536000, immutable"
+        : "public, max-age=31536000, immutable",
+      ...(secret ? { ACL: "private" as const } : {}),
     });
     return `${this.cdn}/${this.prefix}${key}`;
   }

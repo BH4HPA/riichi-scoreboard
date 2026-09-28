@@ -26,8 +26,14 @@ export function Notice() {
   );
 }
 
-export function ConnectionBadge() {
+/**
+ * 连接状态徽标，连上时不显示。
+ * `console`：主控台远看用大一号字，自动重连期间注明不用刷新——没人拿着它，断线时最怕有人去点刷新丢了现场；
+ * 手机底栏放不下这句，保持原样。
+ */
+export function ConnectionBadge({ variant = "phone" }: { variant?: "phone" | "console" }) {
   const status = useRoomStore((s) => s.status);
+  const hadRoom = useRoomStore((s) => s.room !== null);
   if (status === "open") return null;
   const text = {
     idle: "未连接",
@@ -35,9 +41,18 @@ export function ConnectionBadge() {
     reconnecting: "重新连接中…",
     closed: "连接已关闭",
   }[status];
+  // 看门狗掉线后的首次重连也是 connecting（退避计数为 0），同样是自动的；首次连房（还没拿到过房间）不是重连
+  const auto =
+    variant === "console" && (status === "reconnecting" || (status === "connecting" && hadRoom));
   return (
-    <span className="shrink-0 whitespace-nowrap rounded-md bg-neg/15 px-2 py-0.5 text-xs text-neg">
+    <span
+      className={cn(
+        "shrink-0 whitespace-nowrap rounded-md bg-neg/15 text-neg",
+        variant === "console" ? "px-2.5 py-1 text-sm" : "px-2 py-0.5 text-xs",
+      )}
+    >
       {text}
+      {auto && "（自动重连，无需刷新）"}
     </span>
   );
 }

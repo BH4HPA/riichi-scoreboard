@@ -143,9 +143,8 @@ export function applyRecognized(
       uraIndicators,
       riichi,
     },
-    evaluated: null,
     riichiAuto,
-    // 新的一次识别：回到确认态，之前点过的「改牌」不再生效
+    // 新的一次识别：回到确认态，之前点过的「人工调整」不再生效
     editing: false,
     uraStash: [],
     recognition: {

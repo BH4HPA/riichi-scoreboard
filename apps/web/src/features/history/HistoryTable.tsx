@@ -28,7 +28,7 @@ function WinHands({ entry, size }: { entry: HistoryEntry; size: TileSize }) {
       {shown.map((w) => (
         <div key={w.winner} className="space-y-1">
           {shown.length > 1 && (
-            <div className="text-[11px] text-muted">{entry.names[w.winner]}</div>
+            <div className="text-[0.6875rem] text-muted">{entry.names[w.winner]}</div>
           )}
           <HandStrip
             closed={w.hand!.closed}

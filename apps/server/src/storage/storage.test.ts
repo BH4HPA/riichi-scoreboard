@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { CosStore, type CosClient } from "./cos";
+import { isPublicKey } from "./index";
 import { LocalStore } from "./local";
 
 describe("LocalStore", () => {
@@ -17,6 +18,17 @@ describe("LocalStore", () => {
     expect(() => store.resolve("../etc/passwd")).toThrow(/非法/);
     expect(() => store.resolve("avatars/../../x")).toThrow(/非法/);
     expect(() => store.resolve("/abs")).toThrow(/非法/);
+  });
+});
+
+describe("isPublicKey", () => {
+  it("白名单：只有头像公开，识别照片与任何新前缀默认私有；大小写变体也不放行", () => {
+    expect(isPublicKey("avatars/p1/a.jpg")).toBe(true);
+    expect(isPublicKey("hands/p1/a.jpg")).toBe(false);
+    expect(isPublicKey("samples/p1/a.jpg")).toBe(false);
+    expect(isPublicKey("HANDS/p1/a.jpg")).toBe(false);
+    expect(isPublicKey("Avatars/p1/a.jpg")).toBe(false);
+    expect(isPublicKey("hands/avatars/a.jpg")).toBe(false);
   });
 });
 
@@ -65,5 +77,37 @@ describe("CosStore", () => {
         { Bucket: "example-static-123", Region: "ap-shanghai", Key: "riichi/avatars/p1/a.jpg" },
       ],
     ]);
+  });
+
+  it("识别照片以私有 ACL 上传，缓存头也不许共享缓存；头像不带 ACL（继承桶的公有读）", async () => {
+    const puts: Parameters<CosClient["putObject"]>[0][] = [];
+    const fake: CosClient = {
+      putObject: (p) => {
+        puts.push(p);
+        return Promise.resolve({});
+      },
+      deleteObject: () => Promise.resolve({}),
+    };
+    const store = new CosStore(
+      {
+        secretId: "id",
+        secretKey: "key",
+        bucket: "b",
+        region: "r",
+        endpoint: null,
+        cdnDomain: "https://static.example.com",
+        keyPrefix: "",
+      },
+      fake,
+    );
+    await store.put("hands/p1/a.jpg", new Uint8Array([1]), "image/jpeg");
+    await store.put("samples/p1/b.jpg", new Uint8Array([1]), "image/jpeg");
+    await store.put("avatars/p1/c.jpg", new Uint8Array([1]), "image/jpeg");
+    expect(puts.map((p) => [p.Key, p.ACL, p.CacheControl.split(",")[0]])).toEqual([
+      ["hands/p1/a.jpg", "private", "private"],
+      ["samples/p1/b.jpg", "private", "private"],
+      ["avatars/p1/c.jpg", undefined, "public"],
+    ]);
+    expect(puts[2]).not.toHaveProperty("ACL");
   });
 });

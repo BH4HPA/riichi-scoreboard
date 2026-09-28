@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Pencil } from "lucide-react";
+import { Button } from "@/ui/button";
 import type { EvaluatedHand, HandInput, RoomRules, Tile } from "@riichi/core";
 import { withoutLoc, type TileLoc } from "@/features/hand/tileLoc";
 import { confirmable, withHandEdit, type ValueDraft } from "../valueDraft";
@@ -9,7 +11,7 @@ import { TileReplaceSheet } from "./TileReplaceSheet";
 
 /**
  * 牌面页的装配：识别结果自洽就收起键盘只展示牌（确认态），否则展开全键盘（编辑态）。
- * 点过「改牌」就一直留在编辑态，直到下一次识别把 recognition 换掉：用户的显式选择优先于自动判定。
+ * 点过「人工调整」就一直留在编辑态，直到下一次识别把 recognition 换掉：用户的显式选择优先于自动判定。
  */
 export function HandEditor({
   draft,
@@ -29,6 +31,7 @@ export function HandEditor({
   evaluated: EvaluatedHand | null;
   evaluating: boolean;
   evalError: string | null;
+  /** 「拍照识别 / 重新拍照」；没有发布模型或不在房间里（算点数页另有重新拍）时为空 */
   camera: React.ReactNode;
   /** 算点数页核对阶段不算番：不显示番符与役种那一块，免得永远停在「计算中…」 */
   showValue?: boolean;
@@ -42,13 +45,15 @@ export function HandEditor({
   const setHand = (next: HandInput, clear?: TileLoc) =>
     onChange((d) => ({
       ...withHandEdit(d, next),
-      evaluated: null,
       // 换完这一张就别再提示它了；增删牌会让下标失配，那时整批清掉（在 TileKeyboard 那条路上）
       recognition:
         d.recognition && clear
           ? { ...d.recognition, uncertain: withoutLoc(d.recognition.uncertain, clear) }
           : d.recognition,
     }));
+
+  /** 「人工调整」与指示牌空位共用：一直留在编辑态，直到下一次识别 */
+  const openKeyboard = () => onChange((d) => ({ ...d, editing: true }));
 
   if (!confirmable(draft)) {
     return (
@@ -59,7 +64,6 @@ export function HandEditor({
           onChange={(hand) =>
             onChange((d) => ({
               ...withHandEdit(d, hand),
-              evaluated: null,
               // 增删牌之后下标全错位，记号宁可全清也不能钉在别的牌上
               recognition: d.recognition ? { ...d.recognition, uncertain: [] } : null,
             }))
@@ -79,7 +83,13 @@ export function HandEditor({
 
   return (
     <>
-      {camera}
+      <div className={camera ? "grid grid-cols-2 gap-2" : undefined}>
+        {camera}
+        <Button variant="outline" className="w-full" onClick={openKeyboard}>
+          <Pencil className="mr-1 h-4 w-4" />
+          人工调整
+        </Button>
+      </div>
       <HandConfirm
         hand={draft.hand}
         rules={rules}
@@ -93,7 +103,7 @@ export function HandEditor({
         showValue={showValue}
         onHandChange={(next) => setHand(next)}
         onTileClick={setPicking}
-        onEdit={() => onChange((d) => ({ ...d, editing: true }))}
+        onAddDora={openKeyboard}
       />
       <TileReplaceSheet
         hand={draft.hand}

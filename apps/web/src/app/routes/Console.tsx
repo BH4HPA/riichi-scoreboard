@@ -4,11 +4,15 @@ import { Home, Wifi } from "lucide-react";
 import { isRoomKind, seatNames } from "@riichi/core";
 import { Button } from "@/ui/button";
 import { Notice } from "@/ui/notice";
-import { useMediaQuery, WIDE_CONSOLE_QUERY } from "@/lib/useMediaQuery";
+import { useMediaQuery } from "@/lib/useMediaQuery";
 import { useRoomStore } from "@/ws/store";
 import { SocketContext, useRoomConnection } from "@/ws/useRoom";
 import { forgetConsoleRoom } from "@/features/console/consoleRooms";
 import { useConsoleRoom } from "@/features/console/useConsoleRoom";
+import { useWakeLock } from "@/features/console/useWakeLock";
+import { ScaleControl } from "@/features/console/scale/ScaleControl";
+import { useConsoleScale } from "@/features/console/scale/useConsoleScale";
+import { wideConsoleQuery } from "@/features/console/split/wideQuery";
 import { ConsoleGame } from "@/features/console/ConsoleGame";
 import { TenConsoleGame } from "@/features/ten/TenConsoleGame";
 import { DissolveButton } from "@/features/console/DissolveButton";
@@ -33,7 +37,10 @@ export function Console() {
   const room = useRoomStore((s) => s.room);
   const intents = useRoomStore((s) => s.intents);
   const closedReason = useRoomStore((s) => s.closedReason);
-  const wide = useMediaQuery(WIDE_CONSOLE_QUERY);
+  const scale = useConsoleScale();
+  // 双栏门槛随界面大小变：放大后两栏的最小宽度也跟着变大
+  const wide = useMediaQuery(wideConsoleQuery(scale));
+  useWakeLock(room !== null);
 
   // 房间被解散（本机或其它端发起）：回首页，由人决定接下来开哪种房间——不再自动建一个新的
   useEffect(() => {
@@ -70,6 +77,7 @@ export function Console() {
             wide={wide}
             extraActions={
               <>
+                <ScaleControl />
                 {/* 房型在首页选：没有这个出口，进了四人主控台想改开二人房只能手改地址 */}
                 <Button asChild size="lg" variant="ghost">
                   <Link to="/">
